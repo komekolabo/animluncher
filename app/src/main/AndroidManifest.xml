@@ -1,0 +1,21 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- La "carte d'identité" de l'app : son nom, ses écrans, et plus tard ses autorisations. -->
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+
+    <application
+        android:label="AnimLauncher"
+        android:theme="@android:style/Theme.Material.NoActionBar">
+
+        <!-- L'écran principal. exported="true" + le bloc intent-filter
+             = "mets une icône de cette app dans le tiroir d'applications". -->
+        <activity
+            android:name=".MainActivity"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+        </activity>
+
+    </application>
+</manifest>
