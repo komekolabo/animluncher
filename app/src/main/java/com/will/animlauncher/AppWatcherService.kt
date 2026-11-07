@@ -3,6 +3,8 @@ package com.will.animlauncher
 import android.accessibilityservice.AccessibilityService
 import android.content.Context
 import android.graphics.PixelFormat
+import android.os.Handler
+import android.os.Looper
 import android.view.WindowManager
 import android.view.accessibility.AccessibilityEvent
 import java.text.SimpleDateFormat
@@ -14,9 +16,10 @@ import java.util.Locale
 class AppWatcherService : AccessibilityService() {
 
     private var derniereApp: String? = null
-
-    // L'animation en cours, s'il y en a une (pour pouvoir l'enlever).
     private var vueEnCours: AnimationView? = null
+
+    // Un "Handler" permet de programmer une action pour plus tard.
+    private val minuteur = Handler(Looper.getMainLooper())
 
     // LE TABLEAU QUI ASSOCIE CHAQUE APP À SON ANIMATION.
     // Pour ajouter une app : une ligne "nom technique" to AnimationView.Style.XXX
@@ -33,37 +36,36 @@ class AppWatcherService : AccessibilityService() {
         if (app == packageName || app == "com.android.systemui") return
 
         noter(app)
-
-        // Si l'app est dans notre tableau, on joue son animation.
-        // "?.let" : exécute le bloc seulement si on a trouvé un style.
         animations[app]?.let { style -> afficher(style) }
     }
 
-    // Pose une fenêtre transparente par-dessus TOUT l'écran et y joue l'animation.
+    // Pose une fenêtre transparente par-dessus tout l'écran et y joue l'animation.
     private fun afficher(style: AnimationView.Style) {
         val gestionnaire = getSystemService(Context.WINDOW_SERVICE) as WindowManager
-
-        // S'il reste une ancienne animation, on l'enlève d'abord.
-        retirer(gestionnaire)
+        retirer(gestionnaire)   // enlève une éventuelle ancienne animation
 
         val vue = AnimationView(this, style)
         val reglages = WindowManager.LayoutParams(
-            WindowManager.LayoutParams.MATCH_PARENT,   // largeur : tout l'écran
-            WindowManager.LayoutParams.MATCH_PARENT,   // hauteur : tout l'écran
-            // Type réservé aux services d'accessibilité : passe au-dessus de toutes les apps.
+            WindowManager.LayoutParams.MATCH_PARENT,
+            WindowManager.LayoutParams.MATCH_PARENT,
             WindowManager.LayoutParams.TYPE_ACCESSIBILITY_OVERLAY,
-            // NOT_TOUCHABLE : les doigts traversent l'animation, l'app reste utilisable.
-            // NOT_FOCUSABLE : le clavier reste à l'app en dessous.
             WindowManager.LayoutParams.FLAG_NOT_TOUCHABLE or
                 WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE or
-                WindowManager.LayoutParams.FLAG_LAYOUT_IN_SCREEN,
-            PixelFormat.TRANSLUCENT                    // fond transparent
+                WindowManager.LayoutParams.FLAG_LAYOUT_IN_SCREEN or
+                WindowManager.LayoutParams.FLAG_HARDWARE_ACCELERATED,
+            PixelFormat.TRANSLUCENT
         )
 
         try {
             gestionnaire.addView(vue, reglages)
             vueEnCours = vue
-            vue.jouer { retirer(gestionnaire) }   // à la fin, on enlève la fenêtre
+            vue.jouer { if (vueEnCours === vue) retirer(gestionnaire) }
+
+            // FILET DE SÉCURITÉ : quoi qu'il arrive, on retire l'animation
+            // au bout de 0,8 seconde. Plus jamais de rond bloqué à l'écran.
+            minuteur.postDelayed({
+                if (vueEnCours === vue) retirer(gestionnaire)
+            }, 800)
         } catch (e: Exception) {
             noter("Erreur animation : ${e.message}")
         }
@@ -76,7 +78,7 @@ class AppWatcherService : AccessibilityService() {
         vueEnCours = null
     }
 
-    // Note l'app dans le "carnet" affiché par l'écran principal.
+    // Note une ligne dans le "carnet" affiché par l'écran principal.
     private fun noter(texte: String) {
         val carnet = getSharedPreferences(CARNET, Context.MODE_PRIVATE)
         val heure = SimpleDateFormat("HH:mm:ss", Locale.FRANCE).format(Date())
