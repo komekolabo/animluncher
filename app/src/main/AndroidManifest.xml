@@ -2,11 +2,24 @@
 <!-- La "carte d'identité" de l'app : son nom, ses écrans, ses services. -->
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
 
+    <!-- Depuis Android 11, une app ne "voit" pas les autres apps par défaut.
+         Ici on demande à voir : les apps qui ont une icône (LAUNCHER)
+         et l'écran d'accueil (HOME). Rien de plus. -->
+    <queries>
+        <intent>
+            <action android:name="android.intent.action.MAIN" />
+            <category android:name="android.intent.category.LAUNCHER" />
+        </intent>
+        <intent>
+            <action android:name="android.intent.action.MAIN" />
+            <category android:name="android.intent.category.HOME" />
+        </intent>
+    </queries>
+
     <application
         android:label="AnimLauncher"
         android:theme="@android:style/Theme.Material.NoActionBar">
 
-        <!-- L'écran principal, avec son icône dans le tiroir d'applications. -->
         <activity
             android:name=".MainActivity"
             android:exported="true">
@@ -30,8 +43,7 @@
                 android:resource="@xml/accessibility_config" />
         </service>
 
-        <!-- Le KILL SWITCH : un bouton dans le volet des réglages rapides.
-             La permission BIND_QUICK_SETTINGS_TILE garantit que seul Android l'utilise. -->
+        <!-- Le KILL SWITCH : un bouton dans le volet des réglages rapides. -->
         <service
             android:name=".InterrupteurTile"
             android:exported="true"

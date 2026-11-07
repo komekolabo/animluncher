@@ -2,9 +2,11 @@ package com.will.animlauncher
 
 import android.accessibilityservice.AccessibilityService
 import android.content.Context
+import android.content.Intent
 import android.graphics.PixelFormat
 import android.os.Handler
 import android.os.Looper
+import android.os.SystemClock
 import android.view.WindowManager
 import android.view.accessibility.AccessibilityEvent
 import java.text.SimpleDateFormat
@@ -15,38 +17,56 @@ import java.util.Locale
 // et qui joue l'animation correspondante.
 class AppWatcherService : AccessibilityService() {
 
+    // La dernière VRAIE app au premier plan (pas le clavier ni les popups).
     private var derniereApp: String? = null
     private var vueEnCours: AnimationView? = null
-
-    // Un "Handler" permet de programmer une action pour plus tard.
     private val minuteur = Handler(Looper.getMainLooper())
 
     // LE TABLEAU QUI ASSOCIE CHAQUE APP À SON ANIMATION.
-    // Pour ajouter une app : une ligne "nom technique" to AnimationView.Style.XXX
     private val animations = mapOf(
         "com.anthropic.claude" to AnimationView.Style.ECLAIR,
         "com.google.android.googlequicksearchbox" to AnimationView.Style.ONDE
     )
 
+    // Apps qui surgissent toutes seules et qu'on ignore (Samsung Wallet).
+    private val ignorees = setOf("com.samsung.android.spay")
+
+    // Le nom de l'écran d'accueil du téléphone, demandé à Android.
+    // "by lazy" : calculé une seule fois, la première fois qu'on en a besoin.
+    private val ecranAccueil: String? by lazy {
+        val intention = Intent(Intent.ACTION_MAIN).addCategory(Intent.CATEGORY_HOME)
+        packageManager.resolveActivity(intention, 0)?.activityInfo?.packageName
+    }
+
     override fun onAccessibilityEvent(event: AccessibilityEvent) {
         if (event.eventType != AccessibilityEvent.TYPE_WINDOW_STATE_CHANGED) return
         val app = event.packageName?.toString() ?: return
-        if (app == derniereApp) return
-        derniereApp = app
-        if (app == packageName || app == "com.android.systemui") return
+        if (app == packageName || app in ignorees) return
 
+        // FILTRE 1 : on ignore tout ce qui n'est pas une vraie app.
+        // Une vraie app a une icône, donc une "intention de lancement".
+        // Le clavier, la barre système et les popups n'en ont pas.
+        val estVraieApp = app == ecranAccueil ||
+            packageManager.getLaunchIntentForPackage(app) != null
+        if (!estVraieApp) return
+
+        if (app == derniereApp) return   // toujours la même app : rien à faire
+        val precedente = derniereApp
+        derniereApp = app
         noter(app)
 
-        // KILL SWITCH : si les animations sont coupées, on s'arrête là.
-        if (!Reglages.actif(this)) return
+        if (!Reglages.actif(this)) return               // kill switch
+        val style = animations[app] ?: return           // pas dans le tableau
 
-        animations[app]?.let { style -> afficher(style) }
+        // FILTRE 2 : seulement si on arrive de l'écran d'accueil (appui sur l'icône).
+        if (precedente != ecranAccueil) return
+
+        afficher(style)
     }
 
-    // Pose une fenêtre transparente par-dessus tout l'écran et y joue l'animation.
     private fun afficher(style: AnimationView.Style) {
         val gestionnaire = getSystemService(Context.WINDOW_SERVICE) as WindowManager
-        retirer(gestionnaire)   // enlève une éventuelle ancienne animation
+        retirer(gestionnaire, "nouvelle animation")
 
         val vue = AnimationView(this, style)
         val reglages = WindowManager.LayoutParams(
@@ -63,26 +83,24 @@ class AppWatcherService : AccessibilityService() {
         try {
             gestionnaire.addView(vue, reglages)
             vueEnCours = vue
-            vue.jouer { if (vueEnCours === vue) retirer(gestionnaire) }
-
-            // FILET DE SÉCURITÉ : quoi qu'il arrive, on retire l'animation
-            // au bout de 0,8 seconde. Plus jamais de rond bloqué à l'écran.
+            vue.jouer { if (vueEnCours === vue) retirer(gestionnaire, "fin normale") }
             minuteur.postDelayed({
-                if (vueEnCours === vue) retirer(gestionnaire)
+                if (vueEnCours === vue) retirer(gestionnaire, "filet de sécurité")
             }, 800)
         } catch (e: Exception) {
             noter("Erreur animation : ${e.message}")
         }
     }
 
-    private fun retirer(gestionnaire: WindowManager) {
-        vueEnCours?.let {
-            try { gestionnaire.removeView(it) } catch (_: Exception) {}
-        }
+    // Retire l'animation et écrit le rapport du MOUCHARD dans le carnet.
+    private fun retirer(gestionnaire: WindowManager, raison: String) {
+        val vue = vueEnCours ?: return
+        try { gestionnaire.removeView(vue) } catch (_: Exception) {}
         vueEnCours = null
+        val ms = SystemClock.uptimeMillis() - vue.creeeA
+        noter("  ↳ ${vue.images} images, ${ms} ms, $raison")
     }
 
-    // Note une ligne dans le "carnet" affiché par l'écran principal.
     private fun noter(texte: String) {
         val carnet = getSharedPreferences(CARNET, Context.MODE_PRIVATE)
         val heure = SimpleDateFormat("HH:mm:ss", Locale.FRANCE).format(Date())

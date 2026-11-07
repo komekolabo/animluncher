@@ -16,17 +16,15 @@ class AnimationView(context: Context, private val style: Style) : View(context) 
 
     enum class Style { ECLAIR, ONDE }
 
-    // Durée de l'animation en millisecondes.
-    private val duree = 450L
-
-    // L'heure à laquelle la première image a été dessinée (0 = pas encore commencé).
-    private var heureDebut = 0L
-
-    // Avancement de l'animation : 0 = début, 1 = fin.
-    private var progres = 0f
-
-    // Ce qu'il faut faire quand c'est fini (retirer la fenêtre).
+    private val duree = 450L          // durée en millisecondes
+    private var heureDebut = 0L       // heure de la 1re image (0 = pas encore)
+    private var progres = 0f          // 0 = début, 1 = fin
     private var quandFini: (() -> Unit)? = null
+
+    // MOUCHARD : combien d'images ont été dessinées, et quand la vue a été créée.
+    var images = 0
+        private set                    // lisible de l'extérieur, modifiable seulement ici
+    val creeeA = SystemClock.uptimeMillis()
 
     private val pinceau = Paint(Paint.ANTI_ALIAS_FLAG).apply {
         strokeCap = Paint.Cap.ROUND
@@ -35,21 +33,17 @@ class AnimationView(context: Context, private val style: Style) : View(context) 
     fun jouer(fin: () -> Unit) {
         quandFini = fin
         heureDebut = 0L
-        postInvalidateOnAnimation()   // "dessine-toi dès la prochaine image"
+        postInvalidateOnAnimation()
     }
 
-    // Appelée par Android à chaque image.
-    // NOUVELLE MÉTHODE : au lieu d'attendre qu'un outil nous donne l'avancement,
-    // on regarde l'horloge nous-mêmes et on calcule où on en est.
-    // Même si une image saute, l'animation reste à l'heure et finit toujours.
+    // Appelée par Android à chaque image. On calcule l'avancement avec l'horloge.
     override fun onDraw(canvas: Canvas) {
+        images++
         val maintenant = SystemClock.uptimeMillis()
         if (heureDebut == 0L) heureDebut = maintenant
 
-        // t va de 0 à 1 selon le temps écoulé.
         val t = ((maintenant - heureDebut).toFloat() / duree).coerceIn(0f, 1f)
-        // On "décélère" : rapide au début, plus lent à la fin.
-        progres = 1f - (1f - t) * (1f - t)
+        progres = 1f - (1f - t) * (1f - t)   // décélération
 
         val cx = width / 2f
         val cy = height / 2f
@@ -60,11 +54,11 @@ class AnimationView(context: Context, private val style: Style) : View(context) 
         }
 
         if (t < 1f) {
-            postInvalidateOnAnimation()   // pas fini : on redemande une image
+            postInvalidateOnAnimation()
         } else {
             val fin = quandFini
             quandFini = null
-            post { fin?.invoke() }        // fini : on prévient le service
+            post { fin?.invoke() }
         }
     }
 
@@ -72,13 +66,10 @@ class AnimationView(context: Context, private val style: Style) : View(context) 
     private fun dessinerEclair(canvas: Canvas, cx: Float, cy: Float, rayonMax: Float) {
         val opacite = ((1f - progres) * 255).toInt()
 
-        // Léger voile orange sur tout l'écran, qui s'efface.
         pinceau.style = Paint.Style.FILL
         pinceau.color = Color.argb((opacite * 0.25f).toInt(), 217, 119, 87)
         canvas.drawRect(0f, 0f, width.toFloat(), height.toFloat(), pinceau)
 
-        // Les 12 rayons (un tous les 30°). Ils ont déjà une petite longueur
-        // dès la première image, pour ne plus former un simple point.
         pinceau.style = Paint.Style.STROKE
         pinceau.color = Color.argb(opacite, 255, 140, 100)
         pinceau.strokeWidth = 4f + 18f * (1f - progres)
@@ -97,20 +88,18 @@ class AnimationView(context: Context, private val style: Style) : View(context) 
     // Google : 4 anneaux de couleur qui s'élargissent l'un après l'autre.
     private fun dessinerOnde(canvas: Canvas, cx: Float, cy: Float, rayonMax: Float) {
         val couleurs = listOf(
-            Color.rgb(66, 133, 244),   // bleu
-            Color.rgb(234, 67, 53),    // rouge
-            Color.rgb(251, 188, 5),    // jaune
-            Color.rgb(52, 168, 83)     // vert
+            Color.rgb(66, 133, 244),
+            Color.rgb(234, 67, 53),
+            Color.rgb(251, 188, 5),
+            Color.rgb(52, 168, 83)
         )
         pinceau.style = Paint.Style.STROKE
         for ((i, couleur) in couleurs.withIndex()) {
-            // Chaque anneau démarre un peu après le précédent.
             val p = (progres * 1.4f - i * 0.12f).coerceIn(0f, 1f)
             if (p <= 0f) continue
             pinceau.color = couleur
             pinceau.alpha = ((1f - p) * 255).toInt()
             pinceau.strokeWidth = 6f + 30f * (1f - p)
-            // Rayon minimum de 4 % pour qu'on voie l'anneau dès le départ.
             canvas.drawCircle(cx, cy, rayonMax * (0.04f + 0.96f * p), pinceau)
         }
     }
