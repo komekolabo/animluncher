@@ -36,6 +36,10 @@ class AppWatcherService : AccessibilityService() {
         if (app == packageName || app == "com.android.systemui") return
 
         noter(app)
+
+        // KILL SWITCH : si les animations sont coupées, on s'arrête là.
+        if (!Reglages.actif(this)) return
+
         animations[app]?.let { style -> afficher(style) }
     }
 
