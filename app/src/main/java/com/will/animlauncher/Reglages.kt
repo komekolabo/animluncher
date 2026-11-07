@@ -2,22 +2,24 @@ package com.will.animlauncher
 
 import android.content.Context
 
-// Un "object" = une boîte à outils unique, utilisable partout dans l'app.
-// Elle range les réglages dans le petit carnet du téléphone (SharedPreferences).
+// Une boîte à outils unique qui range les réglages dans le carnet du téléphone.
 object Reglages {
     private const val FICHIER = "reglages"
     private const val CLE_ACTIF = "animations_actives"
+    private const val CLE_DEMARRAGE = "seulement_demarrage"
 
-    // Les animations sont-elles activées ? (oui par défaut)
-    fun actif(contexte: Context): Boolean =
-        contexte.getSharedPreferences(FICHIER, Context.MODE_PRIVATE)
-            .getBoolean(CLE_ACTIF, true)
+    private fun carnet(c: Context) = c.getSharedPreferences(FICHIER, Context.MODE_PRIVATE)
 
-    fun definir(contexte: Context, valeur: Boolean) {
-        contexte.getSharedPreferences(FICHIER, Context.MODE_PRIVATE)
-            .edit().putBoolean(CLE_ACTIF, valeur).apply()
+    // KILL SWITCH : les animations sont-elles activées ? (oui par défaut)
+    fun actif(c: Context): Boolean = carnet(c).getBoolean(CLE_ACTIF, true)
+    fun definir(c: Context, valeur: Boolean) {
+        carnet(c).edit().putBoolean(CLE_ACTIF, valeur).apply()
     }
+    fun basculer(c: Context) = definir(c, !actif(c))
 
-    // Inverse l'état : activé -> désactivé, désactivé -> activé.
-    fun basculer(contexte: Context) = definir(contexte, !actif(contexte))
+    // MODE : animation seulement quand l'app démarre ? (non par défaut = à chaque fois)
+    fun seulementDemarrage(c: Context): Boolean = carnet(c).getBoolean(CLE_DEMARRAGE, false)
+    fun definirSeulementDemarrage(c: Context, valeur: Boolean) {
+        carnet(c).edit().putBoolean(CLE_DEMARRAGE, valeur).apply()
+    }
 }

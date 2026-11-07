@@ -21,22 +21,18 @@ class AppWatcherService : AccessibilityService() {
     private var vueEnCours: AnimationView? = null
     private val minuteur = Handler(Looper.getMainLooper())
 
-    // --- MESURES POUR DÉTECTER LES DÉMARRAGES ---
-    // Heure du dernier appui sur l'écran d'accueil (0 = aucun).
-    private var heureClicAccueil = 0L
-    // Les apps déjà ouvertes depuis que le service tourne (donc depuis l'allumage).
-    // "mutableSetOf" = un ensemble modifiable, sans doublons.
-    private val dejaOuvertes = mutableSetOf<String>()
-
     // LE TABLEAU QUI ASSOCIE CHAQUE APP À SON ANIMATION.
     private val animations = mapOf(
         "com.anthropic.claude" to AnimationView.Style.ECLAIR,
         "com.google.android.googlequicksearchbox" to AnimationView.Style.ONDE
     )
 
+    // Apps qui surgissent toutes seules et qu'on ignore :
+    // Samsung Wallet, clavier Samsung, panneau Samsung à gauche de l'accueil.
     private val ignorees = setOf(
         "com.samsung.android.spay",
-        "com.samsung.android.honeyboard"
+        "com.samsung.android.honeyboard",
+        "com.samsung.android.app.spage"
     )
 
     private val ecranAccueil: String? by lazy {
@@ -44,21 +40,11 @@ class AppWatcherService : AccessibilityService() {
         packageManager.resolveActivity(intention, 0)?.activityInfo?.packageName
     }
 
-    // Appelée quand le service démarre : après l'allumage du téléphone,
-    // ou quand on réactive l'accessibilité.
     override fun onServiceConnected() {
         noter("=== Service démarré (allumage ou réactivation) ===")
     }
 
     override fun onAccessibilityEvent(event: AccessibilityEvent) {
-        val maintenant = SystemClock.uptimeMillis()
-
-        // Un appui sur l'écran d'accueil (sur une icône, en général) : on note l'heure.
-        if (event.eventType == AccessibilityEvent.TYPE_VIEW_CLICKED) {
-            if (event.packageName?.toString() == ecranAccueil) heureClicAccueil = maintenant
-            return
-        }
-
         if (event.eventType != AccessibilityEvent.TYPE_WINDOW_STATE_CHANGED) return
         val app = event.packageName?.toString() ?: return
         if (app == packageName || app in ignorees) return
@@ -71,26 +57,24 @@ class AppWatcherService : AccessibilityService() {
         val precedente = derniereApp
         derniereApp = app
 
-        // --- LE RAPPORT DE MESURE ---
-        // "add" renvoie vrai si l'app n'était pas encore dans l'ensemble.
-        val premiereFois = dejaOuvertes.add(app)
         if (app == ecranAccueil) {
             noter(app)
-        } else {
-            // Délai entre l'appui sur l'icône et l'arrivée de l'app
-            // (seulement si on vient de l'accueil et que l'appui date de moins de 10 s).
-            val delai = maintenant - heureClicAccueil
-            val texteDelai = if (precedente == ecranAccueil && heureClicAccueil > 0 && delai < 10_000)
-                "délai $delai ms" else "délai ?"
-            val classe = event.className?.toString()?.substringAfterLast('.') ?: "?"
-            val marque = if (premiereFois) " | 1RE FOIS depuis allumage" else ""
-            noter("$app | $texteDelai | écran $classe$marque")
+            return
         }
-        heureClicAccueil = 0L
+
+        // --- DÉTECTION DU DÉMARRAGE ---
+        // Quand une app démarre, Android affiche d'abord son écran de lancement
+        // ("splash screen" : fond uni + icône). Cet écran est un FrameLayout.
+        // Quand l'app est juste reprise, on voit directement son vrai écran (MainActivity...).
+        val classe = event.className?.toString()?.substringAfterLast('.') ?: "?"
+        val demarrage = classe == "FrameLayout"
+        noter("$app | écran $classe | " + if (demarrage) "DÉMARRAGE" else "reprise")
 
         if (!Reglages.actif(this)) return               // kill switch
         val style = animations[app] ?: return           // pas dans le tableau
         if (precedente != ecranAccueil) return          // depuis l'accueil seulement
+        // Mode "seulement au démarrage" : on ignore les simples reprises.
+        if (Reglages.seulementDemarrage(this) && !demarrage) return
 
         afficher(style)
     }

@@ -1,12 +1,10 @@
 <?xml version="1.0" encoding="utf-8"?>
 <!-- Réglages du service : quels événements on veut recevoir.
-     typeWindowStateChanged = "une app passe au premier plan".
-     typeViewClicked = "on a appuyé sur quelque chose" (pour chronométrer
-     le délai entre l'appui sur une icône et l'arrivée de l'app).
-     notificationTimeout=0 : événements livrés sans délai, pour des mesures précises.
-     On ne lit toujours pas le contenu des écrans (canRetrieveWindowContent=false). -->
+     typeWindowStateChanged = "une app (ou son écran de lancement) passe au premier plan".
+     notificationTimeout=0 : événements livrés sans délai.
+     On ne lit pas le contenu des écrans (canRetrieveWindowContent=false). -->
 <accessibility-service xmlns:android="http://schemas.android.com/apk/res/android"
-    android:accessibilityEventTypes="typeWindowStateChanged|typeViewClicked"
+    android:accessibilityEventTypes="typeWindowStateChanged"
     android:accessibilityFeedbackType="feedbackGeneric"
     android:notificationTimeout="0"
     android:canRetrieveWindowContent="false"
