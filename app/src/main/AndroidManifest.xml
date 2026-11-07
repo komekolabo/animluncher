@@ -1,13 +1,12 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- La "carte d'identité" de l'app : son nom, ses écrans, et plus tard ses autorisations. -->
+<!-- La "carte d'identité" de l'app : son nom, ses écrans, ses services. -->
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
 
     <application
         android:label="AnimLauncher"
         android:theme="@android:style/Theme.Material.NoActionBar">
 
-        <!-- L'écran principal. exported="true" + le bloc intent-filter
-             = "mets une icône de cette app dans le tiroir d'applications". -->
+        <!-- L'écran principal, avec son icône dans le tiroir d'applications. -->
         <activity
             android:name=".MainActivity"
             android:exported="true">
@@ -16,6 +15,22 @@
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
         </activity>
+
+        <!-- Le service qui détecte l'app ouverte.
+             La permission BIND_ACCESSIBILITY_SERVICE garantit que seul Android
+             peut le démarrer. Le bloc meta-data pointe vers ses réglages. -->
+        <service
+            android:name=".AppWatcherService"
+            android:exported="true"
+            android:label="AnimLauncher"
+            android:permission="android.permission.BIND_ACCESSIBILITY_SERVICE">
+            <intent-filter>
+                <action android:name="android.accessibilityservice.AccessibilityService" />
+            </intent-filter>
+            <meta-data
+                android:name="android.accessibilityservice"
+                android:resource="@xml/accessibility_config" />
+        </service>
 
     </application>
 </manifest>

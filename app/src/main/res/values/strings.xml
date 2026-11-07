@@ -1,0 +1,5 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Les textes de l'app. Celui-ci s'affiche dans Paramètres > Accessibilité. -->
+<resources>
+    <string name="description_service">Détecte l’application que tu ouvres pour jouer une animation personnalisée. AnimLauncher ne lit pas le contenu de tes écrans.</string>
+</resources>
