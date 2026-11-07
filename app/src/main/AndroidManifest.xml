@@ -3,8 +3,7 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
 
     <!-- Depuis Android 11, une app ne "voit" pas les autres apps par défaut.
-         Ici on demande à voir : les apps qui ont une icône (LAUNCHER)
-         et l'écran d'accueil (HOME). Rien de plus. -->
+         On demande à voir : les apps qui ont une icône, et l'écran d'accueil. -->
     <queries>
         <intent>
             <action android:name="android.intent.action.MAIN" />
@@ -20,6 +19,7 @@
         android:label="AnimLauncher"
         android:theme="@android:style/Theme.Material.NoActionBar">
 
+        <!-- L'écran principal, avec son icône dans le tiroir d'applications. -->
         <activity
             android:name=".MainActivity"
             android:exported="true">
@@ -28,6 +28,11 @@
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
         </activity>
+
+        <!-- L'écran Journal (pas d'icône : on y accède depuis l'écran principal). -->
+        <activity
+            android:name=".JournalActivity"
+            android:exported="false" />
 
         <!-- Le service qui détecte l'app ouverte et joue l'animation. -->
         <service

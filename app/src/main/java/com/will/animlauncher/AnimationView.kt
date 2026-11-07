@@ -5,6 +5,7 @@ import android.graphics.Canvas
 import android.graphics.Color
 import android.graphics.Paint
 import android.os.SystemClock
+import android.view.Choreographer
 import android.view.View
 import kotlin.math.cos
 import kotlin.math.hypot
@@ -16,33 +17,54 @@ class AnimationView(context: Context, private val style: Style) : View(context) 
 
     enum class Style { ECLAIR, ONDE }
 
-    private val duree = 450L          // durée en millisecondes
-    private var heureDebut = 0L       // heure de la 1re image (0 = pas encore)
-    private var progres = 0f          // 0 = début, 1 = fin
+    private val duree = 450L
+    private var heureDebut = 0L
+    private var progres = 0f
     private var quandFini: (() -> Unit)? = null
+    private var arretee = false
 
-    // MOUCHARD : combien d'images ont été dessinées, et quand la vue a été créée.
+    // MOUCHARD : nombre d'images dessinées, nombre de battements du métronome,
+    // et heure de création de la vue.
     var images = 0
-        private set                    // lisible de l'extérieur, modifiable seulement ici
+        private set
+    var battements = 0
+        private set
     val creeeA = SystemClock.uptimeMillis()
 
     private val pinceau = Paint(Paint.ANTI_ALIAS_FLAG).apply {
         strokeCap = Paint.Cap.ROUND
     }
 
-    fun jouer(fin: () -> Unit) {
-        quandFini = fin
-        heureDebut = 0L
-        postInvalidateOnAnimation()
+    // LE MÉTRONOME : le "Choreographer" d'Android appelle cette fonction
+    // à chaque rafraîchissement de l'écran (environ 60 fois par seconde).
+    // À chaque battement, on demande à la vue de se redessiner,
+    // puis on se réinscrit pour le battement suivant.
+    private val metronome = object : Choreographer.FrameCallback {
+        override fun doFrame(heureImageNanos: Long) {
+            if (arretee) return
+            battements++
+            invalidate()
+            Choreographer.getInstance().postFrameCallback(this)
+        }
     }
 
-    // Appelée par Android à chaque image. On calcule l'avancement avec l'horloge.
+    fun jouer(fin: () -> Unit) {
+        quandFini = fin
+        // L'horloge démarre MAINTENANT : si des images sautent,
+        // l'animation rattrape son retard au lieu de rester bloquée.
+        heureDebut = SystemClock.uptimeMillis()
+        Choreographer.getInstance().postFrameCallback(metronome)
+    }
+
+    // Arrête le métronome (appelée quand on retire l'animation).
+    fun arreter() {
+        arretee = true
+        Choreographer.getInstance().removeFrameCallback(metronome)
+    }
+
     override fun onDraw(canvas: Canvas) {
         images++
-        val maintenant = SystemClock.uptimeMillis()
-        if (heureDebut == 0L) heureDebut = maintenant
-
-        val t = ((maintenant - heureDebut).toFloat() / duree).coerceIn(0f, 1f)
+        val t = ((SystemClock.uptimeMillis() - heureDebut).toFloat() / duree).coerceIn(0f, 1f)
         progres = 1f - (1f - t) * (1f - t)   // décélération
 
         val cx = width / 2f
@@ -53,12 +75,11 @@ class AnimationView(context: Context, private val style: Style) : View(context) 
             Style.ONDE -> dessinerOnde(canvas, cx, cy, rayonMax)
         }
 
-        if (t < 1f) {
-            postInvalidateOnAnimation()
-        } else {
+        // Fini : on prévient le service (une seule fois).
+        if (t >= 1f) {
             val fin = quandFini
             quandFini = null
-            post { fin?.invoke() }
+            if (fin != null) post { fin() }
         }
     }
 

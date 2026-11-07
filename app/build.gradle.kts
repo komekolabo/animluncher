@@ -4,16 +4,20 @@ plugins {
     id("org.jetbrains.kotlin.android") version "2.0.20"  // écrite en Kotlin
 }
 
+// Numéro de compilation fourni par GitHub (1, 2, 3...). 0 si on compile ailleurs.
+// Il devient le numéro de version de l'app : on sait ainsi quelle version est installée.
+val numeroCompilation = (System.getenv("GITHUB_RUN_NUMBER") ?: "0").toInt()
+
 android {
     namespace = "com.will.animlauncher"
     compileSdk = 34
 
     defaultConfig {
-        applicationId = "com.will.animlauncher" // identifiant unique sur le téléphone
-        minSdk = 26        // marche à partir d'Android 8
+        applicationId = "com.will.animlauncher"
+        minSdk = 26
         targetSdk = 34
-        versionCode = 1
-        versionName = "0.1"
+        versionCode = numeroCompilation.coerceAtLeast(1)
+        versionName = "0.$numeroCompilation"
     }
 
     // Toujours la même clé de signature, pour installer

@@ -3,10 +3,8 @@ package com.will.animlauncher
 import android.app.Activity
 import android.app.StatusBarManager
 import android.content.ComponentName
-import android.content.Context
 import android.content.Intent
 import android.graphics.Color
-import android.graphics.Typeface
 import android.graphics.drawable.Icon
 import android.os.Build
 import android.os.Bundle
@@ -18,12 +16,10 @@ import android.widget.ScrollView
 import android.widget.Switch
 import android.widget.TextView
 
-// L'écran principal : interrupteur général, état de la détection,
-// et liste des dernières apps détectées.
+// L'écran principal : interrupteur général, état de la détection, accès au journal.
 class MainActivity : Activity() {
 
     private lateinit var statut: TextView
-    private lateinit var liste: TextView
     private lateinit var interrupteur: Switch
 
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -35,18 +31,15 @@ class MainActivity : Activity() {
             setPadding(56, 140, 56, 56)
         }
 
-        // 1. L'INTERRUPTEUR GÉNÉRAL (kill switch dans l'app).
+        // 1. L'interrupteur général (kill switch).
         interrupteur = Switch(this).apply {
             text = "Animations activées"
             textSize = 22f
             setTextColor(Color.WHITE)
             setPadding(0, 0, 0, 40)
-            // Quand on le bascule, on enregistre le nouvel état.
             setOnCheckedChangeListener { _, coche -> Reglages.definir(this@MainActivity, coche) }
         }
 
-        // 2. Bouton pour ajouter le kill switch au volet des réglages rapides.
-        //    Android 13+ sait le proposer directement ; avant, il faut l'ajouter à la main.
         val boutonVolet = Button(this).apply {
             text = "Ajouter le bouton au volet rapide"
             setOnClickListener { proposerTuile() }
@@ -61,31 +54,32 @@ class MainActivity : Activity() {
 
         val boutonAccessibilite = Button(this).apply {
             text = "Ouvrir les réglages d'accessibilité"
+            setOnClickListener { startActivity(Intent(Settings.ACTION_ACCESSIBILITY_SETTINGS)) }
+        }
+
+        // 2. Le bouton qui ouvre l'écran Journal.
+        val boutonJournal = Button(this).apply {
+            text = "Ouvrir le journal (logs)"
             setOnClickListener {
-                startActivity(Intent(Settings.ACTION_ACCESSIBILITY_SETTINGS))
+                startActivity(Intent(this@MainActivity, JournalActivity::class.java))
             }
         }
 
-        val titre = TextView(this).apply {
-            text = "Dernières apps détectées"
-            textSize = 18f
-            setTextColor(Color.parseColor("#FF7A5C"))
-            setPadding(0, 64, 0, 16)
-        }
-
-        liste = TextView(this).apply {
+        // 3. Le numéro de version, pour savoir quelle compilation est installée.
+        val version = TextView(this).apply {
+            text = "Version " + packageManager.getPackageInfo(packageName, 0).versionName
             textSize = 14f
-            setTextColor(Color.parseColor("#DFE4F7"))
-            typeface = Typeface.MONOSPACE
-            setTextIsSelectable(true)
+            setTextColor(Color.parseColor("#94A0C4"))
+            gravity = Gravity.CENTER
+            setPadding(0, 64, 0, 0)
         }
 
         colonne.addView(interrupteur)
         colonne.addView(boutonVolet)
         colonne.addView(statut)
         colonne.addView(boutonAccessibilite)
-        colonne.addView(titre)
-        colonne.addView(liste)
+        colonne.addView(boutonJournal)
+        colonne.addView(version)
 
         setContentView(ScrollView(this).apply {
             setBackgroundColor(Color.parseColor("#1B2340"))
@@ -93,24 +87,16 @@ class MainActivity : Activity() {
         })
     }
 
-    // À chaque retour sur l'écran, on remet tout à jour
-    // (l'état a pu changer depuis le volet rapide).
     override fun onResume() {
         super.onResume()
         interrupteur.isChecked = Reglages.actif(this)
-
         statut.text = if (serviceActif()) {
             "✅ Détection activée"
         } else {
             "⚠️ Détection désactivée : active AnimLauncher dans l'accessibilité."
         }
-
-        val carnet = getSharedPreferences(AppWatcherService.CARNET, Context.MODE_PRIVATE)
-        val texte = carnet.getString(AppWatcherService.CLE_LISTE, "") ?: ""
-        liste.text = texte.ifBlank { "(rien pour l'instant)" }
     }
 
-    // Demande à Android d'ajouter notre bouton au volet (Android 13+ seulement).
     private fun proposerTuile() {
         if (Build.VERSION.SDK_INT >= 33) {
             val barre = getSystemService(StatusBarManager::class.java)

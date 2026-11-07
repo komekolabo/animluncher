@@ -17,7 +17,6 @@ import java.util.Locale
 // et qui joue l'animation correspondante.
 class AppWatcherService : AccessibilityService() {
 
-    // La dernière VRAIE app au premier plan (pas le clavier ni les popups).
     private var derniereApp: String? = null
     private var vueEnCours: AnimationView? = null
     private val minuteur = Handler(Looper.getMainLooper())
@@ -28,11 +27,13 @@ class AppWatcherService : AccessibilityService() {
         "com.google.android.googlequicksearchbox" to AnimationView.Style.ONDE
     )
 
-    // Apps qui surgissent toutes seules et qu'on ignore (Samsung Wallet).
-    private val ignorees = setOf("com.samsung.android.spay")
+    // Apps qui surgissent toutes seules et qu'on ignore (Samsung Wallet, clavier Samsung).
+    private val ignorees = setOf(
+        "com.samsung.android.spay",
+        "com.samsung.android.honeyboard"
+    )
 
-    // Le nom de l'écran d'accueil du téléphone, demandé à Android.
-    // "by lazy" : calculé une seule fois, la première fois qu'on en a besoin.
+    // Le nom de l'écran d'accueil du téléphone, demandé à Android une seule fois.
     private val ecranAccueil: String? by lazy {
         val intention = Intent(Intent.ACTION_MAIN).addCategory(Intent.CATEGORY_HOME)
         packageManager.resolveActivity(intention, 0)?.activityInfo?.packageName
@@ -43,23 +44,19 @@ class AppWatcherService : AccessibilityService() {
         val app = event.packageName?.toString() ?: return
         if (app == packageName || app in ignorees) return
 
-        // FILTRE 1 : on ignore tout ce qui n'est pas une vraie app.
-        // Une vraie app a une icône, donc une "intention de lancement".
-        // Le clavier, la barre système et les popups n'en ont pas.
+        // FILTRE 1 : seulement les vraies apps (celles qui ont une icône).
         val estVraieApp = app == ecranAccueil ||
             packageManager.getLaunchIntentForPackage(app) != null
         if (!estVraieApp) return
 
-        if (app == derniereApp) return   // toujours la même app : rien à faire
+        if (app == derniereApp) return
         val precedente = derniereApp
         derniereApp = app
         noter(app)
 
         if (!Reglages.actif(this)) return               // kill switch
         val style = animations[app] ?: return           // pas dans le tableau
-
-        // FILTRE 2 : seulement si on arrive de l'écran d'accueil (appui sur l'icône).
-        if (precedente != ecranAccueil) return
+        if (precedente != ecranAccueil) return          // FILTRE 2 : depuis l'accueil
 
         afficher(style)
     }
@@ -88,25 +85,27 @@ class AppWatcherService : AccessibilityService() {
                 if (vueEnCours === vue) retirer(gestionnaire, "filet de sécurité")
             }, 800)
         } catch (e: Exception) {
-            noter("Erreur animation : ${e.message}")
+            noter("ERREUR animation : ${e.message}")
         }
     }
 
-    // Retire l'animation et écrit le rapport du MOUCHARD dans le carnet.
+    // Retire l'animation et écrit le rapport du MOUCHARD dans le journal.
     private fun retirer(gestionnaire: WindowManager, raison: String) {
         val vue = vueEnCours ?: return
+        vue.arreter()
         try { gestionnaire.removeView(vue) } catch (_: Exception) {}
         vueEnCours = null
         val ms = SystemClock.uptimeMillis() - vue.creeeA
-        noter("  ↳ ${vue.images} images, ${ms} ms, $raison")
+        noter("  -> ${vue.images} images / ${vue.battements} battements, $ms ms, $raison")
     }
 
+    // Ajoute une ligne en haut du journal (on garde les 200 dernières).
     private fun noter(texte: String) {
         val carnet = getSharedPreferences(CARNET, Context.MODE_PRIVATE)
         val heure = SimpleDateFormat("HH:mm:ss", Locale.FRANCE).format(Date())
         val ancienne = carnet.getString(CLE_LISTE, "") ?: ""
-        val nouvelle = (listOf("$heure  $texte") + ancienne.lines().filter { it.isNotBlank() })
-            .take(15)
+        val nouvelle = (listOf("$heure $texte") + ancienne.lines().filter { it.isNotBlank() })
+            .take(200)
             .joinToString("\n")
         carnet.edit().putString(CLE_LISTE, nouvelle).apply()
     }
