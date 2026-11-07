@@ -33,7 +33,6 @@ class AppWatcherService : AccessibilityService() {
         "com.samsung.android.honeyboard"
     )
 
-    // Le nom de l'écran d'accueil du téléphone, demandé à Android une seule fois.
     private val ecranAccueil: String? by lazy {
         val intention = Intent(Intent.ACTION_MAIN).addCategory(Intent.CATEGORY_HOME)
         packageManager.resolveActivity(intention, 0)?.activityInfo?.packageName
@@ -81,9 +80,10 @@ class AppWatcherService : AccessibilityService() {
             gestionnaire.addView(vue, reglages)
             vueEnCours = vue
             vue.jouer { if (vueEnCours === vue) retirer(gestionnaire, "fin normale") }
+            // Filet de sécurité à 1 seconde (la surface met un peu de temps à se créer).
             minuteur.postDelayed({
                 if (vueEnCours === vue) retirer(gestionnaire, "filet de sécurité")
-            }, 800)
+            }, 1000)
         } catch (e: Exception) {
             noter("ERREUR animation : ${e.message}")
         }
@@ -96,7 +96,8 @@ class AppWatcherService : AccessibilityService() {
         try { gestionnaire.removeView(vue) } catch (_: Exception) {}
         vueEnCours = null
         val ms = SystemClock.uptimeMillis() - vue.creeeA
-        noter("  -> ${vue.images} images / ${vue.battements} battements, $ms ms, $raison")
+        val surface = if (vue.surfaceCreee) "surface OK" else "PAS de surface"
+        noter("  -> ${vue.images} images, $surface, $ms ms, $raison")
     }
 
     // Ajoute une ligne en haut du journal (on garde les 200 dernières).
