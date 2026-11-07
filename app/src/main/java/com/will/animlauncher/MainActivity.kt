@@ -1,66 +1,94 @@
 package com.will.animlauncher
 
 import android.app.Activity
+import android.content.Context
 import android.content.Intent
 import android.graphics.Color
+import android.graphics.Typeface
 import android.os.Bundle
 import android.provider.Settings
 import android.view.Gravity
 import android.widget.Button
 import android.widget.LinearLayout
+import android.widget.ScrollView
 import android.widget.TextView
 
-// L'écran principal : il dit si la détection est active,
-// et propose un bouton pour aller l'activer.
+// L'écran principal : dit si la détection est active,
+// et affiche la liste des dernières apps détectées.
 class MainActivity : Activity() {
 
-    // "lateinit" : la variable sera remplie plus tard, dans onCreate.
+    // "lateinit" : ces variables seront remplies plus tard, dans onCreate.
     private lateinit var statut: TextView
+    private lateinit var liste: TextView
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
 
-        // Une colonne (LinearLayout vertical) qui empile le texte et le bouton.
-        val ecran = LinearLayout(this).apply {
+        // Une colonne qui empile : statut, bouton, titre, liste.
+        val colonne = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
-            gravity = Gravity.CENTER
-            setBackgroundColor(Color.parseColor("#1B2340"))
-            setPadding(64, 64, 64, 64)
+            gravity = Gravity.CENTER_HORIZONTAL
+            setPadding(56, 140, 56, 56)
         }
 
         statut = TextView(this).apply {
-            textSize = 22f
+            textSize = 20f
             setTextColor(Color.WHITE)
             gravity = Gravity.CENTER
-            setPadding(0, 0, 0, 48)   // espace sous le texte
+            setPadding(0, 0, 0, 32)
         }
 
         val bouton = Button(this).apply {
             text = "Ouvrir les réglages d'accessibilité"
-            // Au clic : ouvre directement Paramètres > Accessibilité.
             setOnClickListener {
                 startActivity(Intent(Settings.ACTION_ACCESSIBILITY_SETTINGS))
             }
         }
 
-        ecran.addView(statut)
-        ecran.addView(bouton)
+        val titre = TextView(this).apply {
+            text = "Dernières apps détectées"
+            textSize = 18f
+            setTextColor(Color.parseColor("#FF7A5C"))
+            setPadding(0, 64, 0, 16)
+        }
+
+        liste = TextView(this).apply {
+            textSize = 14f
+            setTextColor(Color.parseColor("#DFE4F7"))
+            typeface = Typeface.MONOSPACE   // police à chasse fixe, pour aligner les heures
+            setTextIsSelectable(true)       // appui long pour copier le texte
+        }
+
+        colonne.addView(statut)
+        colonne.addView(bouton)
+        colonne.addView(titre)
+        colonne.addView(liste)
+
+        // ScrollView : permet de faire défiler si la liste est longue.
+        val ecran = ScrollView(this).apply {
+            setBackgroundColor(Color.parseColor("#1B2340"))
+            addView(colonne)
+        }
         setContentView(ecran)
     }
 
-    // onResume est appelée à chaque fois qu'on revient sur l'écran
-    // (par exemple en sortant des réglages) : on met le texte à jour.
+    // Appelée à chaque retour sur l'écran : on met tout à jour.
     override fun onResume() {
         super.onResume()
+
         statut.text = if (serviceActif()) {
-            "✅ Détection activée\n\nOuvre une app : son nom s'affichera en bas de l'écran."
+            "✅ Détection activée\nOuvre d'autres apps, puis reviens ici."
         } else {
-            "Détection désactivée\n\nActive AnimLauncher dans les réglages d'accessibilité."
+            "Détection désactivée\nActive AnimLauncher dans les réglages d'accessibilité."
         }
+
+        // On relit le "carnet" rempli par le service.
+        val carnet = getSharedPreferences(AppWatcherService.CARNET, Context.MODE_PRIVATE)
+        val texte = carnet.getString(AppWatcherService.CLE_LISTE, "") ?: ""
+        liste.text = texte.ifBlank { "(rien pour l'instant)" }
     }
 
-    // Demande à Android la liste des services d'accessibilité activés,
-    // et regarde si le nôtre en fait partie.
+    // Regarde si notre service fait partie des services d'accessibilité activés.
     private fun serviceActif(): Boolean {
         val actifs = Settings.Secure.getString(
             contentResolver,
