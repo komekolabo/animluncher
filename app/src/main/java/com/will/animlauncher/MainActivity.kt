@@ -157,11 +157,6 @@ class MainActivity : Activity() {
             "⚠️ Détection désactivée : active AnimLauncher dans l'accessibilité."
         }
         if (!BuildConfig.STORE) afficherEtatStandard()
-        // Le guide « grisé » était ouvert et l'accessibilité est maintenant active : c'est gagné.
-        if (guide?.isShowing == true && serviceActif()) {
-            guide?.dismiss()
-            Toast.makeText(this, "✅ C'est activé ! Les animations sont prêtes.", Toast.LENGTH_LONG).show()
-        }
     }
 
     // ---------------- L'ÉCRAN D'EXPLICATION (version Store) ----------------
@@ -202,103 +197,29 @@ class MainActivity : Activity() {
     }
 
     // ---------------- L'ACCESSIBILITÉ GRISÉE (« paramètres restreints ») ----------------
-    // Depuis Android 13, une app installée HORS du Play Store (un APK téléchargé, comme depuis
-    // GitHub) ne peut pas recevoir l'accessibilité tout de suite : elle apparaît grisée, avec
-    // « Contrôlé par les paramètres restreints ». C'est une protection contre les apps piégées.
-    // Pour la débloquer, l'utilisateur doit faire 3 gestes, qu'on lui explique ici.
-    // (Une app installée depuis le Play Store n'est pas concernée : le guide ne s'affiche pas.)
-    private fun peutEtreRestreinte(): Boolean {
-        if (Build.VERSION.SDK_INT < 33) return false        // la protection n'existe qu'à partir d'Android 13
-        val installeur = try {
-            packageManager.getInstallSourceInfo(packageName).installingPackageName
-        } catch (_: Exception) { null }
-        return installeur != "com.android.vending"           // « com.android.vending » = le Play Store
-    }
+    // Une app installée HORS du Play Store (un APK) apparaît grisée dans l'accessibilité depuis
+    // Android 13. Dans ce cas, on ouvre le guide plein écran (voir GuideDeblocage.kt), qui montre
+    // les 3 missions avec des dessins. Sinon, on ouvre directement l'accessibilité.
+    private fun peutEtreRestreinte(): Boolean = GuideDeblocage.necessaire(this)
 
-    // Le chemin à suivre dans l'accessibilité pour trouver AnimLauncher. Il dépend de la marque :
-    // chez Samsung, les apps comme AnimLauncher sont rangées dans « Applications installées ».
-    private val estSamsung = Build.MANUFACTURER.equals("samsung", ignoreCase = true)
-    // (« get() » : calculé au moment où on s'en sert, car le nom de l'app n'est pas encore
-    //  disponible quand l'écran est construit. Le nom : « AnimLauncher » ou « AnimLauncher Perso ».)
+    // Le chemin à suivre dans l'accessibilité. Chez Samsung, les apps comme AnimLauncher sont
+    // rangées dans « Applications installées ».
+    // (« get() » : calculé au moment où on s'en sert, quand le nom de l'app est disponible.)
     private val cheminAccessibilite: String get() {
         val nom = getString(R.string.app_name)
-        return if (estSamsung) "touche « Applications installées » (en bas), puis « $nom »"
-               else "cherche « $nom » (souvent dans « Applications téléchargées » ou « installées »)"
-    }
-
-    // Ouvre l'accessibilité. (Ouvrir DIRECTEMENT la page d'AnimLauncher est réservé aux apps
-    // système d'Android : on ouvre donc l'accessibilité, et on affiche le chemin à suivre.)
-    // Les deux « extras » demandent aux Paramètres de mettre AnimLauncher EN SURBRILLANCE dans la
-    // liste : ça marche sur les Pixel et beaucoup d'autres téléphones ; les autres les ignorent.
-    private fun ouvrirPageAccessibilite() {
-        val service = ComponentName(this, AppWatcherService::class.java).flattenToString()
-        val intention = Intent(Settings.ACTION_ACCESSIBILITY_SETTINGS)
-            .putExtra(":settings:fragment_args_key", service)
-            .putExtra(":settings:show_fragment_args", Bundle().apply {
-                putString(":settings:fragment_args_key", service)
-            })
-        startActivity(intention)
-        // le rappel s'affiche par-dessus les Paramètres
-        Toast.makeText(this, "Dans l'accessibilité : " + cheminAccessibilite, Toast.LENGTH_LONG).show()
+        return if (Build.MANUFACTURER.equals("samsung", ignoreCase = true))
+            "touche « Applications installées » (en bas), puis « $nom »"
+        else "cherche « $nom » (souvent dans « Applications téléchargées » ou « installées »)"
     }
 
     private fun ouvrirAccessibilite() {
         if (serviceActif() || !peutEtreRestreinte()) {
-            ouvrirPageAccessibilite()
-            return
+            GuideDeblocage.ouvrirAccessibilite(this)
+            // le rappel s'affiche par-dessus les Paramètres
+            Toast.makeText(this, "Dans l'accessibilité : $cheminAccessibilite", Toast.LENGTH_LONG).show()
+        } else {
+            startActivity(Intent(this, GuideDeblocage::class.java))
         }
-        montrerGuide()
-    }
-
-    // LE GUIDE EN 3 ÉTAPES, avec un bouton par étape. Il reste ouvert pendant les allers-retours
-    // dans les Paramètres, et se ferme tout seul quand l'accessibilité est activée (voir onResume).
-    // (Une app ne peut pas appuyer à la place de l'utilisateur dans les Paramètres : on l'emmène
-    // donc au bon endroit, et on lui dit exactement où toucher.)
-    private var guide: AlertDialog? = null
-
-    private fun montrerGuide() {
-        val d = resources.displayMetrics.density
-        val contenu = LinearLayout(this).apply {
-            orientation = LinearLayout.VERTICAL
-            setPadding((24 * d).toInt(), (8 * d).toInt(), (24 * d).toInt(), 0)
-        }
-        fun texte(t: String, taille: Float = 15f, haut: Int = 0) = TextView(this).apply {
-            text = t; textSize = taille; setPadding(0, (haut * d).toInt(), 0, (6 * d).toInt())
-        }
-        fun bouton(t: String, action: () -> Unit) = Button(this).apply {
-            text = t; isAllCaps = false; setOnClickListener { action() }
-        }
-        contenu.addView(texte("Android protège les apps installées en dehors du Play Store : " +
-            "AnimLauncher apparaît grisé tant qu'on ne l'a pas débloqué. Fais les 3 étapes dans l'ordre :"))
-
-        contenu.addView(texte("① Déclencher le blocage", 17f, 14))
-        contenu.addView(texte("Le bouton ouvre l'accessibilité : $cheminAccessibilite (grisé). " +
-            "Un message « paramètre restreint » s'affiche : touche OK, puis reviens ici. " +
-            "(Sans cette étape, l'option ② n'apparaît pas.)"))
-        contenu.addView(bouton("Ouvrir l'accessibilité") { ouvrirPageAccessibilite() })
-
-        contenu.addView(texte("② Autoriser", 17f, 14))
-        contenu.addView(texte("Le bouton ouvre les infos de l'app. Touche les 3 points ⋮ EN HAUT À DROITE, " +
-            "puis « Autoriser les paramètres restreints », et confirme."))
-        contenu.addView(bouton("Ouvrir les infos de l'app") {
-            startActivity(Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS,
-                android.net.Uri.parse("package:$packageName")))
-            // un rappel qui s'affiche par-dessus les Paramètres, le temps de trouver le menu
-            Toast.makeText(this, "Touche ⋮ en haut à droite, puis « Autoriser les paramètres restreints »",
-                Toast.LENGTH_LONG).show()
-        })
-
-        contenu.addView(texte("③ Activer", 17f, 14))
-        contenu.addView(texte("Retourne dans l'accessibilité : $cheminAccessibilite. Il n'est plus grisé : " +
-            "active l'interrupteur. Ce guide se fermera tout seul."))
-        contenu.addView(bouton("Ouvrir l'accessibilité") { ouvrirPageAccessibilite() })
-
-        guide?.dismiss()
-        guide = AlertDialog.Builder(this)
-            .setTitle("Débloquer AnimLauncher")
-            .setView(ScrollView(this).apply { addView(contenu) })
-            .setNegativeButton("Fermer", null)
-            .show()
     }
 
     // ---------------- MODE STANDARD ----------------
