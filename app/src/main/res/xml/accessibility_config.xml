@@ -3,11 +3,13 @@
      typeViewClicked = "on a appuyé sur quelque chose" (ici : une icône de l'écran d'accueil).
        C'est le signal le plus précoce possible : l'animation démarre avant que l'app s'ouvre.
      typeWindowStateChanged = "une app (ou son écran de lancement) passe au premier plan".
+     Les autres types (appui long, sélection, focus) ne servent qu'au mouchard des dossiers :
+       on les note dans le journal pour comprendre ce que le lanceur envoie.
      notificationTimeout=0 : événements livrés sans délai.
      On ne lit pas le contenu des écrans (canRetrieveWindowContent=false) :
      seul le nom de l'icône touchée nous est transmis. -->
 <accessibility-service xmlns:android="http://schemas.android.com/apk/res/android"
-    android:accessibilityEventTypes="typeWindowStateChanged|typeViewClicked"
+    android:accessibilityEventTypes="typeWindowStateChanged|typeViewClicked|typeViewLongClicked|typeViewSelected|typeViewFocused|typeViewAccessibilityFocused"
     android:accessibilityFeedbackType="feedbackGeneric"
     android:notificationTimeout="0"
     android:canRetrieveWindowContent="false"

@@ -65,17 +65,43 @@ class AppWatcherService : AccessibilityService() {
 
     override fun onAccessibilityEvent(event: AccessibilityEvent) {
         when (event.eventType) {
-            AccessibilityEvent.TYPE_VIEW_CLICKED -> clic(event)
+            AccessibilityEvent.TYPE_VIEW_CLICKED -> { diagnostic(event); clic(event) }
             AccessibilityEvent.TYPE_WINDOW_STATE_CHANGED -> fenetre(event)
+            else -> diagnostic(event)
         }
+    }
+
+    // MOUCHARD DES DOSSIERS : pendant 5 s après un appui sur l'écran d'accueil (par exemple
+    // l'ouverture d'un dossier), on note dans le journal TOUS les signaux reçus, avec leur type
+    // et leur texte (12 lignes au plus). Ça permet de voir ce que le lanceur Samsung envoie
+    // quand on touche une icône À L'INTÉRIEUR d'un dossier.
+    private var diagLignes = 0
+    private fun diagnostic(event: AccessibilityEvent) {
+        if (SystemClock.uptimeMillis() - dernierClicAccueil > 5000 || diagLignes >= 12) return
+        // seulement les signaux de l'écran d'accueil (ou sans expéditeur) : on ne note jamais
+        // ce qui se passe à l'intérieur des autres apps
+        val expediteur = event.packageName?.toString()
+        if (expediteur != null && expediteur != ecranAccueil) return
+        val textes = event.text.map { it.toString() } + listOfNotNull(event.contentDescription?.toString())
+        if (textes.all { it.isBlank() }) return
+        diagLignes++
+        noter("  [signal] ${AccessibilityEvent.eventTypeToString(event.eventType)} " +
+            "de ${event.packageName ?: "(inconnu)"} « ${textes.joinToString(" / ")} »")
     }
 
     // 1) LE CLIC SUR L'ICÔNE. Le lanceur (l'écran d'accueil) nous dit sur quoi on a appuyé,
     // AVANT que l'app ne s'ouvre. On retrouve l'app grâce au nom écrit sous l'icône,
     // et l'animation démarre tout de suite : elle couvre l'ouverture de l'app.
     private fun clic(event: AccessibilityEvent) {
-        if (event.packageName?.toString() != ecranAccueil) return
+        // L'appui doit venir de l'écran d'accueil. Certains écrans (comme l'intérieur d'un dossier)
+        // envoient un appui SANS dire de quelle app il vient : on l'accepte si l'écran d'accueil
+        // est bien au premier plan.
+        val expediteur = event.packageName?.toString()
+        if (expediteur == null) {
+            if (derniereApp != ecranAccueil) return
+        } else if (expediteur != ecranAccueil) return
         clicsRecus = true
+        if (SystemClock.uptimeMillis() - dernierClicAccueil > 5000) diagLignes = 0
         dernierClicAccueil = SystemClock.uptimeMillis()
         val textes = event.text.map { it.toString() } + listOfNotNull(event.contentDescription?.toString())
         val app = trouverApp(textes)
@@ -209,10 +235,16 @@ class AppWatcherService : AccessibilityService() {
             return
         }
 
-        // Anti-rebond : cette app vient déjà d'avoir son animation (moins de 10 s) -> on ne la rejoue pas.
+        // Anti-rebond : cette app vient déjà d'avoir son animation (moins de 10 s) -> on ne la rejoue pas…
+        // SAUF si l'utilisateur est vraiment revenu sur l'écran d'accueil entre-temps : soit il y est
+        // resté plus de 0,7 s, soit il y a appuyé sur quelque chose (une icône, un dossier).
+        // (Le « faux » passage par l'accueil que l'anti-rebond doit filtrer, lui, dure une fraction de seconde.)
         animeeA[app]?.let { avant ->
-            val ecart = SystemClock.uptimeMillis() - avant
-            if (ecart < 10_000) {
+            val maintenant = SystemClock.uptimeMillis()
+            val ecart = maintenant - avant
+            val resteSurAccueil = quitteeA > avant && maintenant - quitteeA > 700
+            val appuiDepuis = dernierClicAccueil > avant
+            if (ecart < 10_000 && !resteSurAccueil && !appuiDepuis) {
                 noter("  (animation déjà jouée il y a $ecart ms : on ne la relance pas)")
                 return
             }
