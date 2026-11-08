@@ -25,12 +25,15 @@ jobs:
       - name: Recréer la clé de signature
         run: base64 -d app/debug.keystore.b64 > app/debug.keystore
 
+      # Les deux versions : Perso (la tienne) et Store (celle du Play Store).
       - name: Compiler
-        run: gradle assembleDebug
+        run: gradle assemblePersoDebug assembleStoreDebug
 
-      - name: Publier l'APK
+      - name: Publier les APK
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
+          cp app/build/outputs/apk/perso/debug/app-perso-debug.apk AnimLauncher-Perso.apk
+          cp app/build/outputs/apk/store/debug/app-store-debug.apk AnimLauncher-Store.apk
           gh release delete derniere-version -y --cleanup-tag || true
-          gh release create derniere-version app/build/outputs/apk/debug/app-debug.apk --title "Dernière version" --notes "Compilation n°${{ github.run_number }}"
+          gh release create derniere-version AnimLauncher-Perso.apk AnimLauncher-Store.apk --title "Dernière version" --notes "Compilation n°${{ github.run_number }}"
