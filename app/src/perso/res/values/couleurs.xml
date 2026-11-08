@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- VERSION PERSO : comète ambre, pour reconnaître ta version d'un coup d'œil
+     à côté de la version Store (comète violette). -->
+<resources>
+    <color name="logo_couleur">#FFAA46</color>
+</resources>

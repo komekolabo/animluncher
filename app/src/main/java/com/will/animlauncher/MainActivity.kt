@@ -33,8 +33,14 @@ class MainActivity : Activity() {
         val colonne = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
             gravity = Gravity.CENTER_HORIZONTAL
-            setPadding(56, 140, 56, 56)
+            setPadding(56, 100, 56, 56)
         }
+
+        // 0. Le logo animé (voir LogoAnime.kt), centré en haut.
+        val tailleLogo = (110 * resources.displayMetrics.density).toInt()
+        colonne.addView(LogoAnime(this), LinearLayout.LayoutParams(tailleLogo, tailleLogo).apply {
+            bottomMargin = (16 * resources.displayMetrics.density).toInt()
+        })
 
         // 1. L'interrupteur général (kill switch).
         interrupteur = Switch(this).apply {
@@ -80,7 +86,7 @@ class MainActivity : Activity() {
             // Version Store : Google exige un écran d'explication AVANT d'envoyer vers les réglages.
             setOnClickListener {
                 if (BuildConfig.STORE) expliquerAccessibilite()
-                else startActivity(Intent(Settings.ACTION_ACCESSIBILITY_SETTINGS))
+                else ouvrirAccessibilite()
             }
         }
 
@@ -144,6 +150,9 @@ class MainActivity : Activity() {
         interrupteurDemarrage.isChecked = Reglages.seulementDemarrage(this)
         statut.text = if (serviceActif()) {
             "✅ Détection activée"
+        } else if (peutEtreRestreinte()) {
+            "⚠️ Détection désactivée : active AnimLauncher dans l'accessibilité.\n" +
+                "(Grisé ? Le bouton ci-dessous t'explique comment le débloquer.)"
         } else {
             "⚠️ Détection désactivée : active AnimLauncher dans l'accessibilité."
         }
@@ -178,11 +187,54 @@ class MainActivity : Activity() {
             .setMessage(texte)
             .setCancelable(false)                       // il faut choisir : accepter ou refuser
             .setPositiveButton("Accepter et activer") { _, _ ->
-                startActivity(Intent(Settings.ACTION_ACCESSIBILITY_SETTINGS))
+                ouvrirAccessibilite()
             }
             .setNegativeButton("Refuser") { _, _ ->
                 statut.text = "Sans l'accessibilité, AnimLauncher ne peut pas jouer d'animation. " +
                     "Tu peux changer d'avis quand tu veux avec le bouton ci-dessous."
+            }
+            .show()
+    }
+
+    // ---------------- L'ACCESSIBILITÉ GRISÉE (« paramètres restreints ») ----------------
+    // Depuis Android 13, une app installée HORS du Play Store (un APK téléchargé, comme depuis
+    // GitHub) ne peut pas recevoir l'accessibilité tout de suite : elle apparaît grisée, avec
+    // « Contrôlé par les paramètres restreints ». C'est une protection contre les apps piégées.
+    // Pour la débloquer, l'utilisateur doit faire 3 gestes, qu'on lui explique ici.
+    // (Une app installée depuis le Play Store n'est pas concernée : le guide ne s'affiche pas.)
+    private fun peutEtreRestreinte(): Boolean {
+        if (Build.VERSION.SDK_INT < 33) return false        // la protection n'existe qu'à partir d'Android 13
+        val installeur = try {
+            packageManager.getInstallSourceInfo(packageName).installingPackageName
+        } catch (_: Exception) { null }
+        return installeur != "com.android.vending"           // « com.android.vending » = le Play Store
+    }
+
+    private fun ouvrirAccessibilite() {
+        if (serviceActif() || !peutEtreRestreinte()) {
+            startActivity(Intent(Settings.ACTION_ACCESSIBILITY_SETTINGS))
+            return
+        }
+        val texte = """
+            Si AnimLauncher apparaît GRISÉ (« Contrôlé par les paramètres restreints »), c'est normal : Android protège ainsi les apps installées en dehors du Play Store.
+
+            Pour le débloquer :
+
+            1. Ouvre l'accessibilité, touche AnimLauncher (grisé), puis OK sur le message. Cette étape est obligatoire : elle fait apparaître l'option de l'étape 2.
+
+            2. Ouvre les infos de l'app, touche les 3 points ⋮ en haut à droite, puis « Autoriser les paramètres restreints », et confirme.
+
+            3. Retourne dans l'accessibilité : AnimLauncher n'est plus grisé, tu peux l'activer.
+        """.trimIndent()
+        AlertDialog.Builder(this)
+            .setTitle("AnimLauncher est grisé ?")
+            .setMessage(texte)
+            .setPositiveButton("Étapes 1 et 3 : accessibilité") { _, _ ->
+                startActivity(Intent(Settings.ACTION_ACCESSIBILITY_SETTINGS))
+            }
+            .setNeutralButton("Étape 2 : infos de l'app") { _, _ ->
+                startActivity(Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS,
+                    android.net.Uri.parse("package:$packageName")))
             }
             .show()
     }
