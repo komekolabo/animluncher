@@ -37,6 +37,23 @@ object Catalogue {
         "com.google.android.play.games" to e(S) { Neon() },
         "com.google.android.videos" to e(S) { Salon() },
         "com.google.android.apps.authenticator2" to e(S) { Coffre() },
+        // --- Lot 3 : système Samsung ---
+        "com.samsung.android.dialer" to e(E) { Appel() },
+        "com.samsung.android.messaging" to e(E) { Bulles() },
+        "com.sec.android.app.camera" to e(E) { Diaphragme() },
+        "com.sec.android.gallery3d" to e(E) { ChambreNoire() },
+        "com.android.vending" to e(E) { Spirale() },
+        "com.android.settings" to e(C) { Engrenages() },
+        "com.samsung.android.app.contacts" to e(C) { Constellation() },
+        "com.sec.android.app.clockpackage" to e(C) { Cadran() },
+        "com.samsung.android.calendar" to e(C) { Ephemeride() },
+        "com.sec.android.app.popupcalculator" to e(C) { Compteur() },
+        "com.samsung.android.app.notes" to e(C) { Plume() },
+        "com.sec.android.app.myfiles" to e(C) { Rotatif() },
+        "com.sec.android.app.sbrowser" to e(C) { Toile() },
+        "com.sec.android.app.voicenote" to e(C) { Bande() },
+        "com.samsung.android.app.reminder" to e(C) { Sablier() },
+        "com.sec.android.app.shealth" to e(C) { Pouls() },
     )
 
     fun pour(app: String): Entree? = entrees[app]
