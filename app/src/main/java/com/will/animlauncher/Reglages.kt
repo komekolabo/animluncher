@@ -27,8 +27,15 @@ object Reglages {
     // Chaque réglage est rangé sous une clé qui contient le nom technique de l'app,
     // par exemple "off_com.anthropic.claude".
 
-    // L'animation de cette app est-elle activée ? (oui par défaut)
-    fun appActive(c: Context, app: String): Boolean = !carnet(c).getBoolean("off_$app", false)
+    // L'animation de cette app est-elle activée ?
+    // Si l'utilisateur a déjà choisi (interrupteur dans les options), c'est son choix qui compte.
+    // Sinon, c'est le réglage de base du catalogue : activée, sauf pour quelques apps qu'on veut
+    // ouvrir tout de suite (Téléphone, Appareil photo…), désactivées de base.
+    fun appActive(c: Context, app: String): Boolean {
+        val reglages = carnet(c)
+        return if (reglages.contains("off_$app")) !reglages.getBoolean("off_$app", false)
+               else Catalogue.actifParDefaut(app)
+    }
     fun definirAppActive(c: Context, app: String, active: Boolean) {
         carnet(c).edit().putBoolean("off_$app", !active).apply()
     }

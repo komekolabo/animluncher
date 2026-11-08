@@ -6,7 +6,9 @@ import android.content.Context
 // "(Int) -> Scene" = une petite fonction qui crée une scène neuve à chaque ouverture ;
 // le nombre qu'on lui donne est le numéro de la variante (pour les apps qui en ont plusieurs).
 // "variantes" = le nom de chaque variante (liste vide si l'app n'a qu'une animation).
-class Entree(val categorie: Categorie, val fabrique: (Int) -> Scene, val variantes: List<String> = emptyList()) {
+// "actifParDefaut" = false : l'animation existe mais est désactivée de base (on peut l'activer dans les options).
+class Entree(val categorie: Categorie, val fabrique: (Int) -> Scene, val variantes: List<String> = emptyList(),
+             val actifParDefaut: Boolean = true) {
     // La durée par défaut (apparition + révélation), en millisecondes.
     val dureeDefaut: Int get() = (categorie.intro + categorie.revelation).toInt()
 }
@@ -25,9 +27,14 @@ object Catalogue {
     private val X = Categorie.ECHECS
 
     private fun e(categorie: Categorie, fabrique: () -> Scene) = Entree(categorie, { _ -> fabrique() })
+    // Une app dont l'animation est DÉSACTIVÉE de base (on veut l'ouvrir tout de suite).
+    private fun off(categorie: Categorie, fabrique: () -> Scene) = Entree(categorie, { _ -> fabrique() }, actifParDefaut = false)
     // Une app à plusieurs variantes : on donne leurs noms, et la fonction reçoit le numéro choisi.
     private fun v(categorie: Categorie, variantes: List<String>, fabrique: (Int) -> Scene) = Entree(categorie, fabrique, variantes)
 
+    // off(...) = désactivée de base (on veut ces apps tout de suite) : Téléphone, Appareil photo,
+    // Dictaphone, Authenticator, Identité Numérique La Poste, Wizway. Réactivables dans les options.
+    // « Transition » = juste une belle transition, la plus courte possible (voir ScenesTransition.kt).
     private val entrees: Map<String, Entree> = mapOf(
         // --- Lot 1 : les IA ---
         "com.anthropic.claude" to v(E, MONDES.map { it.nom }) { Horizons(it) },   // un des 5 horizons, au hasard
@@ -48,25 +55,25 @@ object Catalogue {
         "com.google.android.apps.tachyon" to e(C) { Visio() },
         "com.google.android.apps.translate" to e(C) { Passage() },
         "com.google.earth" to e(C) { PlaneteBleue() },
-        "com.google.android.apps.walletnfcrel" to e(C) { Eventail() },
+        "com.google.android.apps.walletnfcrel" to e(C) { Rapide(Eventail()) },   // raccourcie : pas de minimum de 1,2 s
         "com.google.android.play.games" to e(S) { Neon() },
+        "com.google.android.apps.authenticator2" to off(S) { Coffre() },
         "com.google.android.videos" to e(S) { Salon() },
-        "com.google.android.apps.authenticator2" to e(S) { Coffre() },
         // --- Lot 3 : système Samsung ---
-        "com.samsung.android.dialer" to e(E) { Appel() },
-        "com.samsung.android.messaging" to e(E) { Bulles() },
-        "com.sec.android.app.camera" to e(E) { Diaphragme() },
+        "com.samsung.android.dialer" to off(E) { Appel() },
+        "com.sec.android.app.camera" to off(E) { Diaphragme() },
+        "com.sec.android.app.voicenote" to off(C) { Bande() },
+        "com.samsung.android.messaging" to e(S) { Transition(rgb(70, 130, 255)) },      // minimale
         "com.sec.android.gallery3d" to e(E) { ChambreNoire() },
         "com.android.vending" to e(E) { Spirale() },
         "com.android.settings" to e(C) { Engrenages() },
         "com.samsung.android.app.contacts" to e(C) { Constellation() },
         "com.sec.android.app.clockpackage" to e(C) { Cadran() },
         "com.samsung.android.calendar" to e(C) { Ephemeride() },
-        "com.sec.android.app.popupcalculator" to e(C) { Compteur() },
+        "com.sec.android.app.popupcalculator" to e(S) { Transition(rgb(150, 160, 180)) },   // minimale
         "com.samsung.android.app.notes" to e(C) { Plume() },
         "com.sec.android.app.myfiles" to e(C) { Rotatif() },
         "com.sec.android.app.sbrowser" to e(C) { Toile() },
-        "com.sec.android.app.voicenote" to e(C) { Bande() },
         "com.samsung.android.app.reminder" to e(C) { Sablier() },
         "com.sec.android.app.shealth" to e(C) { Pouls() },
         "com.sec.android.app.samsungapps" to e(S) { Galaxie() },
@@ -80,7 +87,7 @@ object Catalogue {
         "com.samsung.android.tvplus" to e(S) { Mire() },
         "com.samsung.ecomm.global.gbr" to e(S) { Paquet() },
         // --- Lot 4 : réseaux, musique, services ---
-        "com.whatsapp" to e(E) { AvionPapier() },
+        "com.whatsapp" to e(S) { Transition(rgb(37, 211, 102)) },       // minimale
         "com.spotify.music" to e(E) { Vinyle() },
         "com.instagram.android" to e(C) { Pellicule() },
         "com.twitter.android" to e(C) { Eclipse() },
@@ -102,7 +109,7 @@ object Catalogue {
         "com.ledger.live" to e(C) { ChaineBlocs() },
         "com.kraken.pay.app" to e(S) { Piece() },
         "com.bankeen" to e(S) { Piles() },
-        "eu.epicompany.wero.wallet" to e(S) { Pont() },
+        "eu.epicompany.wero.wallet" to e(S) { Transition(rgb(230, 220, 70)) },   // minimale
         "zapsolutions.strike" to e(S) { StrikeNoirBlanc() },
         "com.cakewallet.cake_wallet" to e(S) { Strates() },
         "network.bisq.mobile.node" to e(S) { Echange() },
@@ -125,12 +132,15 @@ object Catalogue {
         "com.freevpnplanet" to e(S) { Bulle() },
         "io.github.libresprite" to e(S) { Pixels() },
         "fr.astillia.SigtaoMobile" to e(S) { Boussole() },
-        "com.wizway.nfcagent" to e(S) { SansContact() },
-        "fr.laposte.idn" to e(S) { Empreinte() },
         "com.airbnb.android" to e(S) { Cle() },
+        "fr.laposte.idn" to off(S) { Empreinte() },
+        "com.wizway.nfcagent" to off(S) { SansContact() },
     )
 
     fun pour(app: String): Entree? = entrees[app]
+
+    // L'animation de cette app est-elle activée de base ? (oui, sauf les apps marquées off)
+    fun actifParDefaut(app: String): Boolean = entrees[app]?.actifParDefaut ?: true
 
     // Prépare l'animation d'une app en tenant compte des réglages de l'utilisateur.
     // Renvoie null s'il ne faut rien jouer : pas d'animation pour cette app, animation

@@ -24,8 +24,13 @@ class AnimationView(context: Context, private val scene: Scene, categorie: Categ
     private val dureeIntro = (categorie.intro * facteur).toLong().coerceAtLeast(1L)
     private val dureeRevelation = (categorie.revelation * facteur).toLong().coerceAtLeast(1L)
     // Durée minimale avant la révélation (1,2 s, ajustée par la vitesse choisie dans les réglages).
-    private val dureeMin = (1200 * facteur).toLong()
-    private val dureeAttenteMax = maxOf(3000L, dureeIntro + 200L, dureeMin + 200L)
+    // Les scènes « SansMinimum » (messages, calculatrice…) n'en ont pas : elles s'effacent dès que
+    // l'app est prête, et n'attendent jamais plus de 0,9 s.
+    private val sansMinimum = scene is SansMinimum
+    private val dureeMin = if (sansMinimum) 0L else (1200 * facteur).toLong()
+    private val dureeAttenteMax =
+        if (sansMinimum) maxOf((900 * facteur).toLong(), dureeIntro + 100L)
+        else maxOf(3000L, dureeIntro + 200L, dureeMin + 200L)
 
     private var quandFini: (() -> Unit)? = null
     private val principal = Handler(Looper.getMainLooper())
