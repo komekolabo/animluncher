@@ -4,9 +4,14 @@ import android.accessibilityservice.AccessibilityService
 import android.content.Context
 import android.content.Intent
 import android.graphics.PixelFormat
+import android.graphics.Point
+import android.hardware.display.DisplayManager
+import android.os.Build
 import android.os.Handler
 import android.os.Looper
 import android.os.SystemClock
+import android.view.Display
+import android.view.Gravity
 import android.view.WindowManager
 import android.view.accessibility.AccessibilityEvent
 import java.text.SimpleDateFormat
@@ -14,21 +19,20 @@ import java.util.Date
 import java.util.Locale
 
 // Le service qui surveille quelle app passe au premier plan,
-// et qui joue l'animation correspondante.
+// et qui joue l'écran de chargement correspondant.
 class AppWatcherService : AccessibilityService() {
 
     private var derniereApp: String? = null
     private var vueEnCours: AnimationView? = null
+    private var appAnimee: String? = null      // l'app pour laquelle l'animation tourne
     private val minuteur = Handler(Looper.getMainLooper())
 
     // LE TABLEAU QUI ASSOCIE CHAQUE APP À SON ANIMATION.
     private val animations = mapOf(
-        "com.anthropic.claude" to AnimationView.Style.ECLAIR,
-        "com.google.android.googlequicksearchbox" to AnimationView.Style.ONDE
+        "com.anthropic.claude" to AnimationView.Style.CLAUDE,
+        "com.google.android.googlequicksearchbox" to AnimationView.Style.GOOGLE
     )
 
-    // Apps qui surgissent toutes seules et qu'on ignore :
-    // Samsung Wallet, clavier Samsung, panneau Samsung à gauche de l'accueil.
     private val ignorees = setOf(
         "com.samsung.android.spay",
         "com.samsung.android.honeyboard",
@@ -48,6 +52,19 @@ class AppWatcherService : AccessibilityService() {
         if (event.eventType != AccessibilityEvent.TYPE_WINDOW_STATE_CHANGED) return
         val app = event.packageName?.toString() ?: return
         if (app == packageName || app in ignorees) return
+        val classe = event.className?.toString()?.substringAfterLast('.') ?: "?"
+
+        // L'APP EST-ELLE PRÊTE ? Une animation attend son app : dès que le vrai écran
+        // de l'app arrive (autre chose que l'écran de lancement), on lance la révélation.
+        // Si une autre app passe devant (retour à l'accueil...), on révèle aussi.
+        vueEnCours?.let { vue ->
+            if (app != appAnimee || classe != "FrameLayout") {
+                vue.signalerPret()
+                if (app == appAnimee) {
+                    noter("  .. app prête après ${SystemClock.uptimeMillis() - vue.creeeA} ms (écran $classe)")
+                }
+            }
+        }
 
         val estVraieApp = app == ecranAccueil ||
             packageManager.getLaunchIntentForPackage(app) != null
@@ -62,46 +79,64 @@ class AppWatcherService : AccessibilityService() {
             return
         }
 
-        // --- DÉTECTION DU DÉMARRAGE ---
-        // Quand une app démarre, Android affiche d'abord son écran de lancement
-        // ("splash screen" : fond uni + icône). Cet écran est un FrameLayout.
-        // Quand l'app est juste reprise, on voit directement son vrai écran (MainActivity...).
-        val classe = event.className?.toString()?.substringAfterLast('.') ?: "?"
+        // FrameLayout = écran de lancement = l'app DÉMARRE.
         val demarrage = classe == "FrameLayout"
         noter("$app | écran $classe | " + if (demarrage) "DÉMARRAGE" else "reprise")
 
-        if (!Reglages.actif(this)) return               // kill switch
-        val style = animations[app] ?: return           // pas dans le tableau
-        if (precedente != ecranAccueil) return          // depuis l'accueil seulement
-        // Mode "seulement au démarrage" : on ignore les simples reprises.
+        if (!Reglages.actif(this)) return
+        val style = animations[app] ?: return
+        if (precedente != ecranAccueil) return
         if (Reglages.seulementDemarrage(this) && !demarrage) return
 
-        afficher(style)
+        // Si c'est une simple reprise, l'app est déjà prête : version courte.
+        afficher(style, app, dejaPrete = !demarrage)
     }
 
-    private fun afficher(style: AnimationView.Style) {
+    private fun afficher(style: AnimationView.Style, app: String, dejaPrete: Boolean) {
         val gestionnaire = getSystemService(Context.WINDOW_SERVICE) as WindowManager
         retirer(gestionnaire, "nouvelle animation")
 
+        // La VRAIE taille de l'écran, barres et encoche comprises.
+        val ecran = (getSystemService(Context.DISPLAY_SERVICE) as DisplayManager)
+            .getDisplay(Display.DEFAULT_DISPLAY)
+        val taille = Point()
+        @Suppress("DEPRECATION") ecran.getRealSize(taille)
+
         val vue = AnimationView(this, style)
         val reglages = WindowManager.LayoutParams(
-            WindowManager.LayoutParams.MATCH_PARENT,
-            WindowManager.LayoutParams.MATCH_PARENT,
+            taille.x, taille.y,
             WindowManager.LayoutParams.TYPE_ACCESSIBILITY_OVERLAY,
             WindowManager.LayoutParams.FLAG_NOT_TOUCHABLE or
                 WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE or
                 WindowManager.LayoutParams.FLAG_LAYOUT_IN_SCREEN or
+                WindowManager.LayoutParams.FLAG_LAYOUT_NO_LIMITS or   // déborde sur les barres
                 WindowManager.LayoutParams.FLAG_HARDWARE_ACCELERATED,
             PixelFormat.TRANSLUCENT
-        )
+        ).apply {
+            gravity = Gravity.TOP or Gravity.START
+            x = 0
+            y = 0
+            // Dessiner aussi dans la zone de l'encoche (caméra).
+            if (Build.VERSION.SDK_INT >= 30) {
+                layoutInDisplayCutoutMode =
+                    WindowManager.LayoutParams.LAYOUT_IN_DISPLAY_CUTOUT_MODE_ALWAYS
+                setFitInsetsTypes(0)   // ne pas se pousser pour éviter les barres système
+            } else if (Build.VERSION.SDK_INT >= 28) {
+                layoutInDisplayCutoutMode =
+                    WindowManager.LayoutParams.LAYOUT_IN_DISPLAY_CUTOUT_MODE_SHORT_EDGES
+            }
+        }
 
         try {
             gestionnaire.addView(vue, reglages)
             vueEnCours = vue
+            appAnimee = app
+            if (dejaPrete) vue.signalerPret()
             vue.jouer { if (vueEnCours === vue) retirer(gestionnaire, "fin normale") }
+            // Filet de sécurité : 3 s d'attente max + intro + révélation + marge.
             minuteur.postDelayed({
                 if (vueEnCours === vue) retirer(gestionnaire, "filet de sécurité")
-            }, 1000)
+            }, 4500)
         } catch (e: Exception) {
             noter("ERREUR animation : ${e.message}")
         }
@@ -112,6 +147,7 @@ class AppWatcherService : AccessibilityService() {
         vue.arreter()
         try { gestionnaire.removeView(vue) } catch (_: Exception) {}
         vueEnCours = null
+        appAnimee = null
         val ms = SystemClock.uptimeMillis() - vue.creeeA
         val surface = if (vue.surfaceCreee) "surface OK" else "PAS de surface"
         noter("  -> ${vue.images} images, $surface, $ms ms, $raison")
