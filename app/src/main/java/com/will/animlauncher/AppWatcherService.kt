@@ -19,20 +19,13 @@ import java.util.Date
 import java.util.Locale
 
 // Le service qui surveille quelle app passe au premier plan,
-// et qui joue l'écran de chargement correspondant.
+// et qui joue l'écran de chargement correspondant (voir Catalogue.kt).
 class AppWatcherService : AccessibilityService() {
 
     private var derniereApp: String? = null
     private var vueEnCours: AnimationView? = null
     private var appAnimee: String? = null      // l'app pour laquelle l'animation tourne
     private val minuteur = Handler(Looper.getMainLooper())
-
-    // LE TABLEAU QUI ASSOCIE CHAQUE APP À SON ANIMATION.
-    // Styles disponibles : HORIZON, CONSTELLATION, POINTS.
-    private val animations = mapOf(
-        "com.anthropic.claude" to AnimationView.Style.HORIZON,
-        "com.google.android.googlequicksearchbox" to AnimationView.Style.POINTS
-    )
 
     private val ignorees = setOf(
         "com.samsung.android.spay",
@@ -55,9 +48,8 @@ class AppWatcherService : AccessibilityService() {
         if (app == packageName || app in ignorees) return
         val classe = event.className?.toString()?.substringAfterLast('.') ?: "?"
 
-        // L'APP EST-ELLE PRÊTE ? Une animation attend son app : dès que le vrai écran
-        // de l'app arrive (autre chose que l'écran de lancement), on lance la révélation.
-        // Si une autre app passe devant (retour à l'accueil...), on révèle aussi.
+        // L'APP EST-ELLE PRÊTE ? Dès que le vrai écran de l'app arrive (autre chose que
+        // l'écran de lancement), ou qu'une autre app passe devant, on lance la révélation.
         vueEnCours?.let { vue ->
             if (app != appAnimee || classe != "FrameLayout") {
                 vue.signalerPret()
@@ -85,15 +77,15 @@ class AppWatcherService : AccessibilityService() {
         noter("$app | écran $classe | " + if (demarrage) "DÉMARRAGE" else "reprise")
 
         if (!Reglages.actif(this)) return
-        val style = animations[app] ?: return
+        val entree = Catalogue.pour(app) ?: return
         if (precedente != ecranAccueil) return
         if (Reglages.seulementDemarrage(this) && !demarrage) return
 
         // Si c'est une simple reprise, l'app est déjà prête : version courte.
-        afficher(style, app, dejaPrete = !demarrage)
+        afficher(entree, app, dejaPrete = !demarrage)
     }
 
-    private fun afficher(style: AnimationView.Style, app: String, dejaPrete: Boolean) {
+    private fun afficher(entree: Entree, app: String, dejaPrete: Boolean) {
         val gestionnaire = getSystemService(Context.WINDOW_SERVICE) as WindowManager
         retirer(gestionnaire, "nouvelle animation")
 
@@ -103,25 +95,24 @@ class AppWatcherService : AccessibilityService() {
         val taille = Point()
         @Suppress("DEPRECATION") ecran.getRealSize(taille)
 
-        val vue = AnimationView(this, style)
+        val vue = AnimationView(this, entree.fabrique(), entree.categorie)
         val reglages = WindowManager.LayoutParams(
             taille.x, taille.y,
             WindowManager.LayoutParams.TYPE_ACCESSIBILITY_OVERLAY,
             WindowManager.LayoutParams.FLAG_NOT_TOUCHABLE or
                 WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE or
                 WindowManager.LayoutParams.FLAG_LAYOUT_IN_SCREEN or
-                WindowManager.LayoutParams.FLAG_LAYOUT_NO_LIMITS or   // déborde sur les barres
+                WindowManager.LayoutParams.FLAG_LAYOUT_NO_LIMITS or
                 WindowManager.LayoutParams.FLAG_HARDWARE_ACCELERATED,
             PixelFormat.TRANSLUCENT
         ).apply {
             gravity = Gravity.TOP or Gravity.START
             x = 0
             y = 0
-            // Dessiner aussi dans la zone de l'encoche (caméra).
             if (Build.VERSION.SDK_INT >= 30) {
                 layoutInDisplayCutoutMode =
                     WindowManager.LayoutParams.LAYOUT_IN_DISPLAY_CUTOUT_MODE_ALWAYS
-                setFitInsetsTypes(0)   // ne pas se pousser pour éviter les barres système
+                setFitInsetsTypes(0)
             } else if (Build.VERSION.SDK_INT >= 28) {
                 layoutInDisplayCutoutMode =
                     WindowManager.LayoutParams.LAYOUT_IN_DISPLAY_CUTOUT_MODE_SHORT_EDGES
