@@ -9,6 +9,7 @@ import android.graphics.RectF
 import android.graphics.Shader
 import android.graphics.Typeface
 import kotlin.math.PI
+import kotlin.math.abs
 import kotlin.math.asin
 import kotlin.math.cos
 import kotlin.math.hypot
@@ -41,6 +42,18 @@ private val COUCHES = intArrayOf(rgb(60, 150, 170), rgb(70, 150, 80), rgb(190, 1
 private val CUIRS = intArrayOf(rgb(115, 30, 38), rgb(35, 78, 52), rgb(32, 48, 95), rgb(140, 92, 48), rgb(95, 40, 70), rgb(60, 60, 40))   // bordeaux, vert, marine, fauve, prune, olive
 private val BOIS = rgb(90, 55, 30)
 private val PIERRE = rgb(170, 135, 92)
+// Cellule : cytoplasme, noyau, mitochondries, réticulum, Golgi, têtes de la membrane ; les 4 bases de l'ADN
+private val CYTO = rgb(40, 95, 90)
+private val NOYAU = rgb(95, 70, 140)
+private val MITO = rgb(170, 75, 58)
+private val RETI = rgb(60, 140, 130)
+private val GOLGI = rgb(185, 145, 62)
+private val LIPIDE = rgb(205, 165, 95)
+private val BASES = intArrayOf(rgb(205, 95, 85), rgb(110, 175, 105), rgb(95, 135, 205), rgb(215, 175, 75))
+// Maths : le lavis bleu de Prusse des épures, le sinus en rouge, le cosinus en bleu
+private val EPURE = rgb(35, 58, 100)
+private val SINUS = rgb(215, 105, 95)
+private val COSINUS = rgb(110, 150, 215)
 // Babel : des lettres de toutes les langues (latin, grec, cyrillique, hébreu, arabe, chinois/japonais).
 // Android va chercher tout seul une police qui sait dessiner chaque écriture.
 private val ECRITURES = listOf("abcdefgh&§¶", "αβγδλπΩΣψ", "бжзЯЮфш", "אבגדהשת", "بتجدسعق", "語書言文字本")
@@ -99,6 +112,13 @@ class Gravure(private val nom: String, private val courbure: Float) {
         }
         pts
     }
+    // la cellule : molécules [x, hauteur, taille, phase, base], anticorps [x, hauteur, phase],
+    // mitochondries [x, profondeur, angle, taille], vésicules [x, profondeur, taille], chromatine [x, y, angle]
+    private val molecules = List(22) { floatArrayOf(r.nextFloat(), entre(0.08f, 0.6f), entre(0.006f, 0.013f), r.nextFloat() * 6.28f, r.nextInt(4).toFloat()) }
+    private val anticorps = List(4) { floatArrayOf(entre(0.08f, 0.92f), entre(0.1f, 0.5f), r.nextFloat() * 6.28f) }
+    private val mitos = List(9) { floatArrayOf(entre(-0.45f, 0.45f), entre(0.06f, 0.4f), r.nextFloat() * 3.14f, entre(0.8f, 1.2f)) }
+    private val vesicules = List(18) { floatArrayOf(entre(-0.5f, 0.5f), entre(0.04f, 0.42f), entre(0.006f, 0.014f)) }
+    private val chromatine = List(14) { floatArrayOf(entre(-0.8f, 0.8f), entre(-0.7f, 0.7f), r.nextFloat() * 6.28f) }
 
     // Moins gravé pour la collision et Babel : des hachures plus espacées et plus discrètes…
     private fun hachures(c: Canvas, chemin: Path, angle: Float, esp: Float, p: Paint) {
@@ -139,6 +159,8 @@ class Gravure(private val nom: String, private val courbure: Float) {
         val titres = when (nom) {
             "Vitrail" -> "PL. XII — LA ROSACE" to "Verrière gothique, d'après nature"
             "Accélérateur" -> "FIG. 2 — COLLISION DE PARTICULES" to "Traces relevées dans une chambre à bulles"
+            "Cellule" -> "PL. III — LA CELLULE VIVANTE" to "Coupe vue au microscope"
+            "Maths" -> "FIG. 1 — LE NOMBRE D'OR" to "Spirale, sinus et cercle gradué"
             else -> "PL. VII — LA BIBLIOTHÈQUE DE BABEL" to "Tous les livres, dans toutes les langues"
         }
         ecrireGravure(c, titres.first, cx, mg + 0.05f * h, 0.034f * m, avecAlpha(ENCRE, 0.85f * vis), CAPITALES)
@@ -218,6 +240,8 @@ class Gravure(private val nom: String, private val courbure: Float) {
                     }
                 }
             }
+            "Cellule" -> cielCellule(c, o, haut, w, h, m, sec, vis) { a, ep, col -> encre(a, ep, col) }
+            "Maths" -> cielMaths(c, o, cx, haut, w, h, m, dp, sec, vis) { a, ep, col -> encre(a, ep, col) }
             else -> babel(c, o, cx, crete(cx) + 2f * dp, w, h, m, dp, sec, vis) { a, ep, col -> encre(a, ep, col) }   // la tour de Babel
         }
 
@@ -239,6 +263,10 @@ class Gravure(private val nom: String, private val courbure: Float) {
         }
 
         // ---------- au-dessus de la courbe ----------
+        if (nom == "Cellule" && rCorps > 0f)
+            membrane(c, o, rCorps, h, m, dp, sec, vis, tmax, { a, ep, col -> encre(a, ep, col) }, { rr, th -> pt(rr, th) })
+        if (nom == "Maths" && rCorps > 0f)
+            cercleGradue(c, o, cx, cy, rCorps, w, h, m, dp, sec, vis, tmax, { a, ep, col -> encre(a, ep, col) }, { rr, th -> pt(rr, th) })
         if (nom == "Bibliothèque" && rev < 0.3f)                  // la ville au pied de la tour
             ville(c, o, cx, { x -> crete(x) }, w, m, dp, sec, vis * (1f - rev / 0.3f)) { a, ep, col -> encre(a, ep, col) }
         if (nom == "Accélérateur" && rCorps > 0f && sec < 0.45f) {   // les deux paquets de particules qui foncent
@@ -395,6 +423,8 @@ class Gravure(private val nom: String, private val courbure: Float) {
                     ecrireGravure(c, (if (k % 2 == 0) "D" else "Q") + (k + 4), p[0], p[1], 0.026f * m, avecAlpha(ENCRE, 0.6f * app))
                 }
             }
+            "Cellule" -> intCellule(c, o, cx, cy, rayon, haut, w, h, m, dp, sec, app, encreC)
+            "Maths" -> intMaths(c, o, cx, cy, rayon, haut, w, h, app, tmax, encreC, pt)
             else -> {
                 // sous la courbe : les galeries hexagonales de la Bibliothèque de Babel (Borges),
                 // chacune tapissée de livres, avec son puits central bordé d'une rambarde
@@ -581,5 +611,232 @@ class Gravure(private val nom: String, private val courbure: Float) {
             val a = vis * (0.75f + 0.25f * sin(sec * 3f + k))
             c.drawRect(x - 1.5f * dp, y - lh * 0.6f - 1.5f * dp, x + 1.5f * dp, y - lh * 0.6f + 1.5f * dp, o.pinceau(avecAlpha(rgb(240, 190, 110), 0.85f * a)))
         }
+    }
+
+    // ======================= LA CELLULE (biologie) =======================
+    // Au-dessus de la cellule : une double hélice d'ADN qui se dessine, des molécules et des anticorps.
+    private fun cielCellule(c: Canvas, o: Outils, haut: Float, w: Float, h: Float, m: Float, sec: Float, vis: Float, encreC: (Float, Float, Int) -> Paint) {
+        fun encre(a: Float, ep: Float, col: Int = ENCRE) = encreC(a, ep, col)
+        val dp = o.dp; val mg = 16f * dp
+        for (mo in molecules) {                                          // des molécules qui flottent
+            val x = (mo[0] + 0.015f * sin(sec * 0.8f + mo[3])) * w; val y = haut - mo[1] * h + 0.01f * h * cos(sec * 0.7f + mo[3])
+            val rr = mo[2] * m
+            val boule = Path(); boule.addCircle(x, y, rr, Path.Direction.CW)
+            lavis(c, o, boule, BASES[mo[4].toInt()], 0.55f * vis)
+            c.drawCircle(x - rr * 0.3f, y - rr * 0.3f, rr * 0.35f, o.pinceau(avecAlpha(rgb(240, 225, 200), 0.3f * vis)))
+            c.drawPath(boule, encre(0.6f * vis, 0.8f))
+        }
+        for (an in anticorps) {                                          // des anticorps, en forme de Y
+            val s = 0.024f * m
+            c.save(); c.translate(an[0] * w, haut - an[1] * h); c.rotate((an[2] + sec * 0.6f) * 180f / PI.toFloat())
+            for (b in arrayOf(floatArrayOf(0f, s), floatArrayOf(-s * 0.7f, -s * 0.7f), floatArrayOf(s * 0.7f, -s * 0.7f))) {
+                c.drawLine(0f, 0f, b[0], b[1], encre(0.85f * vis, 3.2f, LIPIDE)); c.drawLine(0f, 0f, b[0], b[1], encre(0.6f * vis, 1f))
+            }
+            c.restore()
+        }
+        // la double hélice : deux brins qui s'enroulent, reliés par des paires de bases colorées
+        val x0 = mg + 0.05f * w; val x1 = w - mg - 0.05f * w; val yH = haut - 0.36f * h; val amp = 0.055f * h; val lam = 0.45f * w
+        val fin = borne(sec / 0.8f); val ph = sec * 1.6f
+        fun brin(x: Float, k: Int): Float { val a = 2 * PI.toFloat() * (x - x0) / lam + ph; return yH + amp * sin(a + k * PI.toFloat()) }
+        val xf = x0 + (x1 - x0) * fin
+        val n = ((x1 - x0) / (0.028f * w)).toInt()
+        for (k in 0..n) {                                                // les barreaux : A-T et G-C
+            val x = x0 + k * (x1 - x0) / n
+            if (x > xf) break
+            val ya = brin(x, 0); val yb = brin(x, 1); val ym = (ya + yb) / 2
+            val i = (k * 7) % 4
+            c.drawLine(x, ya, x, ym, encre(0.8f * vis, 2.6f, BASES[i])); c.drawLine(x, ym, x, yb, encre(0.8f * vis, 2.6f, BASES[i xor 1]))
+        }
+        val couleursBrins = intArrayOf(rgb(110, 150, 210), rgb(210, 120, 100))
+        for (b in 0..1) {                                                // les deux brins (ruban coloré + trait d'encre)
+            val p = Path(); val n2 = 160
+            for (q in 0..n2) {
+                val x = x0 + (xf - x0) * q / n2
+                if (q == 0) p.moveTo(x, brin(x, b)) else p.lineTo(x, brin(x, b))
+            }
+            c.drawPath(p, encre(0.75f * vis, 4.5f, couleursBrins[b])); c.drawPath(p, encre(0.7f * vis, 1f))
+        }
+        if (fin > 0.3f) ecrireGravure(c, "a. A.D.N.", x0 + 0.06f * w, yH - amp - 0.03f * h, 0.028f * m, avecAlpha(ENCRE, 0.75f * vis))
+    }
+
+    // La cellule vue en coupe : cytoplasme, réticulum, noyau, mitochondries, Golgi, vésicules, et leurs légendes.
+    private fun intCellule(c: Canvas, o: Outils, cx: Float, cy: Float, rayon: Float, haut: Float, w: Float, h: Float, m: Float, dp: Float, sec: Float, app: Float,
+                           encreC: (Float, Float, Int) -> Paint) {
+        fun encre(a: Float, ep: Float, col: Int = ENCRE) = encreC(a, ep, col)
+        val fond = Path(); fond.addRect(0f, haut - 2f, w, h * 1.2f, Path.Direction.CW)
+        lavis(c, o, fond, CYTO, 0.4f * app)                              // le cytoplasme
+        hachures(c, fond, 30f, 9f * dp, encre(0.25f * app, 0.6f))
+        val nx = cx + 0.12f * w; val ny = haut + 0.29f * h; val rx = 0.33f * w; val ry = 0.13f * h
+        for (k in 0 until 3) {                                           // le réticulum : des replis autour du noyau
+            val p = Path(); val n = 90
+            for (q in 0..n) {
+                val t = 2 * PI.toFloat() * q / n; val e = 1.18f + 0.1f * k + 0.025f * sin(14 * t + k + sec)
+                if (q == 0) p.moveTo(nx + rx * e * cos(t), ny + ry * e * sin(t)) else p.lineTo(nx + rx * e * cos(t), ny + ry * e * sin(t))
+            }
+            c.drawPath(p, encre(0.6f * app, 3f, RETI)); c.drawPath(p, encre(0.5f * app, 0.7f))
+        }
+        val noyau = Path(); noyau.addOval(RectF(nx - rx, ny - ry, nx + rx, ny + ry), Path.Direction.CW)   // le noyau
+        lavis(c, o, noyau, NOYAU, 0.7f * app)
+        hachures(c, noyau, 45f, 4f * dp, encre(0.5f * app, 0.6f))
+        for (ch in chromatine) {                                         // la chromatine, en petits filaments
+            val x = nx + ch[0] * rx * 0.85f; val y = ny + ch[1] * ry * 0.85f
+            val f = Path(); f.moveTo(x, y)
+            f.quadTo(x + 0.02f * w * cos(ch[2]), y + 0.02f * h * sin(ch[2]), x + 0.035f * w * cos(ch[2] + 1), y + 0.01f * h * sin(ch[2] + 1))
+            c.drawPath(f, encre(0.6f * app, 1.6f, rgb(150, 120, 200)))
+        }
+        val nucl = Path(); nucl.addCircle(nx + 0.05f * w, ny - 0.03f * h, 0.04f * m, Path.Direction.CW)   // le nucléole
+        lavis(c, o, nucl, rgb(70, 45, 110), 0.9f * app)
+        hachures(c, nucl, -45f, 3f * dp, encre(0.6f * app, 0.6f))
+        c.drawPath(nucl, encre(0.8f * app, 1f))
+        c.drawPath(noyau, encre(0.9f * app, 1.5f))
+        c.drawOval(RectF(nx - rx - 4f * dp, ny - ry - 4f * dp, nx + rx + 4f * dp, ny + ry + 4f * dp), encre(0.7f * app, 0.9f))   // la double membrane
+        val pore = o.pinceau(avecAlpha(CYTO, app))
+        for (k in 0 until 16) {                                          // ses pores
+            val t = 2 * PI.toFloat() * k / 16
+            c.drawCircle(nx + (rx + 2f * dp) * cos(t), ny + (ry + 2f * dp) * sin(t), 1.8f * dp, pore)
+        }
+        val gx = cx - 0.3f * w; val gy = haut + 0.2f * h                 // l'appareil de Golgi : des saccules empilés
+        for (k in 0 until 4) {
+            val p = Path(); p.addArc(RectF(gx - 0.09f * w + k * 4f * dp, gy - 0.05f * h + k * 0.011f * h, gx + 0.09f * w - k * 4f * dp, gy + 0.05f * h + k * 0.011f * h), 200f, 140f)
+            c.drawPath(p, encre(0.8f * app, 5f, GOLGI)); c.drawPath(p, encre(0.6f * app, 0.8f))
+        }
+        for (mi in mitos) {                                              // les mitochondries et leurs crêtes
+            val x = cx + mi[0] * w; val y = haut + mi[1] * h + 0.04f * h
+            val ex = (x - nx) / (rx * 1.45f); val ey = (y - ny) / (ry * 1.6f)
+            if (ex * ex + ey * ey < 1f) continue
+            if (abs(x - gx) < 0.12f * w && abs(y - gy) < 0.08f * h) continue
+            val lg = 0.055f * m * mi[3]; val ep = 0.024f * m * mi[3]
+            c.save(); c.translate(x, y); c.rotate((mi[2] + 0.15f * sin(sec + mi[0] * 9f)) * 180f / PI.toFloat())
+            val forme = Path(); forme.addRoundRect(RectF(-lg, -ep, lg, ep), ep, ep, Path.Direction.CW)
+            lavis(c, o, forme, MITO, 0.8f * app)
+            val cr = Path(); cr.moveTo(-lg * 0.8f, 0f)
+            for (j in 1..8) cr.lineTo(-lg * 0.8f + j * lg * 0.2f, ep * 0.6f * (if (j % 2 == 1) 1f else -1f))
+            c.drawPath(cr, encre(0.7f * app, 1f, rgb(240, 180, 150)))
+            c.drawPath(forme, encre(0.85f * app, 1.1f))
+            c.restore()
+        }
+        for (v in vesicules) {                                           // les vésicules
+            val x = cx + v[0] * w; val y = haut + v[1] * h + 0.03f * h
+            val ex = (x - nx) / (rx * 1.3f); val ey = (y - ny) / (ry * 1.4f)
+            if (ex * ex + ey * ey < 1f) continue
+            val ve = Path(); ve.addCircle(x, y, v[2] * m, Path.Direction.CW)
+            lavis(c, o, ve, GOLGI, 0.5f * app); c.drawPath(ve, encre(0.7f * app, 0.8f))
+        }
+        val legende = avecAlpha(ENCRE, 0.8f * app)                       // les légendes, comme sur une planche
+        c.drawLine(nx - rx * 0.2f, ny + ry * 0.4f, nx - rx * 0.55f, ny + ry + 0.038f * h, encre(0.6f * app, 0.7f))
+        ecrireGravure(c, "b. Noyau", nx - rx * 0.55f, ny + ry + 0.05f * h, 0.028f * m, legende)
+        c.drawLine(gx, gy - 0.03f * h, gx - 0.02f * w, gy - 0.092f * h, encre(0.6f * app, 0.7f))
+        ecrireGravure(c, "c. Golgi", gx - 0.02f * w, gy - 0.08f * h, 0.028f * m, legende)
+    }
+
+    // La membrane : une double couche de lipides (une tête ronde, une queue) tout le long de la courbe.
+    private fun membrane(c: Canvas, o: Outils, rCorps: Float, h: Float, m: Float, dp: Float, sec: Float, vis: Float, tmax: Float,
+                         encreC: (Float, Float, Int) -> Paint, pt: (Float, Float) -> FloatArray) {
+        val ep = 0.016f * h
+        val tete = o.pinceau(avecAlpha(LIPIDE, 0.85f * vis))
+        for (couche in 0..1) {
+            val rr = rCorps - couche * ep; val sens = if (couche == 0) 1f else -1f
+            val n = (2 * tmax * rr / (0.012f * m)).toInt()
+            for (j in 0..n) {
+                val th = -tmax + 2 * tmax * j / max(1, n) + 0.006f * sin(sec * 1.5f + j)
+                val p = pt(rr, th); val q = pt(rr - sens * ep * 0.45f, th)
+                c.drawLine(p[0], p[1], q[0], q[1], encreC(0.55f * vis, 0.8f, ENCRE))
+                c.drawCircle(p[0], p[1], 0.0048f * m, tete)
+                c.drawCircle(p[0], p[1], 0.0048f * m, encreC(0.6f * vis, 0.6f, ENCRE))
+            }
+        }
+    }
+
+    // ======================= LES MATHS =======================
+    // Au-dessus : le papier quadrillé, le rectangle d'or et sa spirale qui se construisent, une sinusoïde.
+    private fun cielMaths(c: Canvas, o: Outils, cx: Float, haut: Float, w: Float, h: Float, m: Float, dp: Float, sec: Float, vis: Float,
+                          encreC: (Float, Float, Int) -> Paint) {
+        fun encre(a: Float, ep: Float, col: Int = ENCRE) = encreC(a, ep, col)
+        val mg = 16f * dp
+        val pas = 0.05f * m                                              // le quadrillage
+        var y = modulo(haut, pas)
+        while (y < haut) { c.drawLine(mg, y, w - mg, y, encre(0.12f * vis, 0.6f)); y += pas }
+        var x = modulo(cx, pas)
+        while (x < w - mg) { if (x > mg) c.drawLine(x, 0.13f * h, x, haut, encre(0.12f * vis, 0.6f)); x += pas }
+        val phi = (1f + sqrt(5f)) / 2                                    // le rectangle d'or, découpé en carrés
+        val L = min(0.7f * w, 0.42f * (haut - 0.16f * h) * phi); val H = L / phi
+        var rx = cx - L / 2; var ry = haut - 0.2f * h - H; var rw = L; var rh = H
+        val couleurs = intArrayOf(rgb(215, 175, 75), rgb(110, 150, 215), rgb(215, 105, 95), rgb(110, 175, 105))
+        val spirale = Path(); var premier = true
+        for (k in 0 until 9) {
+            val visible = borne((sec - k * 0.07f) / 0.12f)
+            if (visible <= 0f) break
+            val sx: Float; val sy: Float; val cote: Float; val ccx: Float; val ccy: Float; val a0: Float
+            when (k % 4) {                                               // on coupe un carré à gauche, en haut, à droite, en bas…
+                0 -> { sx = rx; sy = ry; cote = rh; ccx = rx + rh; ccy = ry + rh; a0 = 180f; rx += rh; rw -= rh }
+                1 -> { sx = rx; sy = ry; cote = rw; ccx = rx; ccy = ry + rw; a0 = 270f; ry += rw; rh -= rw }
+                2 -> { sx = rx + rw - rh; sy = ry; cote = rh; ccx = rx + rw - rh; ccy = ry; a0 = 0f; rw -= rh }
+                else -> { sx = rx; sy = ry + rh - rw; cote = rw; ccx = rx + rw; ccy = ry + rh - rw; a0 = 90f; rh -= rw }
+            }
+            val carre = Path(); carre.addRect(sx, sy, sx + cote, sy + cote, Path.Direction.CW)
+            lavis(c, o, carre, couleurs[k % 4], 0.28f * vis * visible)
+            c.drawPath(carre, encre(0.7f * vis * visible, 1f))
+            spirale.arcTo(RectF(ccx - cote, ccy - cote, ccx + cote, ccy + cote), a0, 90f * visible, premier); premier = false
+        }
+        c.drawPath(spirale, encre(0.9f * vis, 2.2f, OR))                 // … et un quart de cercle dans chacun : la spirale d'or
+        ecrireGravure(c, "φ = 1,618…", cx - L / 2 + 0.06f * w, haut - 0.2f * h - H - 0.025f * h, 0.03f * m, avecAlpha(OR, 0.85f * vis))
+        val ys = haut - 0.09f * h; val amp = 0.035f * h                  // la sinusoïde, sur son axe
+        val xa = mg + 0.04f * w; val lx = w - 2 * mg - 0.08f * w
+        c.drawLine(xa, ys, xa + lx, ys, encre(0.5f * vis, 0.8f))
+        val p = Path(); val n = 120; val fin = borne(sec / 0.9f)
+        for (q in 0..(n * fin).toInt()) {
+            val px = xa + lx * q / n; val py = ys - amp * sin(2 * PI.toFloat() * 2 * q / n - sec * 2f)
+            if (q == 0) p.moveTo(px, py) else p.lineTo(px, py)
+        }
+        c.drawPath(p, encre(0.85f * vis, 2f, SINUS))
+        for ((k, lab) in listOf("0", "π", "2π", "3π", "4π").withIndex()) {
+            val px = xa + lx * k / 4
+            c.drawLine(px, ys - 3f * dp, px, ys + 3f * dp, encre(0.6f * vis, 0.8f))
+            ecrireGravure(c, lab, px, ys + 0.018f * h, 0.024f * m, avecAlpha(ENCRE, 0.6f * vis))
+        }
+    }
+
+    // Sous la courbe : l'épure au lavis bleu, des cercles concentriques et des rayons.
+    private fun intMaths(c: Canvas, o: Outils, cx: Float, cy: Float, rayon: Float, haut: Float, w: Float, h: Float, app: Float, tmax: Float,
+                         encreC: (Float, Float, Int) -> Paint, pt: (Float, Float) -> FloatArray) {
+        val fond = Path(); fond.addRect(0f, haut - 2f, w, h * 1.2f, Path.Direction.CW)
+        lavis(c, o, fond, EPURE, 0.55f * app)
+        for (k in 1..11) c.drawCircle(cx, cy, rayon - k * 0.03f * h, encreC((if (k % 5 == 0) 0.45f else 0.22f) * app, 0.7f, ENCRE))
+        for (j in -40..40) {
+            val th = j * 1.5f * PI.toFloat() / 180f
+            if (abs(th) > tmax) continue
+            val a = pt(rayon - 0.02f * h, th); val b = pt(rayon - 0.4f * h, th)
+            c.drawLine(a[0], a[1], b[0], b[1], encreC((if (j % 10 == 0) 0.35f else 0.15f) * app, 0.6f, ENCRE))
+        }
+    }
+
+    // Le bord gradué en degrés, la tangente, et un point qui glisse avec son sinus (rouge) et son cosinus (bleu).
+    private fun cercleGradue(c: Canvas, o: Outils, cx: Float, cy: Float, rCorps: Float, w: Float, h: Float, m: Float, dp: Float, sec: Float, vis: Float, tmax: Float,
+                             encreC: (Float, Float, Int) -> Paint, pt: (Float, Float) -> FloatArray) {
+        fun encre(a: Float, ep: Float, col: Int = ENCRE) = encreC(a, ep, col)
+        for (j in -40..40) {                                             // les graduations, tous les degrés
+            val th = j * PI.toFloat() / 180f
+            if (abs(th) > tmax) continue
+            val lg = (if (j % 5 == 0) 0.022f else 0.01f) * h
+            val a = pt(rCorps, th); val b = pt(rCorps - lg, th)
+            c.drawLine(a[0], a[1], b[0], b[1], encre(0.8f * vis, 1f))
+            if (j % 5 == 0 && j != 0) { val l = pt(rCorps - 0.04f * h, th); ecrireGravure(c, "$j°", l[0], l[1], 0.024f * m, avecAlpha(ENCRE, 0.7f * vis)) }
+        }
+        val ys = cy - rCorps
+        c.drawLine(cx - 0.42f * w, ys, cx + 0.42f * w, ys, encre(0.8f * vis, 1.4f, OR))      // la tangente au sommet, et l'angle droit
+        val q = 0.025f * m
+        c.drawLine(cx + q, ys, cx + q, ys + q, encre(0.8f * vis, 1f, OR)); c.drawLine(cx + q, ys + q, cx, ys + q, encre(0.8f * vis, 1f, OR))
+        c.drawLine(cx, ys, cx, ys + 0.3f * h, encre(0.8f * vis, 1.6f, COSINUS))              // l'axe (cosinus)
+        ecrireGravure(c, "cos θ", cx - 0.06f * w, ys + 0.2f * h, 0.03f * m, avecAlpha(COSINUS, 0.9f * vis))
+        val th = 0.8f * tmax * sin(sec * 1.2f)                           // le point qui glisse sur le cercle
+        val p = pt(rCorps, th)
+        c.drawLine(p[0], p[1], cx, p[1], encre(0.9f * vis, 2f, SINUS))                        // son sinus
+        ecrireGravure(c, "sin θ", (p[0] + cx) / 2, p[1] + 0.022f * h, 0.03f * m, avecAlpha(SINUS, 0.9f * vis))
+        val bas = pt(rCorps - 0.3f * h, th)
+        c.drawLine(p[0], p[1], bas[0], bas[1], encre(0.6f * vis, 1f))                         // son rayon
+        val lt = pt(rCorps - 0.12f * h, th / 2)
+        ecrireGravure(c, "θ", lt[0], lt[1], 0.032f * m, avecAlpha(OR, 0.9f * vis))
+        o.halo(c, p[0], p[1], 12f * dp, 0.35f * vis, OR)
+        c.drawCircle(p[0], p[1], 4f * dp, o.pinceau(avecAlpha(OR, vis))); c.drawCircle(p[0], p[1], 4f * dp, encre(0.9f * vis, 1f))
     }
 }
