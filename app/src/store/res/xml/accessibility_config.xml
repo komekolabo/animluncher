@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- VERSION STORE : le service d'accessibilité ALLÉGÉ (le strict minimum pour Google Play).
+     On reçoit seulement deux signaux :
+       typeViewClicked        = on a appuyé sur quelque chose (une icône de l'écran d'accueil) ;
+       typeWindowStateChanged = une app passe au premier plan.
+     PAS de canRetrieveWindowContent : le service ne peut PAS lire le contenu de l'écran
+     (ni les widgets, ni les apps récentes). Il reçoit seulement le nom écrit sous l'icône touchée.
+     (Ta version Perso utilise src/main/res/xml/accessibility_config.xml, plus complet.) -->
+<accessibility-service xmlns:android="http://schemas.android.com/apk/res/android"
+    android:accessibilityEventTypes="typeWindowStateChanged|typeViewClicked"
+    android:accessibilityFeedbackType="feedbackGeneric"
+    android:notificationTimeout="0"
+    android:canRetrieveWindowContent="false"
+    android:description="@string/description_service" />

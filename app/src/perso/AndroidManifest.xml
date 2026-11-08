@@ -1,0 +1,31 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- VERSION PERSO uniquement : ajouté au manifeste commun (src/main) au moment de la compilation. -->
+<manifest xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:tools="http://schemas.android.com/tools">
+
+    <!-- Internet : seulement pour envoyer le journal sur GitHub (si une clé a été donnée). -->
+    <uses-permission android:name="android.permission.INTERNET" />
+
+    <!-- MODE STANDARD (sans accessibilité, voir ModeStandard.kt) :
+         - lire le journal d'utilisation d'Android (l'utilisateur l'autorise dans les réglages) ;
+         - afficher le rideau par-dessus les autres apps ;
+         - tourner en continu avec une notification (service « au premier plan »). -->
+    <uses-permission android:name="android.permission.PACKAGE_USAGE_STATS"
+        tools:ignore="ProtectedPermissions" />
+    <uses-permission android:name="android.permission.SYSTEM_ALERT_WINDOW" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_SPECIAL_USE" />
+    <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
+
+    <application>
+        <!-- Le MODE STANDARD : la détection sans accessibilité (prototype). -->
+        <service
+            android:name=".ModeStandard"
+            android:exported="false"
+            android:foregroundServiceType="specialUse">
+            <property
+                android:name="android.app.PROPERTY_SPECIAL_USE_FGS_SUBTYPE"
+                android:value="Détecte l'ouverture des apps pour jouer une animation de lancement" />
+        </service>
+    </application>
+</manifest>
