@@ -86,7 +86,7 @@ object Catalogue {
         "com.twitter.android" to e(C) { Eclipse() },
         "com.discord" to e(C) { EnseigneNeon() },
         "ee.mtakso.client" to e(C) { Route() },
-        "com.duolingo" to e(C) { Flamme() },
+        "com.duolingo" to v(C, DUO_VARIANTES) { duolingo(it) },   // une des 5 animations Duolingo, au hasard
         "com.suno.android" to e(C) { Spectre() },
         "com.github.android" to e(C) { Branches() },
         "com.fabernovel.ratp" to e(C) { Quai() },
