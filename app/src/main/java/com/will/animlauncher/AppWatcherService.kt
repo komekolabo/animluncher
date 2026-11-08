@@ -131,6 +131,14 @@ class AppWatcherService : AccessibilityService() {
                 noter("« Tout fermer » : toutes les apps sont fermées")
                 return
             }
+            // Un appui sur une CARTE des apps récentes (pas une icône) : c'est une reprise depuis
+            // l'arrière-plan. L'app s'affiche tout de suite, avant toute animation possible : on ne
+            // joue rien. (Avant, cet appui était pris pour un widget, et l'animation arrivait EN
+            // RETARD, par-dessus l'app déjà affichée.)
+            if (dansRecents) {
+                noter("appui dans les apps récentes « ${textes.joinToString(" / ")} » : reprise, pas d'animation")
+                return
+            }
             clicInconnuA = dernierClicAccueil
             noter("clic accueil « ${textes.joinToString(" / ")} » : pas une app connue")
             return
