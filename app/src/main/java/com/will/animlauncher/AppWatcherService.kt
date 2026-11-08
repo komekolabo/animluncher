@@ -28,9 +28,10 @@ class AppWatcherService : AccessibilityService() {
     private val minuteur = Handler(Looper.getMainLooper())
 
     // LE TABLEAU QUI ASSOCIE CHAQUE APP À SON ANIMATION.
+    // Styles disponibles : HORIZON, CONSTELLATION, POINTS.
     private val animations = mapOf(
-        "com.anthropic.claude" to AnimationView.Style.CLAUDE,
-        "com.google.android.googlequicksearchbox" to AnimationView.Style.GOOGLE
+        "com.anthropic.claude" to AnimationView.Style.HORIZON,
+        "com.google.android.googlequicksearchbox" to AnimationView.Style.POINTS
     )
 
     private val ignorees = setOf(
