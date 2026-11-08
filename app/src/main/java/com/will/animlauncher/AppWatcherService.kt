@@ -80,13 +80,16 @@ class AppWatcherService : AccessibilityService() {
         }
         if (app in ignorees) return
         if (!Reglages.actif(this)) return
-        val entree = Catalogue.pour(app) ?: return
+        if (Catalogue.pour(app) == null) return
+        // Réglages de l'app : désactivée, durée 0 s, ou aucune variante cochée -> rien
+        val lancement = Catalogue.lancement(this, app)
+        if (lancement == null) { noter("clic -> $app : animation désactivée dans les réglages"); return }
         // Mode « seulement au démarrage » : si l'app a déjà été ouverte, c'est sûrement
         // une reprise -> on laisse l'ancienne méthode décider (elle ignore les reprises).
         if (Reglages.seulementDemarrage(this) && app in dejaOuvertes) return
         appCliquee = app
         clicA = SystemClock.uptimeMillis()
-        afficher(entree, app, dejaPrete = false)      // d'abord l'animation, le journal après
+        afficher(lancement, app, dejaPrete = false)      // d'abord l'animation, le journal après
         noter("clic sur « ${textes.firstOrNull() ?: "?"} » -> $app : animation lancée")
     }
 
@@ -180,7 +183,7 @@ class AppWatcherService : AccessibilityService() {
         noter("$app | écran $classe | " + if (demarrage) "DÉMARRAGE" else "reprise")
 
         if (!Reglages.actif(this)) return
-        val entree = Catalogue.pour(app) ?: return
+        val lancement = Catalogue.lancement(this, app) ?: return
         if (precedente != ecranAccueil) return
         if (Reglages.seulementDemarrage(this) && !demarrage) return
         // Une app peut faire apparaître une fenêtre sans qu'on l'ait ouverte (mini-lecteur
@@ -199,11 +202,11 @@ class AppWatcherService : AccessibilityService() {
         }
 
         // Si c'est une simple reprise, l'app est déjà prête : version courte.
-        afficher(entree, app, dejaPrete = !demarrage)
+        afficher(lancement, app, dejaPrete = !demarrage)
         appApparue = true      // ici, la fenêtre de l'app est déjà là
     }
 
-    private fun afficher(entree: Entree, app: String, dejaPrete: Boolean) {
+    private fun afficher(lancement: Lancement, app: String, dejaPrete: Boolean) {
         val gestionnaire = getSystemService(Context.WINDOW_SERVICE) as WindowManager
         retirer(gestionnaire, "nouvelle animation")
 
@@ -213,7 +216,7 @@ class AppWatcherService : AccessibilityService() {
         val taille = Point()
         @Suppress("DEPRECATION") ecran.getRealSize(taille)
 
-        val vue = AnimationView(this, entree.fabrique(), entree.categorie)
+        val vue = AnimationView(this, lancement.scene, lancement.categorie, lancement.facteur)
         val reglages = WindowManager.LayoutParams(
             taille.x, taille.y,
             WindowManager.LayoutParams.TYPE_ACCESSIBILITY_OVERLAY,
@@ -244,10 +247,10 @@ class AppWatcherService : AccessibilityService() {
             appApparue = false
             if (dejaPrete) vue.signalerPret()
             vue.jouer { if (vueEnCours === vue) retirer(gestionnaire, "fin normale") }
-            // Filet de sécurité : 3 s d'attente max + intro + révélation + marge.
+            // Filet de sécurité : attente max + révélation + une marge d'une seconde.
             minuteur.postDelayed({
                 if (vueEnCours === vue) retirer(gestionnaire, "filet de sécurité")
-            }, 4500)
+            }, vue.dureeMax + 1000)
         } catch (e: Exception) {
             noter("ERREUR animation : ${e.message}")
         }

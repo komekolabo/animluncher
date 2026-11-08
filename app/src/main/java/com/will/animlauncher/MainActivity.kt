@@ -55,6 +55,13 @@ class MainActivity : Activity() {
             }
         }
 
+        // Le grand bouton vers la liste des apps : couper, accélérer ou ralentir chaque animation.
+        val boutonApps = Button(this).apply {
+            text = "🎬  Animations par app"
+            textSize = 18f
+            setOnClickListener { startActivity(Intent(this@MainActivity, AppsActivity::class.java)) }
+        }
+
         val boutonVolet = Button(this).apply {
             text = "Ajouter le bouton au volet rapide"
             setOnClickListener { proposerTuile() }
@@ -95,6 +102,7 @@ class MainActivity : Activity() {
 
         colonne.addView(interrupteur)
         colonne.addView(interrupteurDemarrage)
+        colonne.addView(boutonApps)
         colonne.addView(boutonVolet)
         colonne.addView(statut)
         colonne.addView(boutonAccessibilite)

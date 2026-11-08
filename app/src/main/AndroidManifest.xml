@@ -34,6 +34,15 @@
             android:name=".JournalActivity"
             android:exported="false" />
 
+        <!-- La liste des apps, et les réglages d'une app (durée, variantes, aperçu). -->
+        <activity
+            android:name=".AppsActivity"
+            android:exported="false"
+            android:windowSoftInputMode="adjustResize" />
+        <activity
+            android:name=".ReglageAppActivity"
+            android:exported="false" />
+
         <!-- Le service qui détecte l'app ouverte et joue l'animation. -->
         <service
             android:name=".AppWatcherService"
