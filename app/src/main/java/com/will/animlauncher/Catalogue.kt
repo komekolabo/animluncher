@@ -17,7 +17,7 @@ object Catalogue {
 
     private val entrees: Map<String, Entree> = mapOf(
         // --- Lot 1 : les IA ---
-        "com.anthropic.claude" to e(E) { Horizon() },
+        "com.anthropic.claude" to e(E) { Horizons() },   // un des 5 horizons, au hasard
         "com.anthropic.aibo" to e(E) { Lucioles() },
         "com.openai.chatgpt" to e(E) { Brume() },
         "com.google.android.apps.bard" to e(E) { Aurore() },
@@ -25,7 +25,7 @@ object Catalogue {
         // --- Lot 2 : Google ---
         "com.google.android.googlequicksearchbox" to e(E) { Quatre() },
         "com.android.chrome" to e(E) { Tunnel() },
-        "com.google.android.apps.maps" to e(E) { AEtoile() },
+        "com.google.android.apps.maps" to e(E) { Capitales() },   // une des 5 capitales, au hasard
         "com.google.android.gm" to e(E) { Pli() },
         "com.google.android.apps.photos" to e(E) { PoseLongue() },
         "app.revanced.android.youtube" to e(E) { Cinema() },
