@@ -22,9 +22,10 @@ import kotlin.random.Random
 
 // ===================== CLAUDE : « Horizons » =====================
 // Même histoire que Horizon : une courbe monte, la lumière respire, puis le sol monte et un liseré
-// révèle l'app. Mais 6 courbes, tirées au hasard à chaque ouverture, sur des sujets variés :
+// révèle l'app. Mais 7 courbes, tirées au hasard à chaque ouverture, sur des sujets variés :
 // planète (la version de base), forêt (avec le sol vu en coupe), cellule (biologie),
-// vitrail (art), collisionneur de particules (physique), cercle trigonométrique (maths).
+// cercle trigonométrique (maths), et trois planches en gravure ancienne (voir ScenesGravures.kt) :
+// la rosace (art), la collision de particules (physique), la bibliothèque (littérature).
 
 // La fiche d'un monde : courbure du sol (rayon / largeur d'écran) et ses couleurs.
 class Monde(
@@ -36,16 +37,16 @@ val MONDES = listOf(
     Monde("Planète", 1.6f, rgb(7, 8, 13), rgb(7, 8, 13), rgb(11, 14, 26), rgb(230, 170, 130), rgb(230, 150, 100), rgb(217, 119, 87)),
     Monde("Forêt", 2.4f, rgb(18, 28, 58), rgb(220, 150, 115), rgb(12, 18, 16), rgb(250, 205, 160), rgb(250, 185, 130), rgb(240, 170, 120)),
     Monde("Cellule", 1.8f, rgb(3, 10, 12), rgb(10, 34, 36), rgb(9, 30, 32), rgb(140, 235, 210), rgb(120, 230, 200), rgb(120, 230, 200)),
-    Monde("Vitrail", 2.2f, rgb(9, 8, 12), rgb(28, 22, 30), rgb(14, 12, 16), rgb(235, 195, 120), rgb(255, 215, 150), rgb(235, 195, 120)),
-    Monde("Collisionneur", 1.9f, rgb(4, 6, 12), rgb(12, 18, 36), rgb(10, 12, 20), rgb(120, 190, 255), rgb(150, 210, 255), rgb(120, 190, 255)),
+    Monde("Vitrail", 2.2f, 0, 0, 0, 0, 0, 0),               // gravure : ses couleurs sont dans ScenesGravures.kt
+    Monde("Accélérateur", 1.9f, 0, 0, 0, 0, 0, 0),          // gravure
     Monde("Maths", 1.7f, rgb(6, 10, 22), rgb(16, 26, 50), rgb(9, 16, 32), rgb(190, 215, 255), rgb(190, 215, 255), rgb(190, 215, 255)),
+    Monde("Bibliothèque", 2.0f, 0, 0, 0, 0, 0, 0),          // gravure
 )
 
 private val ATMO_D = floatArrayOf(0f, 5f, 13f, 24f, 31f, 42f, 75f, 130f)
 private val PLANETE_ATMO = intArrayOf(rgb(210, 150, 110), rgb(190, 110, 70), rgb(150, 70, 50), rgb(110, 45, 75), rgb(55, 75, 140), rgb(35, 45, 105), rgb(20, 16, 50), rgb(7, 8, 13))
-private val VERRES = intArrayOf(rgb(40, 70, 190), rgb(170, 30, 55), rgb(205, 150, 45), rgb(35, 130, 75), rgb(105, 45, 165))
-private val RAYONS_VITRAIL = intArrayOf(rgb(60, 100, 230), rgb(220, 60, 80), rgb(240, 190, 70), rgb(60, 180, 110), rgb(150, 80, 210))
-private val TRACES_COULEURS = intArrayOf(rgb(120, 200, 255), rgb(255, 170, 90), rgb(220, 120, 255))
+// Les mondes dessinés en gravure ancienne (par la classe Gravure).
+private val GRAVURES = setOf("Vitrail", "Accélérateur", "Bibliothèque")
 
 // Un dégradé vertical de y0 (couleur « haut ») à y1 (couleur « bas »), sur toute la largeur.
 private fun degrade(c: Canvas, o: Outils, w: Float, y0: Float, y1: Float, haut: Int, bas: Int) {
@@ -97,27 +98,15 @@ class Horizons(numero: Int = -1) : Scene() {
     private val anticorps = List(5) { floatArrayOf(entre(0.05f, 0.95f), entre(0.1f, 0.45f), r2.nextFloat() * 6.28f) }
     private val organites = List(9) { floatArrayOf(entre(-0.45f, 0.45f), entre(0.05f, 0.28f), r2.nextFloat() * 3.14f, entre(0.7f, 1.2f)) }
     private val vesicules = List(18) { floatArrayOf(entre(-0.5f, 0.5f), entre(0.03f, 0.3f), entre(0.006f, 0.016f)) }
-    // --- vitrail --- la couleur de chaque verre, tirée une fois pour toutes
-    private val couleursVerre = IntArray(400) { r2.nextInt(5) }
-    // --- collisionneur --- les traces en spirale laissées par les particules (points x, y à la suite)
-    private val traces = List(9) {
-        var ang = -PI.toFloat() / 2 + entre(-1.2f, 1.2f); var rr = entre(0.06f, 0.2f)
-        val sens = if (r2.nextBoolean()) 1f else -1f
-        val pts = FloatArray(242)
-        var x = 0f; var y = 0f
-        for (s in 1..120) {                        // la particule tourne de plus en plus serré : une spirale
-            x += cos(ang) * 0.004f; y += sin(ang) * 0.004f
-            ang += sens * 0.004f / rr; rr *= 0.985f
-            pts[2 * s] = x; pts[2 * s + 1] = y
-        }
-        pts
-    }
-    private val tracesCouleur = IntArray(9) { r2.nextInt(3) }
     // --- maths --- des formules célèbres : [texte, x, hauteur]
     private val formules = listOf(Triple("e^(iπ) + 1 = 0", 0.18f, 0.5f), Triple("x² + y² = r²", 0.72f, 0.38f), Triple("φ = (1 + √5) / 2", 0.3f, 0.2f),
         Triple("Σ 1/n² = π²/6", 0.8f, 0.12f), Triple("sin²θ + cos²θ = 1", 0.5f, 0.62f), Triple("∫ e^(−x²) dx = √π", 0.12f, 0.08f))
 
+    // Pour les trois mondes en gravure, c'est la classe Gravure qui dessine tout.
+    private val gravure = if (monde.nom in GRAVURES) Gravure(monde.nom, monde.courbure) else null
+
     override fun dessiner(c: Canvas, o: Outils, i: Instant) {
+        gravure?.let { it.dessiner(c, o, i); return }
         val dp = o.dp; val sec = i.secondes; val intro = i.intro; val rev = i.revelation
         val w = c.width.toFloat(); val h = c.height.toFloat()
         val mo = monde
@@ -185,21 +174,6 @@ class Horizons(numero: Int = -1) : Scene() {
                     c.drawLine(0f, 0f, 0f, s, yp); c.drawLine(0f, 0f, -s * 0.7f, -s * 0.7f, yp); c.drawLine(0f, 0f, s * 0.7f, -s * 0.7f, yp)
                     c.restore()
                 }
-            }
-            "Vitrail" -> {
-                for (k in -3..3) {                     // la lumière colorée qui traverse le vitrail
-                    val th = k * tmax / 3.5f
-                    val x0 = cx + rayon * sin(th); val y0 = cy - rayon * cos(th)
-                    val col = RAYONS_VITRAIL[(k + 3) % 5]
-                    val ray = Path()
-                    ray.moveTo(x0 - 0.04f * w, y0); ray.lineTo(x0 + 0.04f * w, y0)
-                    ray.lineTo(x0 + 0.1f * w + k * 0.06f * w, haut - 0.7f * h); ray.lineTo(x0 - 0.1f * w + k * 0.06f * w, haut - 0.7f * h); ray.close()
-                    val rp = o.lumiere()
-                    rp.shader = LinearGradient(0f, y0, 0f, haut - 0.7f * h, avecAlpha(col, 0.10f * vis * (0.8f + 0.2f * sin(sec * 2f + k))), avecAlpha(col, 0f), Shader.TileMode.CLAMP)
-                    c.drawPath(ray, rp)
-                }
-                for (x in floatArrayOf(0.04f, 0.96f))  // deux piliers de pierre
-                    c.drawRect(x * w - 0.03f * w, 0f, x * w + 0.03f * w, h, o.pinceau(avecAlpha(rgb(22, 19, 24), app)))
             }
             "Maths" -> {
                 val pas = 0.05f * m                    // le quadrillage
@@ -282,37 +256,6 @@ class Horizons(numero: Int = -1) : Scene() {
                     val th = -tmax + 2 * tmax * j / max(1, n) + 0.02f * sin(sec * 1.5f + j)
                     val p = pt(rr, th)
                     c.drawCircle(p[0], p[1], 0.0045f * m, tete)
-                }
-            }
-        }
-        if (rCorps > 0f && mo.nom == "Vitrail")       // le cadre en plomb du vitrail
-            c.drawCircle(cx, cy, rCorps, o.pinceau(avecAlpha(rgb(30, 26, 32), app), 0.012f * h))
-        if (mo.nom == "Collisionneur") {
-            val rt = rCorps - 0.012f * h                // le tube où circulent les faisceaux
-            if (rt > 0f) {
-                c.drawCircle(cx, cy, rt, o.pinceau(avecAlpha(rgb(40, 52, 80), app), 0.014f * h))
-                c.drawCircle(cx, cy, rt, o.pinceau(avecAlpha(rgb(90, 120, 170), 0.6f * app), 1f * dp))
-            }
-            val choc = 0.45f                           // le moment où les deux paquets de particules se percutent
-            for ((sens, col) in listOf(1f to rgb(120, 200, 255), -1f to rgb(255, 170, 90))) {
-                val f = borne(sec / choc)
-                for (k in 0 until 14) {                // chaque paquet laisse une traînée
-                    var th = sens * (-tmax * (1f - doux(f))) - sens * k * 0.006f
-                    if (sec > choc) th = sens * (sec - choc) * 0.6f - sens * k * 0.006f
-                    val p = pt(rt, th)
-                    c.drawCircle(p[0], p[1], (3.2f - k * 0.2f) * dp, o.lumiere(avecAlpha(col, (0.9f - k * 0.06f) * vis)))
-                }
-            }
-            val apres = sec - choc
-            if (apres > 0f) {
-                val yc = haut - 0.012f * h
-                o.halo(c, cx, yc, 0.08f * m, 0.45f * (1f - borne(apres / 0.6f)) * (1f - rev), rgb(200, 220, 255))
-                for ((k, pts) in traces.withIndex()) { // les traces en spirale des particules
-                    val nb = (pts.size / 2 * borne(apres / 0.5f)).toInt()
-                    if (nb < 2) continue
-                    val tp = Path(); tp.moveTo(cx + pts[0] * m, yc + pts[1] * m)
-                    for (j in 1 until nb) tp.lineTo(cx + pts[2 * j] * m, yc + pts[2 * j + 1] * m)
-                    c.drawPath(tp, o.lumiere(avecAlpha(TRACES_COULEURS[tracesCouleur[k]], 0.6f * (1f - rev)), 1.4f * dp))
                 }
             }
         }
@@ -460,83 +403,6 @@ class Horizons(numero: Int = -1) : Scene() {
                 for (v in vesicules) {                // les vésicules
                     val x = cx + v[0] * w
                     c.drawCircle(x, creteD(x, v[1] * h + 0.02f * h), v[2] * m, ves)
-                }
-            }
-            "Vitrail" -> {
-                // Une rosace de cathédrale vue de près : des lancettes en ogive, une couronne de médaillons,
-                // puis une mosaïque de losanges. Chaque verre brille un peu, comme traversé par le soleil.
-                val plomb = o.pinceau(avecAlpha(rgb(16, 13, 18), app), 2.6f * dp)
-                fun verre(i: Int, k: Int): Int {
-                    val col = VERRES[couleursVerre[((i % 400) + 400) % 400]]
-                    val e = 0.7f + 0.3f * sin(sec * 1.5f + k * 1.3f)
-                    return avecAlpha(rgb((Color.red(col) * e).toInt(), (Color.green(col) * e).toInt(), (Color.blue(col) * e).toInt()), app)
-                }
-                // 1) les lancettes : de longs pétales en ogive qui rayonnent
-                val rHaut = rayon - 0.012f * h; val rBas = rayon - 0.16f * h
-                val dth = 0.4f * (rHaut - rBas) / rayon     // largeur d'une lancette : 40 % de sa hauteur
-                val n = (tmax / dth).toInt() + 1
-                val fin = o.pinceau(avecAlpha(rgb(16, 13, 18), app), 1.5f * dp)
-                for (j in -n..n) {
-                    val th = j * dth
-                    val g0 = th - dth * 0.4f; val g1 = th + dth * 0.4f
-                    val lan = Path()
-                    var p = pt(rBas, g0); lan.moveTo(p[0], p[1])
-                    p = pt(rHaut - 0.04f * h, g0); lan.lineTo(p[0], p[1])
-                    var cp = pt(rHaut - 0.01f * h, g0); p = pt(rHaut, th); lan.quadTo(cp[0], cp[1], p[0], p[1])   // le sommet pointu (l'ogive)
-                    cp = pt(rHaut - 0.01f * h, g1); p = pt(rHaut - 0.04f * h, g1); lan.quadTo(cp[0], cp[1], p[0], p[1])
-                    p = pt(rBas, g1); lan.lineTo(p[0], p[1]); lan.close()
-                    c.drawPath(lan, o.pinceau(verre(j + 50, j)))
-                    c.drawPath(lan, plomb)
-                    val a = pt(rBas + 0.01f * h, th); val b = pt(rHaut - 0.03f * h, th)
-                    c.drawLine(a[0], a[1], b[0], b[1], fin)                         // le plomb au milieu
-                    for (f in floatArrayOf(0.35f, 0.65f)) {                          // et deux barres en travers
-                        val xa = pt(mix(rBas, rHaut, f), g0); val xb = pt(mix(rBas, rHaut, f), g1)
-                        c.drawLine(xa[0], xa[1], xb[0], xb[1], fin)
-                    }
-                }
-                // 2) la couronne de médaillons ronds
-                val rMed = rayon - 0.2f * h; val rm = 0.028f * m
-                val dth2 = 2.6f * rm / rMed
-                val n2 = (tmax / dth2).toInt() + 1
-                for (j in -n2..n2) {
-                    val p = pt(rMed, j * dth2 + dth2 / 2)
-                    c.drawCircle(p[0], p[1], rm, o.pinceau(verre(j + 120, j + 3)))
-                    c.drawCircle(p[0], p[1], rm * 0.45f, o.pinceau(verre(j + 160, j + 7)))
-                    c.drawCircle(p[0], p[1], rm, plomb); c.drawCircle(p[0], p[1], rm * 0.45f, plomb)
-                }
-                c.drawCircle(cx, cy, rBas, o.pinceau(avecAlpha(rgb(16, 13, 18), app), 4f * dp))
-                c.drawCircle(cx, cy, rMed + rm + 3f * dp, plomb); c.drawCircle(cx, cy, rMed - rm - 3f * dp, plomb)
-                // 3) la mosaïque de losanges, plus bas
-                for (k in 0 until 4) {
-                    val rOut = rMed - rm - 0.01f * h - k * 0.045f * h; val rIn = rOut - 0.045f * h
-                    val d3 = 0.06f * w / rOut
-                    val n3 = (tmax / d3).toInt() + 1
-                    for (j in -n3..n3) {
-                        val a0 = j * d3 + (if (k % 2 == 1) d3 / 2 else 0f)
-                        val cell = Path()
-                        var p = pt(rOut, a0); cell.moveTo(p[0], p[1])
-                        p = pt((rOut + rIn) / 2, a0 + d3 / 2); cell.lineTo(p[0], p[1])
-                        p = pt(rIn, a0); cell.lineTo(p[0], p[1])
-                        p = pt((rOut + rIn) / 2, a0 - d3 / 2); cell.lineTo(p[0], p[1]); cell.close()
-                        c.drawPath(cell, o.pinceau(verre(j * 7 + k * 31 + 200, j + k)))
-                        c.drawPath(cell, plomb)
-                    }
-                }
-                val lum = o.lumiere()                // la lumière qui traverse, plus forte en haut
-                lum.shader = LinearGradient(0f, haut, 0f, haut + 0.3f * h, avecAlpha(rgb(255, 230, 190), 0.10f * app), avecAlpha(rgb(255, 230, 190), 0f), Shader.TileMode.CLAMP)
-                c.drawRect(0f, haut - 2f, w, haut + 0.3f * h, lum)
-            }
-            "Collisionneur" -> {
-                val paroi = o.pinceau(avecAlpha(rgb(30, 40, 64), 0.6f * app), 1f * dp)
-                for (k in 1..8) c.drawCircle(cx, cy, rayon - k * 0.035f * h, paroi)   // les parois du tunnel
-                val n = 22                            // les aimants qui guident les faisceaux (bleus et rouges)
-                for (j in -n..n) {
-                    val th = j * tmax / n * 1.05f
-                    val p = pt(rayon - 0.035f * h, th)
-                    c.save(); c.translate(p[0], p[1]); c.rotate(Math.toDegrees(th.toDouble()).toFloat())
-                    val col = if (j % 2 == 0) rgb(40, 80, 190) else rgb(170, 50, 55)
-                    c.drawRoundRect(RectF(-0.018f * m, -0.012f * h, 0.018f * m, 0.012f * h), 2f * dp, 2f * dp, o.pinceau(avecAlpha(col, 0.85f * app)))
-                    c.restore()
                 }
             }
             "Maths" -> {
