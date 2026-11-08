@@ -256,6 +256,11 @@ class AppWatcherService : AccessibilityService() {
             }
         }
 
+        // LES APPS RÉCENTES : quand on les ouvre, on regarde régulièrement quelles apps y sont.
+        // Une app qui disparaît de la liste pendant la visite a été fermée (glissée vers le haut).
+        if (app == ecranAccueil && classe == "RecentsActivity") debutRecents()
+        else if (dansRecents && ((app == ecranAccueil && classe == "Launcher") || (app != ecranAccueil && estVraieApp))) finRecents()
+
         if (!estVraieApp) return
 
         if (app == derniereApp) return
@@ -362,7 +367,10 @@ class AppWatcherService : AccessibilityService() {
             gravity = Gravity.TOP or Gravity.START
             x = 0
             y = 0
-            alpha = 0f                         // invisible tant qu'aucune animation ne joue
+            // Au tout début, alpha 1 (le rideau est transparent, donc invisible quand même) :
+            // Android ne crée la surface de dessin que si la fenêtre est « visible ». Une fois la
+            // surface prête, on passe à alpha 0 (voir plus bas) ; elle reste prête ensuite.
+            alpha = 1f
             if (Build.VERSION.SDK_INT >= 30) {
                 layoutInDisplayCutoutMode =
                     WindowManager.LayoutParams.LAYOUT_IN_DISPLAY_CUTOUT_MODE_ALWAYS
@@ -382,6 +390,7 @@ class AppWatcherService : AccessibilityService() {
             rideau = r
             cadreRideau = cadre
             reglagesRideau = reglages
+            minuteur.postDelayed({ if (seanceEnCours == null) montrerRideau(false) }, 2000)
         } catch (e: Exception) {
             noter("ERREUR installation du rideau : ${e.message}")
         }
@@ -475,6 +484,66 @@ class AppWatcherService : AccessibilityService() {
         val taille = Point()
         @Suppress("DEPRECATION") ecran.getRealSize(taille)
         return taille
+    }
+
+    // ---------------- LES APPS RÉCENTES ----------------
+    private var dansRecents = false
+    private val vusRecents = HashSet<String>()      // toutes les apps vues pendant cette visite
+    private var dernierReleve: Set<String> = emptySet()
+
+    private fun debutRecents() {
+        if (dansRecents) return
+        dansRecents = true
+        vusRecents.clear()
+        dernierReleve = emptySet()
+        minuteur.postDelayed(object : Runnable {
+            override fun run() {
+                if (!dansRecents) return
+                releverRecents()
+                minuteur.postDelayed(this, 250)
+            }
+        }, 150)
+    }
+
+    // Lit les noms des apps affichées dans l'écran des apps récentes (rien d'autre).
+    private fun releverRecents() {
+        val racine = try { rootInActiveWindow } catch (_: Exception) { null } ?: return
+        if (racine.packageName?.toString() != ecranAccueil) return
+        val trouvees = HashSet<String>()
+        // Pour être sûr de lire l'écran des apps récentes (et pas l'écran d'accueil, qui affiche
+        // lui aussi des noms d'apps), on cherche son bouton « Tout fermer », ou le message
+        // « Aucune application récente » quand la liste est vide.
+        var boutonFermer = false
+        var listeVide = false
+        val pile = ArrayDeque<android.view.accessibility.AccessibilityNodeInfo>()
+        pile.add(racine)
+        var vus = 0
+        while (pile.isNotEmpty() && vus < 400) {
+            val n = pile.removeLast()
+            vus++
+            val textes = listOfNotNull(n.text?.toString(), n.contentDescription?.toString())
+            for (t in textes) {
+                val m = t.trim().lowercase()
+                if (m == "tout fermer" || m == "fermer tout" || m == "close all") boutonFermer = true
+                if (m.contains("aucune application récente") || m.contains("no recent")) listeVide = true
+            }
+            if (textes.isNotEmpty()) chercher(textes)?.let { trouvees.add(it) }
+            for (i in 0 until n.childCount) n.getChild(i)?.let { pile.add(it) }
+        }
+        if (listeVide) trouvees.clear()
+        else if (!boutonFermer) return          // ce n'est pas (ou plus) l'écran des apps récentes
+        vusRecents.addAll(trouvees)
+        dernierReleve = trouvees
+    }
+
+    private fun finRecents() {
+        dansRecents = false
+        // les apps vues pendant la visite mais absentes du dernier relevé ont été fermées
+        val fermees = vusRecents - dernierReleve
+        for (app in fermees) dejaOuvertes.remove(app)
+        noter("  (apps récentes : ${vusRecents.size} app(s) vue(s)" +
+            (if (fermees.isNotEmpty()) ", fermée(s) : ${fermees.joinToString()})" else ", aucune fermée)"))
+        vusRecents.clear()
     }
 
     // L'app est-elle encore ouverte en arrière-plan ? (vue il y a moins de 30 min, sans « Tout fermer »)
