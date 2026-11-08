@@ -2,6 +2,8 @@ package com.will.animlauncher
 
 import android.app.Activity
 import android.app.StatusBarManager
+import android.content.ClipData
+import android.content.ClipboardManager
 import android.content.ComponentName
 import android.content.Intent
 import android.graphics.Color
@@ -15,6 +17,7 @@ import android.widget.LinearLayout
 import android.widget.ScrollView
 import android.widget.Switch
 import android.widget.TextView
+import android.widget.Toast
 
 // L'écran principal : interrupteurs, état de la détection, accès au journal.
 class MainActivity : Activity() {
@@ -76,6 +79,12 @@ class MainActivity : Activity() {
             }
         }
 
+        // 3. Copie la liste de toutes les apps (nom + nom technique), à coller dans Claude.
+        val boutonListe = Button(this).apply {
+            text = "Copier la liste de mes apps"
+            setOnClickListener { copierListeApps() }
+        }
+
         val version = TextView(this).apply {
             text = "Version " + packageManager.getPackageInfo(packageName, 0).versionName
             textSize = 14f
@@ -90,6 +99,7 @@ class MainActivity : Activity() {
         colonne.addView(statut)
         colonne.addView(boutonAccessibilite)
         colonne.addView(boutonJournal)
+        colonne.addView(boutonListe)
         colonne.addView(version)
 
         setContentView(ScrollView(this).apply {
@@ -107,6 +117,20 @@ class MainActivity : Activity() {
         } else {
             "⚠️ Détection désactivée : active AnimLauncher dans l'accessibilité."
         }
+    }
+
+    // Demande à Android toutes les apps qui ont une icône, et copie
+    // "Nom affiché = nom.technique" pour chacune, triées par ordre alphabétique.
+    private fun copierListeApps() {
+        val intention = Intent(Intent.ACTION_MAIN).addCategory(Intent.CATEGORY_LAUNCHER)
+        val apps = packageManager.queryIntentActivities(intention, 0)
+            .map { "${it.loadLabel(packageManager)} = ${it.activityInfo.packageName}" }
+            .distinct()
+            .sortedBy { it.lowercase() }
+        val texte = "Mes apps (${apps.size})\n\n" + apps.joinToString("\n")
+        getSystemService(ClipboardManager::class.java)
+            .setPrimaryClip(ClipData.newPlainText("Mes apps", texte))
+        Toast.makeText(this, "${apps.size} apps copiées", Toast.LENGTH_SHORT).show()
     }
 
     private fun proposerTuile() {
