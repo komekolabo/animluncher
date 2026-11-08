@@ -23,9 +23,7 @@ import android.widget.FrameLayout
 class AppWatcherService : AccessibilityService() {
 
     private var derniereApp: String? = null
-    private var vueEnCours: AnimationView? = null
-    private var cadreEnCours: FrameLayout? = null   // le cadre qui contient l'animation (voir afficher)
-    private var reglagesVue: WindowManager.LayoutParams? = null   // taille et position de l'animation
+    private var seanceEnCours: Rideau.Seance? = null   // l'animation qui joue en ce moment
     private var appAnimee: String? = null      // l'app pour laquelle l'animation tourne
     private var appApparue = false             // la fenêtre de cette app est-elle déjà arrivée ?
     // LES APPS OUVERTES EN ARRIÈRE-PLAN : l'app -> la dernière fois qu'on l'a quittée.
@@ -69,6 +67,7 @@ class AppWatcherService : AccessibilityService() {
         Journal.installerFilet(this)
         noter("=== Service démarré (allumage ou réactivation) ===")
         noms = calculerNoms()      // préparé à l'avance : le clic doit être traité instantanément
+        installerRideau()          // la fenêtre des animations, prête d'avance (voir Rideau.kt)
     }
 
     override fun onAccessibilityEvent(event: AccessibilityEvent) {
@@ -143,7 +142,7 @@ class AppWatcherService : AccessibilityService() {
         val lancement = Catalogue.lancement(this, app)
         if (lancement == null) { noter("clic -> $app : animation désactivée dans les réglages"); return }
         // Le même appui signalé deux fois : l'animation tourne déjà pour cette app, on ne la recommence pas.
-        if (vueEnCours != null && appAnimee == app) return
+        if (seanceEnCours != null && appAnimee == app) return
         // Mode « seulement au démarrage » (général ou réglé pour cette app) : si l'app est encore
         // ouverte en arrière-plan, on ne joue rien. Avant, on regardait si son écran de lancement
         // apparaissait, mais Gmail ou YouTube en affichent un à chaque fois, même en arrière-plan.
@@ -152,12 +151,10 @@ class AppWatcherService : AccessibilityService() {
             noter("clic sur « ${textes.firstOrNull() ?: "?"} » -> $app : déjà ouverte en arrière-plan, pas d'animation")
             return
         }
-        val aConfirmer = false
         appCliquee = app
         clicA = SystemClock.uptimeMillis()
-        afficher(lancement, app, dejaPrete = false, aConfirmer = aConfirmer)   // d'abord l'animation, le journal après
-        noter((if (parWidget) "clic sur un widget" else "clic sur « ${textes.firstOrNull() ?: "?"} »") + " -> $app : " +
-            if (aConfirmer) "animation prête (démarrage ou reprise ?)" else "animation lancée")
+        afficher(lancement, app, dejaPrete = false)   // d'abord l'animation, le journal après
+        noter((if (parWidget) "clic sur un widget" else "clic sur « ${textes.firstOrNull() ?: "?"} »") + " -> $app : animation lancée")
     }
 
     // LES WIDGETS. Un widget est affiché par l'écran d'accueil, donc l'appui semble venir du
@@ -240,7 +237,7 @@ class AppWatcherService : AccessibilityService() {
         // ignore les autres fenêtres (le lanceur bouge encore pendant le clic).
         val estVraieApp = app == ecranAccueil ||
             packageManager.getLaunchIntentForPackage(app) != null
-        vueEnCours?.let { vue ->
+        seanceEnCours?.let { vue ->
             // RELAIS : certaines icônes ouvrent en fait une autre app (ex. Gemini s'ouvre
             // dans l'app Google). Si une autre vraie app arrive avant celle attendue, on la suit.
             if (!appApparue && app != appAnimee && app != ecranAccueil && estVraieApp) {
@@ -248,17 +245,7 @@ class AppWatcherService : AccessibilityService() {
                 appAnimee = app
                 animeeA[app] = SystemClock.uptimeMillis()
             }
-            // CONFIRMATION (mode « seulement au démarrage ») : la première fenêtre de l'app tranche.
-            if (vue.enAttente && app == appAnimee) {
-                if (classe == "FrameLayout") {
-                    vue.montrer()
-                    noter("  .. l'app démarre vraiment : animation affichée")
-                } else {
-                    noter("  .. simple reprise (écran $classe) : pas d'animation")
-                    retirer(getSystemService(Context.WINDOW_SERVICE) as WindowManager, "reprise")
-                }
-            }
-            if (vueEnCours === vue && app == appAnimee) {
+            if (seanceEnCours === vue && app == appAnimee) {
                 appApparue = true
                 if (classe != "FrameLayout") {
                     vue.signalerPret()
@@ -280,7 +267,7 @@ class AppWatcherService : AccessibilityService() {
         if (app != ecranAccueil) dejaOuvertes[app] = SystemClock.uptimeMillis()
 
         // L'animation tourne déjà pour cette app (lancée au clic) : rien de plus à faire.
-        if ((vueEnCours != null && appAnimee == app) ||
+        if ((seanceEnCours != null && appAnimee == app) ||
             (app == appCliquee && SystemClock.uptimeMillis() - clicA < 6000)) {
             noter("$app | écran $classe | animation déjà lancée au clic")
             return
@@ -352,14 +339,16 @@ class AppWatcherService : AccessibilityService() {
         appApparue = true      // ici, la fenêtre de l'app est déjà là
     }
 
-    private fun afficher(lancement: Lancement, app: String, dejaPrete: Boolean, aConfirmer: Boolean = false) {
+    // LE RIDEAU (voir Rideau.kt) : la fenêtre des animations, installée une fois pour toutes,
+    // transparente et invisible (alpha 0) quand elle ne sert pas.
+    private var rideau: Rideau? = null
+    private var cadreRideau: FrameLayout? = null
+    private var reglagesRideau: WindowManager.LayoutParams? = null
+
+    private fun installerRideau() {
+        if (rideau != null) return
         val gestionnaire = getSystemService(Context.WINDOW_SERVICE) as WindowManager
-        retirer(gestionnaire, "nouvelle animation")
-
         val taille = tailleEcran()
-
-        val vue = AnimationView(this, lancement.scene, lancement.categorie, lancement.facteur)
-        if (aConfirmer) vue.attendreConfirmation()
         val reglages = WindowManager.LayoutParams(
             taille.x, taille.y,
             WindowManager.LayoutParams.TYPE_ACCESSIBILITY_OVERLAY,
@@ -373,6 +362,7 @@ class AppWatcherService : AccessibilityService() {
             gravity = Gravity.TOP or Gravity.START
             x = 0
             y = 0
+            alpha = 0f                         // invisible tant qu'aucune animation ne joue
             if (Build.VERSION.SDK_INT >= 30) {
                 layoutInDisplayCutoutMode =
                     WindowManager.LayoutParams.LAYOUT_IN_DISPLAY_CUTOUT_MODE_ALWAYS
@@ -382,51 +372,71 @@ class AppWatcherService : AccessibilityService() {
                     WindowManager.LayoutParams.LAYOUT_IN_DISPLAY_CUTOUT_MODE_SHORT_EDGES
             }
         }
-
-        // L'animation est posée dans un CADRE, et c'est le cadre qu'on ajoute à l'écran.
-        // Sans cadre, Android 16 plantait (« requestTransparentRegion on a null object ») quand
-        // l'animation était retirée juste après avoir été ajoutée : la vue n'avait plus de parent
-        // au moment où Android finissait de l'installer. Avec le cadre, elle en a toujours un.
+        // Le rideau est posé dans un CADRE (sans cadre, Android 16 pouvait planter :
+        // « requestTransparentRegion on a null object »).
+        val r = Rideau(this)
         val cadre = FrameLayout(this)
-        cadre.addView(vue, FrameLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT))
-
+        cadre.addView(r, FrameLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT))
         try {
             gestionnaire.addView(cadre, reglages)
-            vueEnCours = vue
-            cadreEnCours = cadre
-            reglagesVue = reglages
-            // au cas où l'écran tournerait sans prévenir (ex. une app qui s'ouvre à l'horizontale)
-            for (delai in longArrayOf(300L, 700L, 1200L)) minuteur.postDelayed({ if (vueEnCours === vue) ajusterTaille() }, delai)
-            appAnimee = app
-            animeeA[app] = SystemClock.uptimeMillis()
-            appApparue = false
-            if (dejaPrete) vue.signalerPret()
-            vue.jouer { if (vueEnCours === vue) retirer(gestionnaire, "fin normale") }
-            // Sans confirmation au bout de 2 s (aucune fenêtre de l'app n'est arrivée) : on abandonne.
-            if (aConfirmer) minuteur.postDelayed({
-                if (vueEnCours === vue && vue.enAttente) retirer(gestionnaire, "pas de confirmation")
-            }, 2000)
-            // Filet de sécurité : attente max + révélation + une marge d'une seconde.
-            minuteur.postDelayed({
-                if (vueEnCours === vue) retirer(gestionnaire, "filet de sécurité")
-            }, vue.dureeMax + 1000)
+            rideau = r
+            cadreRideau = cadre
+            reglagesRideau = reglages
         } catch (e: Exception) {
-            noter("ERREUR animation : ${e.message}")
+            noter("ERREUR installation du rideau : ${e.message}")
         }
     }
 
-    private fun retirer(gestionnaire: WindowManager, raison: String) {
-        val vue = vueEnCours ?: return
-        vue.arreter()
-        cadreEnCours?.let { cadre -> try { gestionnaire.removeView(cadre) } catch (_: Exception) {} }
-        vueEnCours = null
-        cadreEnCours = null
-        reglagesVue = null
+    // Rend le rideau visible (1) ou invisible (0).
+    private fun montrerRideau(visible: Boolean) {
+        val cadre = cadreRideau ?: return
+        val reglages = reglagesRideau ?: return
+        val a = if (visible) 1f else 0f
+        if (reglages.alpha == a) return
+        reglages.alpha = a
+        try {
+            (getSystemService(Context.WINDOW_SERVICE) as WindowManager).updateViewLayout(cadre, reglages)
+        } catch (e: Exception) {
+            noter("ERREUR rideau : ${e.message}")
+        }
+    }
+
+    private fun afficher(lancement: Lancement, app: String, dejaPrete: Boolean) {
+        retirer("nouvelle animation", cacher = false)
+        installerRideau()
+        val r = rideau ?: return
+        ajusterTaille()
+        val seance = Rideau.Seance(lancement.scene, lancement.categorie, lancement.facteur) { fini ->
+            if (seanceEnCours === fini) retirer("fin normale")
+        }
+        seanceEnCours = seance
+        appAnimee = app
+        animeeA[app] = SystemClock.uptimeMillis()
+        appApparue = false
+        if (dejaPrete) seance.signalerPret()
+        r.jouer(seance)          // d'abord on lance le dessin…
+        montrerRideau(true)      // …puis on rend le rideau visible
+        if (!r.surfacePrete) noter("  (le rideau n'était pas encore prêt)")
+        // au cas où l'écran tournerait sans prévenir (ex. une app qui s'ouvre à l'horizontale)
+        for (delai in longArrayOf(300L, 700L, 1200L)) minuteur.postDelayed({ if (seanceEnCours === seance) ajusterTaille() }, delai)
+        // Filet de sécurité : attente max + révélation + une marge d'une seconde.
+        minuteur.postDelayed({
+            if (seanceEnCours === seance) retirer("filet de sécurité")
+        }, seance.dureeMax + 1000)
+    }
+
+    // Arrête l'animation en cours ; « cacher » = rendre le rideau invisible (non quand une autre suit).
+    private fun retirer(raison: String, cacher: Boolean = true) {
+        val seance = seanceEnCours ?: return
+        seance.arreter()
+        seanceEnCours = null
         appAnimee = null
         appApparue = false
-        val ms = SystemClock.uptimeMillis() - vue.creeeA
-        val surface = if (vue.surfaceCreee) "surface OK" else "PAS de surface"
-        noter("  -> ${vue.images} images, $surface, $ms ms, $raison")
+        if (cacher) montrerRideau(false)
+        val ms = SystemClock.uptimeMillis() - seance.creeeA
+        val premiere = if (seance.premiereImageA > 0) "1re image après ${seance.premiereImageA - seance.creeeA} ms"
+                       else "aucune image"
+        noter("  -> ${seance.images} images, $premiere, $ms ms, $raison")
     }
 
     // Une ligne dans le journal (voir Journal.kt), qui partira ensuite sur GitHub.
@@ -444,8 +454,8 @@ class AppWatcherService : AccessibilityService() {
     }
 
     private fun ajusterTaille() {
-        val cadre = cadreEnCours ?: return
-        val reglages = reglagesVue ?: return
+        val cadre = cadreRideau ?: return
+        val reglages = reglagesRideau ?: return
         val taille = tailleEcran()
         if (reglages.width == taille.x && reglages.height == taille.y) return
         reglages.width = taille.x
