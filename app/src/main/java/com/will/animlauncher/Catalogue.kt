@@ -10,6 +10,7 @@ object Catalogue {
     private val E = Categorie.ESSENTIELLE
     private val C = Categorie.COURANTE
     private val S = Categorie.SECONDAIRE
+    private val J = Categorie.JEU
 
     private fun e(categorie: Categorie, fabrique: () -> Scene) = Entree(categorie, fabrique)
 
@@ -23,7 +24,7 @@ object Catalogue {
         // --- Lot 2 : Google ---
         "com.google.android.googlequicksearchbox" to e(E) { Quatre() },
         "com.android.chrome" to e(E) { Tunnel() },
-        "com.google.android.apps.maps" to e(E) { Itineraire() },
+        "com.google.android.apps.maps" to e(E) { AEtoile() },
         "com.google.android.gm" to e(E) { Pli() },
         "com.google.android.apps.photos" to e(E) { PoseLongue() },
         "app.revanced.android.youtube" to e(E) { Cinema() },
@@ -93,17 +94,17 @@ object Catalogue {
         "network.bisq.mobile.node" to e(S) { Echange() },
         "com.btcframe" to e(S) { Facettes() },
         "com.microstrategy.stream" to e(S) { Isometrie() },
-        // --- Lot 6 : jeux et utilitaires ---
-        "com.playstack.balatro.android" to e(C) { Cartes() },
-        "com.supercell.clashofclans" to e(C) { Torches() },
-        "com.chess" to e(C) { Echiquier() },
-        "com.robtopx.geometryjumplite" to e(C) { Cube() },
-        "com.robtopx.geometrydashmeltdown" to e(S) { Cube(rgb(255, 140, 50), true) },
-        "com.BlackSaltGames.DREDGE" to e(S) { Lanterne() },
-        "com.dsemu.drastic" to e(S) { DoubleEcran() },
-        "com.chessbar" to e(S) { Pendule() },
-        "com.strayfawnstudio.gambonanza" to e(S) { Des() },
-        "com.venezianoapp.frusta" to e(S) { Fouet() },
+        // --- Lot 6 : jeux (environ 1 s) et utilitaires ---
+        "com.playstack.balatro.android" to e(J) { Cartes() },
+        "com.supercell.clashofclans" to e(J) { Torches() },
+        "com.chess" to e(J) { Sacrifice() },
+        "com.robtopx.geometryjumplite" to e(J) { Cube() },
+        "com.robtopx.geometrydashmeltdown" to e(J) { Cube(rgb(255, 140, 50), true) },
+        "com.BlackSaltGames.DREDGE" to e(J) { Etire(Lanterne(), 2.5f) },
+        "com.dsemu.drastic" to e(J) { Etire(DoubleEcran(), 2.5f) },
+        "com.chessbar" to e(J) { Etire(Pendule(), 2.5f) },
+        "com.strayfawnstudio.gambonanza" to e(J) { Etire(Des(), 2.5f) },
+        "com.venezianoapp.frusta" to e(J) { Etire(Fouet(), 2.5f) },
         "app.revanced.android.gms" to e(S) { Puzzle() },
         "com.revanced.net.revancedmanager" to e(S) { Couture() },
         "tv.parsec.client" to e(S) { Hyperespace() },

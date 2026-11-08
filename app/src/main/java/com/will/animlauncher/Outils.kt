@@ -19,7 +19,8 @@ import kotlin.random.Random
 enum class Categorie(val intro: Long, val revelation: Long) {
     ESSENTIELLE(450, 520),   // IA, Google principal, apps qui font vivre le téléphone
     COURANTE(300, 380),      // réseaux sociaux, banques, outils du quotidien
-    SECONDAIRE(200, 260)     // le reste
+    SECONDAIRE(200, 260),    // le reste
+    JEU(650, 400)            // les jeux : environ 1 seconde, le temps de raconter une petite histoire
 }
 
 // Où en est l'animation à cette image : temps écoulé, avancement de l'intro et de la révélation (0 à 1).
