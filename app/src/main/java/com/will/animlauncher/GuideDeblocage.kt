@@ -27,19 +27,19 @@ import kotlin.math.sin
 //
 // Pourquoi ? Une app installée en dehors du Play Store (un APK) apparaît GRISÉE dans
 // l'accessibilité (« Contrôlé par les paramètres restreints »). Pour la débloquer, Android
-// impose 3 missions, dans cet ordre :
+// impose 3 étapes, dans cet ordre :
 //   1. essayer de l'activer (Android refuse, et c'est ce refus qui débloque la suite) ;
 //   2. autoriser les « paramètres restreints » dans les infos de l'app (menu ⋮) ;
 //   3. l'activer pour de vrai.
 //
-// Le guide montre UNE mission à la fois, avec des DESSINS de ce qu'on va voir (voir la classe
+// Le guide montre UNE étape à la fois, avec des DESSINS de ce qu'on va voir (voir la classe
 // Schema plus bas) : l'endroit à toucher est entouré d'un cadre qui pulse doucement, avec un doigt.
-// Un gros bouton « J'y vais » ouvre le bon écran des Paramètres ; on revient avec la flèche retour.
-// Dès que l'accessibilité est activée, le guide affiche la victoire tout seul.
+// Un gros bouton ouvre le bon écran des Paramètres ; on revient avec la touche retour.
+// Dès que l'accessibilité est activée, le guide affiche la confirmation tout seul.
 // ============================================================================
 class GuideDeblocage : Activity() {
 
-    private var etape = 0                       // 0 = accueil, 1-3 = missions, 4 = victoire
+    private var etape = 0                       // 0 = accueil, 1-3 = étapes, 4 = terminé
     private lateinit var contenu: LinearLayout
     private lateinit var boutonPrincipal: Button
     private lateinit var boutonSecond: Button
@@ -78,7 +78,7 @@ class GuideDeblocage : Activity() {
         etat.putInt("etape", etape)
     }
 
-    // Quand on revient des Paramètres : si l'accessibilité est activée, c'est gagné.
+    // Quand on revient des Paramètres : si l'accessibilité est activée, on affiche la confirmation.
     override fun onResume() {
         super.onResume()
         if (etape in 1..3 && serviceActif(this)) { etape = 4; afficher() }
@@ -89,32 +89,32 @@ class GuideDeblocage : Activity() {
         contenu.removeAllViews()
         when (etape) {
             0 -> accueil()
-            1 -> mission(1, "Faire apparaître la clé",
-                "Android va dire NON. C'est normal ! Ce « non » débloque la mission 2.",
+            1 -> mission(1, "Première tentative",
+                "Android refuse d'abord l'activation. Ce refus est attendu : il fait apparaître l'option de l'étape 2.",
                 listOf(
                     "Touche « Applications installées »" to Schema.Ecran.ACCESSIBILITE,
-                    "Touche « $nom » (il est gris)" to Schema.Ecran.APPS_GRISE,
-                    "Un message dit « L'accès a été refusé ». C'EST NORMAL 👍 Touche « Fermer »." to Schema.Ecran.REFUS
+                    "Touche « $nom » (grisé)" to Schema.Ecran.APPS_GRISE,
+                    "Le message « L'accès a été refusé à cette appli » s'affiche : c'est attendu. Touche « Fermer »." to Schema.Ecran.REFUS
                 ),
                 "Ouvrir les réglages",
                 "Touche « Applications installées », puis « $nom »") { ouvrirAccessibilite(this) }
-            2 -> mission(2, "Tourner la clé",
-                "On autorise $nom dans ses infos.",
+            2 -> mission(2, "Autoriser les paramètres restreints",
+                "Cette option se trouve dans les infos de l'app.",
                 listOf(
-                    "Touche les 3 petits points ⋮ EN HAUT À DROITE" to Schema.Ecran.INFOS_APP,
+                    "Touche le menu ⋮ en haut à droite" to Schema.Ecran.INFOS_APP,
                     "Touche « Autoriser les paramètres restreints », puis confirme (code ou empreinte)" to Schema.Ecran.MENU
                 ),
                 "Ouvrir les infos de l'app",
-                "Touche les 3 petits points ⋮ en haut à droite") {
+                "Touche le menu ⋮ en haut à droite") {
                 startActivity(Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS,
                     android.net.Uri.parse("package:$packageName")))
             }
-            3 -> mission(3, "Allumer !",
-                "$nom n'est plus gris. On l'allume.",
+            3 -> mission(3, "Activer le service",
+                "$nom n'est plus grisé : il reste à l'activer.",
                 listOf(
                     "Touche « Applications installées »" to Schema.Ecran.ACCESSIBILITE,
-                    "Touche « $nom » (il n'est plus gris !)" to Schema.Ecran.APPS_OK,
-                    "Allume l'interrupteur" to Schema.Ecran.INTERRUPTEUR,
+                    "Touche « $nom » (il n'est plus grisé)" to Schema.Ecran.APPS_OK,
+                    "Active l'interrupteur" to Schema.Ecran.INTERRUPTEUR,
                     "Touche « Autoriser »" to Schema.Ecran.AUTORISER
                 ),
                 "Ouvrir les réglages",
@@ -134,23 +134,23 @@ class GuideDeblocage : Activity() {
         contenu.addView(LogoAnime(this), LinearLayout.LayoutParams((110 * d).toInt(), (110 * d).toInt()).apply {
             gravity = Gravity.CENTER_HORIZONTAL
         })
-        contenu.addView(texte("On débloque $nom ensemble", 26f, haut = 12, centre = true))
-        contenu.addView(texte("Android bloque les apps installées en dehors du Play Store. " +
-            "C'est une sécurité, pas une panne.", 17f, "#B8C0DA", 8, true))
-        contenu.addView(texte("3 petites missions. Pour chacune :", 18f, haut = 20))
-        contenu.addView(texte("1️⃣  Tu appuies sur le gros bouton en bas.", 18f))
-        contenu.addView(texte("2️⃣  Tu touches ce qui est ENTOURÉ sur les images 👆", 18f))
-        contenu.addView(texte("3️⃣  Tu reviens ici avec la flèche retour ◁", 18f))
+        contenu.addView(texte("Activer $nom", 26f, haut = 12, centre = true))
+        contenu.addView(texte("Android restreint les apps installées en dehors du Play Store. " +
+            "Trois étapes suffisent pour lever cette restriction.", 17f, "#B8C0DA", 8, true))
+        contenu.addView(texte("Pour chaque étape :", 18f, haut = 20))
+        contenu.addView(texte("1.  Le bouton en bas ouvre le bon écran des Paramètres.", 18f))
+        contenu.addView(texte("2.  Touche l'élément encadré sur les illustrations.", 18f))
+        contenu.addView(texte("3.  Reviens ici avec la touche retour ◁", 18f))
         contenu.addView(texte("Durée : environ 1 minute.", 16f, "#94A0C4", 12))
-        boutonPrincipal.text = "C'est parti →"
+        boutonPrincipal.text = "Commencer"
         boutonPrincipal.setOnClickListener { etape = 1; afficher() }
         boutonSecond.visibility = View.GONE
     }
 
-    // Une mission : un titre, une phrase, puis chaque action avec son dessin.
+    // Une étape : un titre, une phrase, puis chaque action avec son dessin.
     private fun mission(numero: Int, titre: String, phrase: String, actions: List<Pair<String, Schema.Ecran>>,
                         texteBouton: String, rappel: String, aller: () -> Unit) {
-        contenu.addView(texte("Mission $numero sur 3   " + "●".repeat(numero) + "○".repeat(3 - numero),
+        contenu.addView(texte("Étape $numero sur 3   " + "●".repeat(numero) + "○".repeat(3 - numero),
             15f, "#9A6EF5"))
         contenu.addView(texte(titre, 26f))
         contenu.addView(texte(phrase, 17f, "#B8C0DA"))
@@ -159,27 +159,27 @@ class GuideDeblocage : Activity() {
             contenu.addView(texte("${pastilles[i]}  $consigne", 19f, haut = 16))
             contenu.addView(Schema(this, ecran, nom), LinearLayout.LayoutParams(-1, (190 * d).toInt()))
         }
-        contenu.addView(texte("Quand c'est fait : reviens ici avec la flèche retour ◁", 17f, "#FFD27A", 18))
-        boutonPrincipal.text = "J'y vais →  ($texteBouton)"
+        contenu.addView(texte("Une fois terminé, reviens ici avec la touche retour ◁", 17f, "#FFD27A", 18))
+        boutonPrincipal.text = "$texteBouton →"
         boutonPrincipal.setOnClickListener {
             aller()
             Toast.makeText(this, rappel, Toast.LENGTH_LONG).show()   // un rappel par-dessus les Paramètres
         }
         boutonSecond.visibility = View.VISIBLE
-        boutonSecond.text = if (numero < 3) "C'est fait ✓  Mission suivante" else "J'ai fini ✓"
+        boutonSecond.text = if (numero < 3) "Étape suivante" else "Terminer"
         boutonSecond.setOnClickListener {
             if (numero < 3) { etape = numero + 1; afficher() }
             else if (serviceActif(this)) { etape = 4; afficher() }
-            else Toast.makeText(this, "Pas encore allumé : regarde les images ③ et ④ 👆", Toast.LENGTH_LONG).show()
+            else Toast.makeText(this, "Le service n'est pas encore activé : voir les étapes ③ et ④.", Toast.LENGTH_LONG).show()
         }
     }
 
     private fun victoire() {
-        contenu.addView(texte("✅", 64f, haut = 40, centre = true))
-        contenu.addView(texte("C'est gagné !", 30f, centre = true))
-        contenu.addView(texte("$nom est activé. Ouvre une app depuis ton écran d'accueil pour voir l'animation.",
+        contenu.addView(texte("✓", 64f, "#9A6EF5", haut = 40, centre = true))
+        contenu.addView(texte("$nom est activé", 28f, centre = true))
+        contenu.addView(texte("Ouvre une app depuis l'écran d'accueil pour voir l'animation.",
             18f, "#B8C0DA", 8, true))
-        boutonPrincipal.text = "Terminer"
+        boutonPrincipal.text = "Fermer"
         boutonPrincipal.setOnClickListener { finish() }
         boutonSecond.visibility = View.GONE
     }
@@ -256,7 +256,7 @@ class Schema(context: Context, private val ecran: Ecran, private val nom: String
                 fond(c, carte, "#232A35")
                 ecrire(c, "🛡  L'accès a été refusé à cette appli", carte.left + 14 * d, carte.top + 26 * d,
                     carte.width() - 28 * d, 14f, Color.WHITE)
-                ecrire(c, "(c'est normal !)", carte.left + 14 * d, carte.top + 46 * d, carte.width(), 12f,
+                ecrire(c, "(message attendu)", carte.left + 14 * d, carte.top + 46 * d, carte.width(), 12f,
                     Color.parseColor("#FFD27A"))
                 bouton(c, RectF(carte.left + 30 * d, carte.bottom - 40 * d, carte.right - 30 * d, carte.bottom - 10 * d),
                     "Fermer", cible = true)
