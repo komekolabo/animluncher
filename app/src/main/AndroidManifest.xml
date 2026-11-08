@@ -47,6 +47,11 @@
             android:name=".ReglageAppActivity"
             android:exported="false" />
 
+        <!-- Le guide plein écran pour débloquer l'accessibilité grisée (apps installées hors Play Store). -->
+        <activity
+            android:name=".GuideDeblocage"
+            android:exported="false" />
+
         <!-- Le service qui détecte l'app ouverte et joue l'animation. -->
         <service
             android:name=".AppWatcherService"
