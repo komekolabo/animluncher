@@ -21,7 +21,7 @@ enum class Categorie(val intro: Long, val revelation: Long) {
     COURANTE(300, 380),      // réseaux sociaux, banques, outils du quotidien
     SECONDAIRE(200, 260),    // le reste
     JEU(650, 400),           // les jeux : environ 1 seconde, le temps de raconter une petite histoire
-    ECHECS(1300, 450)        // les échecs : un peu plus long, pour avoir le temps de voir le coup
+    ECHECS(1500, 450)        // les échecs : un peu plus long, pour avoir le temps de voir la combinaison
 }
 
 // Où en est l'animation à cette image : temps écoulé, avancement de l'intro et de la révélation (0 à 1).
