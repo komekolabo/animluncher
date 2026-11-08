@@ -14,7 +14,9 @@ import android.os.SystemClock
 import android.view.Display
 import android.view.Gravity
 import android.view.WindowManager
+import android.view.ViewGroup
 import android.view.accessibility.AccessibilityEvent
+import android.widget.FrameLayout
 
 // Le service qui surveille quelle app passe au premier plan,
 // et qui joue l'écran de chargement correspondant (voir Catalogue.kt).
@@ -22,6 +24,7 @@ class AppWatcherService : AccessibilityService() {
 
     private var derniereApp: String? = null
     private var vueEnCours: AnimationView? = null
+    private var cadreEnCours: FrameLayout? = null   // le cadre qui contient l'animation (voir afficher)
     private var reglagesVue: WindowManager.LayoutParams? = null   // taille et position de l'animation
     private var appAnimee: String? = null      // l'app pour laquelle l'animation tourne
     private var appApparue = false             // la fenêtre de cette app est-elle déjà arrivée ?
@@ -357,9 +360,17 @@ class AppWatcherService : AccessibilityService() {
             }
         }
 
+        // L'animation est posée dans un CADRE, et c'est le cadre qu'on ajoute à l'écran.
+        // Sans cadre, Android 16 plantait (« requestTransparentRegion on a null object ») quand
+        // l'animation était retirée juste après avoir été ajoutée : la vue n'avait plus de parent
+        // au moment où Android finissait de l'installer. Avec le cadre, elle en a toujours un.
+        val cadre = FrameLayout(this)
+        cadre.addView(vue, FrameLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT))
+
         try {
-            gestionnaire.addView(vue, reglages)
+            gestionnaire.addView(cadre, reglages)
             vueEnCours = vue
+            cadreEnCours = cadre
             reglagesVue = reglages
             // au cas où l'écran tournerait sans prévenir (ex. une app qui s'ouvre à l'horizontale)
             for (delai in longArrayOf(300L, 700L, 1200L)) minuteur.postDelayed({ if (vueEnCours === vue) ajusterTaille() }, delai)
@@ -384,8 +395,9 @@ class AppWatcherService : AccessibilityService() {
     private fun retirer(gestionnaire: WindowManager, raison: String) {
         val vue = vueEnCours ?: return
         vue.arreter()
-        try { gestionnaire.removeView(vue) } catch (_: Exception) {}
+        cadreEnCours?.let { cadre -> try { gestionnaire.removeView(cadre) } catch (_: Exception) {} }
         vueEnCours = null
+        cadreEnCours = null
         reglagesVue = null
         appAnimee = null
         appApparue = false
@@ -409,14 +421,14 @@ class AppWatcherService : AccessibilityService() {
     }
 
     private fun ajusterTaille() {
-        val vue = vueEnCours ?: return
+        val cadre = cadreEnCours ?: return
         val reglages = reglagesVue ?: return
         val taille = tailleEcran()
         if (reglages.width == taille.x && reglages.height == taille.y) return
         reglages.width = taille.x
         reglages.height = taille.y
         try {
-            (getSystemService(Context.WINDOW_SERVICE) as WindowManager).updateViewLayout(vue, reglages)
+            (getSystemService(Context.WINDOW_SERVICE) as WindowManager).updateViewLayout(cadre, reglages)
             noter("  .. écran tourné : animation redimensionnée en ${taille.x} x ${taille.y}")
         } catch (e: Exception) {
             noter("ERREUR redimensionnement : ${e.message}")
