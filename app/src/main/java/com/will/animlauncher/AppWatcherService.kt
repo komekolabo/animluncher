@@ -149,6 +149,9 @@ class AppWatcherService : AccessibilityService() {
         // Un widget, lui, ouvre toujours l'app volontairement : l'animation est jouée dans tous les cas.
         if (!parWidget && Reglages.seulementDemarrage(this, app) && enArrierePlan(app)) {
             noter("clic sur « ${textes.firstOrNull() ?: "?"} » -> $app : déjà ouverte en arrière-plan, pas d'animation")
+            // …sauf si son écran de démarrage arrive juste après (voir fenetre) : elle était en fait fermée.
+            refuseeApp = app
+            refuseeA = SystemClock.uptimeMillis()
             return
         }
         appCliquee = app
@@ -259,7 +262,16 @@ class AppWatcherService : AccessibilityService() {
         // LES APPS RÉCENTES : quand on les ouvre, on regarde régulièrement quelles apps y sont.
         // Une app qui disparaît de la liste pendant la visite a été fermée (glissée vers le haut).
         if (app == ecranAccueil && classe == "RecentsActivity") debutRecents()
-        else if (dansRecents && ((app == ecranAccueil && classe == "Launcher") || (app != ecranAccueil && estVraieApp))) finRecents()
+        else if (dansRecents && ((app == ecranAccueil && classe == "Launcher") || (app != ecranAccueil && estVraieApp))) {
+            finRecents()
+            // On a touché une carte des apps récentes : l'app reprend depuis l'arrière-plan.
+            // Si elle affiche quand même son écran de démarrage, c'est qu'elle le fait à chaque fois
+            // (comme Gmail ou YouTube) : on le retient.
+            if (app != ecranAccueil && classe == "FrameLayout" && app !in splashToujours()) {
+                retenirSplash(app)
+                noter("  (appris : $app affiche son écran de démarrage même en reprise)")
+            }
+        }
 
         if (!estVraieApp) return
 
@@ -295,6 +307,18 @@ class AppWatcherService : AccessibilityService() {
         if (!Reglages.actif(this)) return
         val lancement = Catalogue.lancement(this, app) ?: return
         if (precedente != ecranAccueil) return
+        // RATTRAPAGE : le clic vient d'être refusé (« déjà ouverte en arrière-plan »), mais l'app
+        // affiche son écran de démarrage moins de 300 ms après : elle avait en fait été fermée
+        // (par exemple d'un glissement dans les apps récentes que le relevé n'a pas vu).
+        // On lance donc l'animation, sauf pour les apps qui affichent cet écran à chaque fois.
+        if (demarrage && app == refuseeApp && SystemClock.uptimeMillis() - refuseeA < 300 && app !in splashToujours()) {
+            refuseeApp = null
+            noter("  .. écran de démarrage juste après le clic : l'app était fermée, animation lancée")
+            appCliquee = app
+            clicA = SystemClock.uptimeMillis()
+            afficher(lancement, app, dejaPrete = false)
+            return
+        }
         // Un appui sur l'accueil qui n'était pas une icône (sans doute un widget qu'on n'a pas su
         // reconnaître) juste avant que l'app arrive : l'utilisateur l'a ouverte exprès -> animation,
         // même si elle était déjà ouverte en arrière-plan.
@@ -486,6 +510,26 @@ class AppWatcherService : AccessibilityService() {
         return taille
     }
 
+    // ---------------- LE RATTRAPAGE ----------------
+    // Le dernier clic refusé parce que l'app semblait ouverte en arrière-plan.
+    private var refuseeApp: String? = null
+    private var refuseeA = 0L
+
+    // Les apps qui affichent leur écran de démarrage même quand elles reviennent de l'arrière-plan :
+    // pour elles, cet écran ne prouve pas qu'elles avaient été fermées. Gmail et YouTube au départ,
+    // puis celles qu'on découvre en les rouvrant depuis les apps récentes (gardées dans le carnet).
+    private val splashDeBase = setOf(
+        "com.google.android.gm", "com.google.android.youtube", "app.revanced.android.youtube"
+    )
+    private fun splashToujours(): Set<String> =
+        splashDeBase + (getSharedPreferences("apprentissage", Context.MODE_PRIVATE)
+            .getStringSet("splash_toujours", emptySet()) ?: emptySet())
+    private fun retenirSplash(app: String) {
+        val carnet = getSharedPreferences("apprentissage", Context.MODE_PRIVATE)
+        val liste = (carnet.getStringSet("splash_toujours", emptySet()) ?: emptySet()) + app
+        carnet.edit().putStringSet("splash_toujours", liste.toSet()).apply()
+    }
+
     // ---------------- LES APPS RÉCENTES ----------------
     private var dansRecents = false
     private val vusRecents = HashSet<String>()      // toutes les apps vues pendant cette visite
@@ -500,7 +544,7 @@ class AppWatcherService : AccessibilityService() {
             override fun run() {
                 if (!dansRecents) return
                 releverRecents()
-                minuteur.postDelayed(this, 250)
+                minuteur.postDelayed(this, 120)
             }
         }, 150)
     }
