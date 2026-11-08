@@ -74,7 +74,40 @@ class ReglageAppActivity : Activity() {
                 majAvertissement()
             }
         })
+        // --- 1 bis. seulement au démarrage, pour cette app ---
+        // (sinon, l'app suit l'interrupteur général de l'écran principal)
+        val carteDemarrage = carte()
+        val noteDemarrage = TextView(this).apply {
+            textSize = 13f
+            setTextColor(Color.parseColor("#94A0C4"))
+        }
+        var majAuto = false      // vrai quand c'est le programme (pas le doigt) qui bouge l'interrupteur
+        val interDemarrage = Switch(this).apply {
+            text = "Seulement au démarrage de l'app"
+            textSize = 17f
+            setTextColor(Color.WHITE)
+            isChecked = Reglages.seulementDemarrage(this@ReglageAppActivity, pkg)
+            setOnCheckedChangeListener { _, coche ->
+                if (majAuto) return@setOnCheckedChangeListener
+                Reglages.definirSeulementDemarrage(this@ReglageAppActivity, pkg, coche)
+                majNoteDemarrage(noteDemarrage)
+            }
+        }
+        carteDemarrage.addView(interDemarrage)
+        carteDemarrage.addView(noteDemarrage)
+        carteDemarrage.addView(Button(this).apply {
+            text = "Suivre le réglage général"
+            setOnClickListener {
+                Reglages.oublierSeulementDemarrage(this@ReglageAppActivity, pkg)
+                majAuto = true
+                interDemarrage.isChecked = Reglages.seulementDemarrage(this@ReglageAppActivity, pkg)
+                majAuto = false
+                majNoteDemarrage(noteDemarrage)
+            }
+        })
+        majNoteDemarrage(noteDemarrage)
         colonne.addView(carteActive)
+        colonne.addView(carteDemarrage)
 
         // --- 2. la durée : un curseur de 0 à 4 s, par pas de 0,1 s ---
         val carteDuree = carte()
@@ -178,6 +211,15 @@ class ReglageAppActivity : Activity() {
     }
 
     private fun secondes(ms: Int) = String.format("%.2f", ms / 1000f).trimEnd('0').trimEnd(',', '.') + " s"
+
+    // La petite explication sous l'interrupteur « Seulement au démarrage ».
+    private fun majNoteDemarrage(note: TextView) {
+        val choix = if (Reglages.seulementDemarrage(this, pkg))
+            "Pas d'animation si l'app est encore ouverte en arrière-plan."
+            else "Animation à chaque appui sur l'icône."
+        note.text = choix + if (Reglages.seulementDemarrageChoisi(this, pkg)) "  (réglé pour cette app)"
+                            else "  (réglage général)"
+    }
 
     // Met à jour le texte et la position du curseur de durée.
     private fun majDuree() {

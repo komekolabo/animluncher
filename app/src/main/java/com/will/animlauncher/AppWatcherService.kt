@@ -28,7 +28,10 @@ class AppWatcherService : AccessibilityService() {
     private var reglagesVue: WindowManager.LayoutParams? = null   // taille et position de l'animation
     private var appAnimee: String? = null      // l'app pour laquelle l'animation tourne
     private var appApparue = false             // la fenêtre de cette app est-elle déjà arrivée ?
-    private val dejaOuvertes = HashSet<String>()   // apps déjà vues depuis le démarrage du service
+    // LES APPS OUVERTES EN ARRIÈRE-PLAN : l'app -> la dernière fois qu'on l'a quittée.
+    // Une app y entre quand elle s'affiche ; elle en sort quand on appuie sur « Tout fermer »
+    // dans les apps récentes, ou quand on ne l'a plus vue depuis 30 min (Android l'a sans doute fermée).
+    private val dejaOuvertes = HashMap<String, Long>()
 
     // Nom affiché sous l'icône -> nom technique de l'app (ex. "Claude" -> "com.anthropic.claude").
     private var noms: Map<String, String> = emptyMap()
@@ -123,6 +126,12 @@ class AppWatcherService : AccessibilityService() {
             parWidget = app != null
         }
         if (app == null) {
+            // « Tout fermer » dans les apps récentes : plus aucune app n'est ouverte en arrière-plan.
+            if (textes.any { val t = it.trim().lowercase(); t == "tout fermer" || t == "fermer tout" || t == "close all" }) {
+                dejaOuvertes.clear()
+                noter("« Tout fermer » : toutes les apps sont fermées")
+                return
+            }
             clicInconnuA = dernierClicAccueil
             noter("clic accueil « ${textes.joinToString(" / ")} » : pas une app connue")
             return
@@ -135,12 +144,15 @@ class AppWatcherService : AccessibilityService() {
         if (lancement == null) { noter("clic -> $app : animation désactivée dans les réglages"); return }
         // Le même appui signalé deux fois : l'animation tourne déjà pour cette app, on ne la recommence pas.
         if (vueEnCours != null && appAnimee == app) return
-        // Mode « seulement au démarrage » : si l'app a déjà été ouverte, on ne sait pas encore si elle
-        // va vraiment démarrer (écran de lancement) ou juste reprendre là où elle était. On prépare
-        // donc l'animation tout de suite, mais INVISIBLE ; la première fenêtre de l'app décidera
-        // (démarrage -> on l'affiche ; reprise -> on l'enlève).
+        // Mode « seulement au démarrage » (général ou réglé pour cette app) : si l'app est encore
+        // ouverte en arrière-plan, on ne joue rien. Avant, on regardait si son écran de lancement
+        // apparaissait, mais Gmail ou YouTube en affichent un à chaque fois, même en arrière-plan.
         // Un widget, lui, ouvre toujours l'app volontairement : l'animation est jouée dans tous les cas.
-        val aConfirmer = !parWidget && Reglages.seulementDemarrage(this) && app in dejaOuvertes
+        if (!parWidget && Reglages.seulementDemarrage(this, app) && enArrierePlan(app)) {
+            noter("clic sur « ${textes.firstOrNull() ?: "?"} » -> $app : déjà ouverte en arrière-plan, pas d'animation")
+            return
+        }
+        val aConfirmer = false
         appCliquee = app
         clicA = SystemClock.uptimeMillis()
         afficher(lancement, app, dejaPrete = false, aConfirmer = aConfirmer)   // d'abord l'animation, le journal après
@@ -262,7 +274,10 @@ class AppWatcherService : AccessibilityService() {
         if (app == derniereApp) return
         val precedente = derniereApp
         derniereApp = app
-        if (app != ecranAccueil) dejaOuvertes.add(app)
+        // l'app qu'on quitte : on note l'heure (elle reste ouverte en arrière-plan)
+        if (precedente != null && precedente != ecranAccueil) dejaOuvertes[precedente] = SystemClock.uptimeMillis()
+        val etaitOuverte = app != ecranAccueil && enArrierePlan(app)
+        if (app != ecranAccueil) dejaOuvertes[app] = SystemClock.uptimeMillis()
 
         // L'animation tourne déjà pour cette app (lancée au clic) : rien de plus à faire.
         if ((vueEnCours != null && appAnimee == app) ||
@@ -272,7 +287,7 @@ class AppWatcherService : AccessibilityService() {
         }
 
         if (app == ecranAccueil) {
-            noter(app)
+            noter("$app | écran $classe")
             // On est revenu sur l'accueil après avoir vu l'app cliquée : ce clic-là est terminé.
             // (Sinon, rouvrir la même app dans les 6 s suivantes était pris pour « le même clic ».)
             if (precedente == appCliquee) appCliquee = null
@@ -293,7 +308,7 @@ class AppWatcherService : AccessibilityService() {
         // même si elle était déjà ouverte en arrière-plan.
         val apresWidget = clicInconnuA == dernierClicAccueil && SystemClock.uptimeMillis() - clicInconnuA < 2500
         if (apresWidget) noter("  (ouverte depuis un widget)")
-        if (Reglages.seulementDemarrage(this) && !demarrage && !apresWidget) return
+        if (Reglages.seulementDemarrage(this, app) && !apresWidget && (!demarrage || etaitOuverte)) return
         // Une app peut faire apparaître une fenêtre sans qu'on l'ait ouverte (mini-lecteur
         // de YouTube quand on la quitte, etc.). On n'anime donc que si on vient d'appuyer
         // sur l'écran d'accueil (moins de 2 s). Si le téléphone ne nous signale jamais
@@ -442,6 +457,12 @@ class AppWatcherService : AccessibilityService() {
         val taille = Point()
         @Suppress("DEPRECATION") ecran.getRealSize(taille)
         return taille
+    }
+
+    // L'app est-elle encore ouverte en arrière-plan ? (vue il y a moins de 30 min, sans « Tout fermer »)
+    private fun enArrierePlan(app: String): Boolean {
+        val vue = dejaOuvertes[app] ?: return false
+        return SystemClock.uptimeMillis() - vue < 30 * 60_000L
     }
 
     override fun onInterrupt() {}

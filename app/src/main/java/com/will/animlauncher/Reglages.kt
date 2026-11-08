@@ -40,6 +40,22 @@ object Reglages {
         carnet(c).edit().putBoolean("off_$app", !active).apply()
     }
 
+    // « Seulement au démarrage » pour CETTE app : si on l'a réglé dans la page de l'app, c'est ce
+    // choix qui compte ; sinon on suit l'interrupteur général de l'écran principal.
+    fun seulementDemarrage(c: Context, app: String): Boolean {
+        val reglages = carnet(c)
+        return if (reglages.contains("dem_$app")) reglages.getBoolean("dem_$app", false)
+               else seulementDemarrage(c)
+    }
+    fun definirSeulementDemarrage(c: Context, app: String, valeur: Boolean) {
+        carnet(c).edit().putBoolean("dem_$app", valeur).apply()
+    }
+    // Revenir au réglage général pour cette app.
+    fun oublierSeulementDemarrage(c: Context, app: String) {
+        carnet(c).edit().remove("dem_$app").apply()
+    }
+    fun seulementDemarrageChoisi(c: Context, app: String): Boolean = carnet(c).contains("dem_$app")
+
     // La durée choisie pour cette app, en millisecondes. -1 = la durée par défaut.
     // 0 = pas d'animation du tout.
     fun duree(c: Context, app: String): Int = carnet(c).getInt("duree_$app", -1)
