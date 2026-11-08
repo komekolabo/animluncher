@@ -391,7 +391,19 @@ class Capitales(numero: Int = -1) : Scene() {
         return p.measureText(s)
     }
 
-    // Le dessin, dans le style de Google Maps en mode sombre, sans rien qui clignote.
+    // DEUX HABILLAGES (voir build.gradle.kts : les versions « perso » et « store ») :
+    // - version Perso : le style de Google Maps en mode sombre (barre de recherche, panneau « Démarrer »).
+    // - version Store : la MÊME carte et le même A*, mais un habillage original, pour ne pas imiter
+    //   l'interface d'une autre app : le nom de la destination écrit sur la carte, un petit compteur
+    //   néon en bas, un itinéraire violet et un repère ambre.
+    private val store = BuildConfig.STORE
+    private val bleu = if (store) rgb(150, 110, 245) else rgb(66, 133, 244)        // itinéraire, point de départ
+    private val bleuFonce = if (store) rgb(55, 35, 120) else rgb(24, 70, 160)      // le liseré de l'itinéraire
+    private val rougeEpingle = if (store) rgb(255, 170, 70) else rgb(234, 67, 53)
+    private val coeurEpingle = if (store) rgb(110, 60, 10) else rgb(120, 20, 15)
+    private val neon = rgb(110, 225, 235)                                          // le compteur de la version Store
+
+    // Le dessin, sans rien qui clignote.
     override fun dessiner(c: Canvas, o: Outils, i: Instant) {
         val dp = o.dp; val sec = i.secondes; val rev = i.revelation
         val t = sec * 1.25f                          // l'horloge de l'histoire : tout est joué en 0,9 s environ
@@ -455,7 +467,7 @@ class Capitales(numero: Int = -1) : Scene() {
         val efface = 1f - borne((t - 0.75f) / 0.3f)
         c.drawPath(arbre, o.pinceau(avecAlpha(rgb(110, 160, 230), 0.5f * efface * a), 1.4f * dp))
 
-        // --- 2) l'itinéraire, en bleu Google avec son liseré ---
+        // --- 2) l'itinéraire, avec son liseré (bleu en Perso, violet en Store) ---
         val trace = doux(borne((t - 0.55f) / 0.35f))
         if (trace > 0f && chemin.size > 1) {
             val ch = Path()
@@ -464,7 +476,7 @@ class Capitales(numero: Int = -1) : Scene() {
             ch.moveTo(xs[chemin[0]], ys[chemin[0]])
             for (q in 1..kk) ch.lineTo(xs[chemin[q]], ys[chemin[q]])
             if (kk < chemin.size - 1) ch.lineTo(mix(xs[chemin[kk]], xs[chemin[kk + 1]], nb - kk), mix(ys[chemin[kk]], ys[chemin[kk + 1]], nb - kk))
-            for ((ep, col) in listOf(8.5f to rgb(24, 70, 160), 6f to rgb(66, 133, 244))) {
+            for ((ep, col) in listOf(8.5f to bleuFonce, 6f to bleu)) {
                 val l = o.pinceau(avecAlpha(col, a), ep * dp)
                 l.strokeJoin = Paint.Join.ROUND
                 c.drawPath(ch, l)
@@ -472,21 +484,28 @@ class Capitales(numero: Int = -1) : Scene() {
         }
         // --- le point bleu « vous êtes ici », qui respire doucement ---
         val pouls = 0.5f + 0.5f * sin(sec * 3f)
-        c.drawCircle(dx, dy, (14f + 4f * pouls) * dp, o.pinceau(avecAlpha(rgb(66, 133, 244), 0.18f * app * a)))
+        c.drawCircle(dx, dy, (14f + 4f * pouls) * dp, o.pinceau(avecAlpha(bleu, 0.18f * app * a)))
         c.drawCircle(dx, dy, 7.5f * dp, o.pinceau(avecAlpha(rgb(255, 255, 255), app * a)))
-        c.drawCircle(dx, dy, 5.5f * dp, o.pinceau(avecAlpha(rgb(66, 133, 244), app * a)))
+        c.drawCircle(dx, dy, 5.5f * dp, o.pinceau(avecAlpha(bleu, app * a)))
         // --- 3) l'épingle rouge tombe sur la destination ---
         val chute = ralentit(borne((t - 0.85f) / 0.2f))
         if (chute > 0f) {
             c.drawOval(RectF(ex - 6f * dp, ey - 2f * dp, ex + 6f * dp, ey + 2f * dp), o.pinceau(argb(110f * chute * a, 0, 0, 0)))
             val yb = ey - (1f - chute) * 60f * dp
-            val corps = o.pinceau(avecAlpha(rgb(234, 67, 53), chute * a))
+            val corps = o.pinceau(avecAlpha(rougeEpingle, chute * a))
             c.drawCircle(ex, yb - 22f * dp, 11f * dp, corps)
             val pied = Path(); pied.moveTo(ex - 9.5f * dp, yb - 17f * dp); pied.lineTo(ex, yb); pied.lineTo(ex + 9.5f * dp, yb - 17f * dp); pied.close()
             c.drawPath(pied, corps)
-            c.drawCircle(ex, yb - 22f * dp, 4f * dp, o.pinceau(avecAlpha(rgb(120, 20, 15), chute * a)))
+            c.drawCircle(ex, yb - 22f * dp, 4f * dp, o.pinceau(avecAlpha(coeurEpingle, chute * a)))
         }
         c.restore()
+
+        if (store) {
+            habillageStore(c, o, t, a, w, h, u, dp)
+            o.vignette(c, w, h, 0.35f)
+            o.revelationDouce(c, ex, ey, rev, bleu)
+            return
+        }
 
         // --- l'interface : la barre de recherche en haut ---
         val barre = ralentit(borne((t - 0.05f) / 0.3f))
@@ -528,5 +547,58 @@ class Capitales(numero: Int = -1) : Scene() {
         }
         o.vignette(c, w, h, 0.35f)
         o.revelationDouce(c, ex, ey, rev, rgb(66, 133, 244))
+    }
+
+    // L'HABILLAGE DE LA VERSION STORE : rien qui ressemble à l'interface d'une app existante.
+    private fun habillageStore(c: Canvas, o: Outils, t: Float, a: Float, w: Float, h: Float, u: Float, dp: Float) {
+        // 1) En haut : le nom de la destination s'écrit en grandes lettres fines et espacées,
+        //    sous un petit mot « DESTINATION », avec un trait qui se dessine en dessous.
+        val entree = ralentit(borne((t - 0.05f) / 0.3f))
+        if (entree > 0f) {
+            val haut = 56f * dp - (1f - entree) * 20f * dp
+            val petit = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+                textSize = 10f * dp; letterSpacing = 0.35f; textAlign = Paint.Align.CENTER
+                color = avecAlpha(rgb(150, 158, 175), entree * a)
+            }
+            c.drawText("DESTINATION", w / 2, haut, petit)
+            val titre = nomBut.uppercase()
+            val tape = (titre.length * borne((t - 0.15f) / 0.4f)).toInt()          // lettre par lettre
+            val grand = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+                textSize = 22f * dp; letterSpacing = 0.12f; textAlign = Paint.Align.CENTER
+                typeface = android.graphics.Typeface.create("sans-serif-light", android.graphics.Typeface.NORMAL)
+                color = avecAlpha(rgb(235, 238, 245), a)
+            }
+            // on mesure le titre COMPLET pour qu'il ne bouge pas pendant qu'il s'écrit
+            val largeurTitre = grand.measureText(titre)
+            grand.textAlign = Paint.Align.LEFT
+            c.drawText(titre.substring(0, tape), w / 2 - largeurTitre / 2, haut + 30f * dp, grand)
+            // le trait sous le titre : il part du centre et s'étire vers les deux côtés
+            val trait = doux(borne((t - 0.3f) / 0.5f)) * (largeurTitre / 2 + 12f * dp)
+            if (trait > 0f) c.drawLine(w / 2 - trait, haut + 42f * dp, w / 2 + trait, haut + 42f * dp,
+                o.pinceau(avecAlpha(bleu, 0.8f * a), 1.2f * dp))
+        }
+        // 2) En bas à gauche : un petit compteur néon (durée · distance), sans panneau ni bouton.
+        val compteur = ralentit(borne((t - 0.85f) / 0.3f))
+        if (compteur > 0f && chemin.size > 1) {
+            var lg = 0f
+            for (j in 0 until chemin.size - 1) lg += hypot(xs[chemin[j + 1]] - xs[chemin[j]], ys[chemin[j + 1]] - ys[chemin[j]])
+            val km = lg / u * 4.2f                                                    // 1 écran ≈ 4 km
+            val minutes = max(3, Math.round(km * 3.2f))
+            val y = h - 40f * dp + (1f - compteur) * 16f * dp
+            val p = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+                textSize = 15f * dp; letterSpacing = 0.18f
+                typeface = android.graphics.Typeface.MONOSPACE
+                color = avecAlpha(neon, compteur * a)
+            }
+            val texteCompteur = "$minutes MIN · " + String.format("%.1f", km).replace('.', ',') + " KM"
+            // un halo doux derrière le texte (pas de flash : faible opacité, apparition progressive)
+            val halo = Paint(p).apply {
+                color = avecAlpha(neon, 0.25f * compteur * a)
+                maskFilter = android.graphics.BlurMaskFilter(6f * dp, android.graphics.BlurMaskFilter.Blur.NORMAL)
+            }
+            // (le flou n'est géré par la puce graphique qu'à partir d'Android 9 : avant, pas de halo)
+            if (android.os.Build.VERSION.SDK_INT >= 28) c.drawText(texteCompteur, 24f * dp, y, halo)
+            c.drawText(texteCompteur, 24f * dp, y, p)
+        }
     }
 }
