@@ -257,6 +257,9 @@ class AppWatcherService : AccessibilityService() {
 
         if (app == ecranAccueil) {
             noter(app)
+            // On est revenu sur l'accueil après avoir vu l'app cliquée : ce clic-là est terminé.
+            // (Sinon, rouvrir la même app dans les 6 s suivantes était pris pour « le même clic ».)
+            if (precedente == appCliquee) appCliquee = null
             appQuittee = precedente
             quitteeA = SystemClock.uptimeMillis()
             return
