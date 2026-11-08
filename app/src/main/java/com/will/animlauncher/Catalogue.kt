@@ -93,6 +93,26 @@ object Catalogue {
         "network.bisq.mobile.node" to e(S) { Echange() },
         "com.btcframe" to e(S) { Facettes() },
         "com.microstrategy.stream" to e(S) { Isometrie() },
+        // --- Lot 6 : jeux et utilitaires ---
+        "com.playstack.balatro.android" to e(C) { Cartes() },
+        "com.supercell.clashofclans" to e(C) { Torches() },
+        "com.chess" to e(C) { Echiquier() },
+        "com.robtopx.geometryjumplite" to e(C) { Cube() },
+        "com.robtopx.geometrydashmeltdown" to e(S) { Cube(rgb(255, 140, 50), true) },
+        "com.BlackSaltGames.DREDGE" to e(S) { Lanterne() },
+        "com.dsemu.drastic" to e(S) { DoubleEcran() },
+        "com.chessbar" to e(S) { Pendule() },
+        "com.strayfawnstudio.gambonanza" to e(S) { Des() },
+        "com.venezianoapp.frusta" to e(S) { Fouet() },
+        "app.revanced.android.gms" to e(S) { Puzzle() },
+        "com.revanced.net.revancedmanager" to e(S) { Couture() },
+        "tv.parsec.client" to e(S) { Hyperespace() },
+        "com.freevpnplanet" to e(S) { Bulle() },
+        "io.github.libresprite" to e(S) { Pixels() },
+        "fr.astillia.SigtaoMobile" to e(S) { Boussole() },
+        "com.wizway.nfcagent" to e(S) { SansContact() },
+        "fr.laposte.idn" to e(S) { Empreinte() },
+        "com.airbnb.android" to e(S) { Cle() },
     )
 
     fun pour(app: String): Entree? = entrees[app]
