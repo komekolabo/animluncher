@@ -15,7 +15,11 @@
         </intent>
     </queries>
 
+    <!-- Internet : seulement pour envoyer le journal sur GitHub (si une clé a été donnée). -->
+    <uses-permission android:name="android.permission.INTERNET" />
+
     <application
+        android:name=".AnimApp"
         android:label="AnimLauncher"
         android:theme="@android:style/Theme.Material.NoActionBar">
 

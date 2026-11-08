@@ -14,9 +14,6 @@ import android.view.Display
 import android.view.Gravity
 import android.view.WindowManager
 import android.view.accessibility.AccessibilityEvent
-import java.text.SimpleDateFormat
-import java.util.Date
-import java.util.Locale
 
 // Le service qui surveille quelle app passe au premier plan,
 // et qui joue l'écran de chargement correspondant (voir Catalogue.kt).
@@ -61,15 +58,22 @@ class AppWatcherService : AccessibilityService() {
     }
 
     override fun onServiceConnected() {
+        Journal.installerFilet(this)
         noter("=== Service démarré (allumage ou réactivation) ===")
         noms = calculerNoms()      // préparé à l'avance : le clic doit être traité instantanément
     }
 
     override fun onAccessibilityEvent(event: AccessibilityEvent) {
-        when (event.eventType) {
-            AccessibilityEvent.TYPE_VIEW_CLICKED -> { diagnostic(event); clic(event) }
-            AccessibilityEvent.TYPE_WINDOW_STATE_CHANGED -> fenetre(event)
-            else -> diagnostic(event)
+        // Si quelque chose se passe mal pendant le traitement d'un signal, on l'écrit dans le
+        // journal au lieu de laisser planter le service (un service planté = plus aucune animation).
+        try {
+            when (event.eventType) {
+                AccessibilityEvent.TYPE_VIEW_CLICKED -> { diagnostic(event); clic(event) }
+                AccessibilityEvent.TYPE_WINDOW_STATE_CHANGED -> fenetre(event)
+                else -> diagnostic(event)
+            }
+        } catch (e: Exception) {
+            noter("ERREUR (rattrapée) : " + Journal.pile(e))
         }
     }
 
@@ -145,7 +149,14 @@ class AppWatcherService : AccessibilityService() {
     // par exemple "com.spotify.music:id/bouton_lecture". On regarde donc l'élément touché, puis
     // ses parents (le cadre du widget), et on prend le premier identifiant qui vient d'une autre
     // app que le lanceur. On ne lit rien d'autre de l'écran.
-    private fun appDuWidget(event: AccessibilityEvent): String? {
+    private fun appDuWidget(event: AccessibilityEvent): String? = try {
+        chercherDansWidget(event)
+    } catch (e: Exception) {
+        noter("ERREUR widget (rattrapée) : " + Journal.pile(e))
+        null
+    }
+
+    private fun chercherDansWidget(event: AccessibilityEvent): String? {
         var noeud = try { event.source } catch (_: Exception) { null } ?: return null
         val aVoir = ArrayDeque<android.view.accessibility.AccessibilityNodeInfo>()
         // l'élément touché et ses parents…
@@ -381,20 +392,16 @@ class AppWatcherService : AccessibilityService() {
         noter("  -> ${vue.images} images, $surface, $ms ms, $raison")
     }
 
+    // Une ligne dans le journal (voir Journal.kt), qui partira ensuite sur GitHub.
     private fun noter(texte: String) {
-        val carnet = getSharedPreferences(CARNET, Context.MODE_PRIVATE)
-        val heure = SimpleDateFormat("HH:mm:ss", Locale.FRANCE).format(Date())
-        val ancienne = carnet.getString(CLE_LISTE, "") ?: ""
-        val nouvelle = (listOf("$heure $texte") + ancienne.lines().filter { it.isNotBlank() })
-            .take(200)
-            .joinToString("\n")
-        carnet.edit().putString(CLE_LISTE, nouvelle).apply()
+        Journal.noter(this, texte)
+        Journal.programmerEnvoi(this)
     }
 
     override fun onInterrupt() {}
 
     companion object {
-        const val CARNET = "detections"
-        const val CLE_LISTE = "liste"
+        const val CARNET = Journal.CARNET
+        const val CLE_LISTE = Journal.CLE_LISTE
     }
 }
