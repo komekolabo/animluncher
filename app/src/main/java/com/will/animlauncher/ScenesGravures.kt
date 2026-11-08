@@ -1,5 +1,6 @@
 package com.will.animlauncher
 
+import android.graphics.Bitmap
 import android.graphics.Canvas
 import android.graphics.LinearGradient
 import android.graphics.Paint
@@ -426,56 +427,109 @@ class Gravure(private val nom: String, private val courbure: Float) {
             "Cellule" -> intCellule(c, o, cx, cy, rayon, haut, w, h, m, dp, sec, app, encreC)
             "Maths" -> intMaths(c, o, cx, cy, rayon, haut, w, h, app, tmax, encreC, pt)
             else -> {
-                // sous la courbe : les galeries hexagonales de la Bibliothèque de Babel (Borges),
-                // chacune tapissée de livres, avec son puits central bordé d'une rambarde
-                val R = 0.11f * m; val hx = sqrt(3f) * R
-                val fond = o.pinceau(SOL); val vide = o.pinceau(FOND)
-                fun hexagone(x: Float, y: Float, r: Float): Path {
-                    val p = Path()
-                    for (k in 0 until 6) {
-                        val a = k * PI.toFloat() / 3
-                        if (k == 0) p.moveTo(x + r * cos(a), y + r * sin(a)) else p.lineTo(x + r * cos(a), y + r * sin(a))
-                    }
-                    p.close(); return p
-                }
-                var colonne = 0; var xc = -R
-                while (xc < w + R) {
-                    var yc = haut - 0.01f * h + (if (colonne % 2 == 1) hx / 2 else 0f)
-                    while (yc < h + hx) {
-                        val hexa = hexagone(xc, yc, R); val dedans = hexagone(xc, yc, 0.84f * R)
-                        lavis(c, o, hexa, BOIS, 0.55f * app)              // le cadre en bois
-                        c.drawPath(dedans, fond)
-                        c.save(); c.clipPath(dedans)
-                        var idx = modulo((colonne * 37 + yc.toInt()).toFloat(), 500f).toInt()
-                        for (rang in 0 until 4) {                     // quatre rayonnages de livres
-                            val yb = yc - 0.84f * hx / 2 + (rang + 1) * 0.84f * hx / 4
-                            val hl = 0.84f * hx / 4 * 0.85f
-                            var x = xc - 0.84f * R
-                            while (x < xc + 0.84f * R) {
-                                val lv = livres[idx % 500]; idx++
-                                val lb = lv[0] * w * 0.55f; val hb = hl * lv[1]
-                                val dos = Path(); dos.addRect(x, yb - hb, x + lb * 0.92f, yb, Path.Direction.CW)
-                                lavis(c, o, dos, CUIRS[cuirs[idx % 500]], 0.8f * app)
-                                c.drawLine(x, yb - hb * 0.85f, x + lb * 0.92f, yb - hb * 0.85f, encre(0.6f * app, 0.6f, OR))
-                                x += lb
-                            }
-                            c.drawLine(xc - R, yb, xc + R, yb, encre(0.7f * app, 1f))
-                        }
-                        c.restore()
-                        val puits = 0.26f * R                          // le puits central et sa rambarde
-                        c.drawCircle(xc, yc, puits, vide)
-                        c.drawCircle(xc, yc, puits, encre(0.85f * app, 1.2f))
-                        for (k in 0 until 12) {
-                            val a = k * PI.toFloat() / 6
-                            c.drawLine(xc + puits * cos(a), yc + puits * sin(a), xc + puits * 1.25f * cos(a), yc + puits * 1.25f * sin(a), encre(0.6f * app, 0.8f))
-                        }
-                        c.drawCircle(xc, yc, puits * 1.25f, encre(0.7f * app, 0.9f))
-                        c.drawPath(hexa, encre(0.9f * app, 1.4f)); c.drawPath(dedans, encre(0.6f * app, 0.8f))
-                        yc += hx
-                    }
-                    xc += 1.5f * R; colonne++
+                // sous la courbe : les galeries hexagonales de la Bibliothèque de Babel (Borges).
+                // Il y a des milliers de livres : les redessiner à chaque image faisait ramer l'animation.
+                // On les dessine donc UNE SEULE FOIS dans une image (dans un fil à part), puis, à chaque
+                // image, on se contente de poser cette image à la bonne hauteur. En attendant qu'elle
+                // soit prête (les tout premiers instants), on dessine comme avant.
+                val y0 = haut - 0.01f * h
+                val img = biblio
+                if (img != null && biblioPour == w.toInt() * 100000 + h.toInt()) {
+                    val p = Paint(Paint.FILTER_BITMAP_FLAG); p.alpha = (255 * app).toInt().coerceIn(0, 255)
+                    c.drawBitmap(img, 0f, y0 - biblioMarge, p)
+                } else {
+                    preparerBibliotheque(o, w, h, m)
+                    bibliotheque(c, o, w, h, m, y0, h + 0.2f * m, app)
                 }
             }
+        }
+    }
+
+    // ---------- la Bibliothèque de Babel, préparée une seule fois ----------
+    @Volatile private var biblio: Bitmap? = null
+    @Volatile private var biblioPour = 0          // pour quelle taille d'écran elle a été préparée
+    private var biblioMarge = 0f                  // la place laissée au-dessus de la première rangée
+    @Volatile private var biblioEnCours = false
+
+    // Lance (une seule fois) la fabrication de l'image de la bibliothèque, dans un fil à part.
+    private fun preparerBibliotheque(o: Outils, w: Float, h: Float, m: Float) {
+        if (biblioEnCours) return
+        biblioEnCours = true
+        Thread {
+            try {
+                // La courbe monte jusqu'à « hautFin » pendant la révélation : l'image doit couvrir
+                // toute la hauteur que la bibliothèque peut occuper, de la plus haute à l'écran.
+                val rayon = courbure * w
+                val hautFin = sqrt(max(0f, rayon * rayon - w * w / 4)) - rayon - 0.04f * h
+                val hautMin = min(0.66f * h, hautFin)
+                val hx = sqrt(3f) * 0.11f * m
+                val marge = hx / 2 + 4f
+                val hauteur = (h + hx) - (hautMin - 0.01f * h) + marge
+                val bmp = Bitmap.createBitmap(w.toInt().coerceAtLeast(1), hauteur.toInt().coerceAtLeast(1), Bitmap.Config.ARGB_8888)
+                bibliotheque(Canvas(bmp), o, w, hauteur, m, marge, hauteur, 1f)
+                biblioMarge = marge
+                biblioPour = w.toInt() * 100000 + h.toInt()
+                biblio = bmp
+            } catch (_: Throwable) {
+                // pas assez de mémoire, par exemple : on continue de dessiner en direct
+            }
+        }.start()
+    }
+
+    // Dessine les galeries : la première rangée d'alvéoles est centrée sur y0, et on descend
+    // jusqu'à yMax. Chaque alvéole est tapissée de livres, avec son puits central et sa rambarde.
+    private fun bibliotheque(c: Canvas, o: Outils, w: Float, h: Float, m: Float, y0: Float, yMax: Float, app: Float) {
+        val dp = o.dp
+        val kE = if (leger) 0.8f else 1f
+        fun encre(a: Float, ep: Float, col: Int = ENCRE) = o.pinceau(avecAlpha(col, a * kE), ep * dp)
+        val R = 0.11f * m; val hx = sqrt(3f) * R
+        val fond = o.pinceau(SOL); val vide = o.pinceau(FOND)
+        fun hexagone(x: Float, y: Float, r: Float): Path {
+            val p = Path()
+            for (k in 0 until 6) {
+                val a = k * PI.toFloat() / 3
+                if (k == 0) p.moveTo(x + r * cos(a), y + r * sin(a)) else p.lineTo(x + r * cos(a), y + r * sin(a))
+            }
+            p.close(); return p
+        }
+        var colonne = 0; var xc = -R
+        while (xc < w + R) {
+            var yc = y0 + (if (colonne % 2 == 1) hx / 2 else 0f)
+            while (yc < yMax) {
+                val hexa = hexagone(xc, yc, R); val dedans = hexagone(xc, yc, 0.84f * R)
+                lavis(c, o, hexa, BOIS, 0.55f * app)              // le cadre en bois
+                c.drawPath(dedans, fond)
+                c.save(); c.clipPath(dedans)
+                // (le choix des livres dépend de la place de l'alvéole dans la grille, pas de l'écran :
+                //  ils ne changent donc pas quand la bibliothèque monte)
+                var idx = modulo((colonne * 37 + (yc - y0).toInt()).toFloat(), 500f).toInt()
+                for (rang in 0 until 4) {                     // quatre rayonnages de livres
+                    val yb = yc - 0.84f * hx / 2 + (rang + 1) * 0.84f * hx / 4
+                    val hl = 0.84f * hx / 4 * 0.85f
+                    var x = xc - 0.84f * R
+                    while (x < xc + 0.84f * R) {
+                        val lv = livres[idx % 500]; idx++
+                        val lb = lv[0] * w * 0.55f; val hb = hl * lv[1]
+                        val dos = Path(); dos.addRect(x, yb - hb, x + lb * 0.92f, yb, Path.Direction.CW)
+                        lavis(c, o, dos, CUIRS[cuirs[idx % 500]], 0.8f * app)
+                        c.drawLine(x, yb - hb * 0.85f, x + lb * 0.92f, yb - hb * 0.85f, encre(0.6f * app, 0.6f, OR))
+                        x += lb
+                    }
+                    c.drawLine(xc - R, yb, xc + R, yb, encre(0.7f * app, 1f))
+                }
+                c.restore()
+                val puits = 0.26f * R                          // le puits central et sa rambarde
+                c.drawCircle(xc, yc, puits, vide)
+                c.drawCircle(xc, yc, puits, encre(0.85f * app, 1.2f))
+                for (k in 0 until 12) {
+                    val a = k * PI.toFloat() / 6
+                    c.drawLine(xc + puits * cos(a), yc + puits * sin(a), xc + puits * 1.25f * cos(a), yc + puits * 1.25f * sin(a), encre(0.6f * app, 0.8f))
+                }
+                c.drawCircle(xc, yc, puits * 1.25f, encre(0.7f * app, 0.9f))
+                c.drawPath(hexa, encre(0.9f * app, 1.4f)); c.drawPath(dedans, encre(0.6f * app, 0.8f))
+                yc += hx
+            }
+            xc += 1.5f * R; colonne++
         }
     }
 
