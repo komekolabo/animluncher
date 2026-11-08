@@ -115,15 +115,18 @@ class AppWatcherService : AccessibilityService() {
         // Réglages de l'app : désactivée, durée 0 s, ou aucune variante cochée -> rien
         val lancement = Catalogue.lancement(this, app)
         if (lancement == null) { noter("clic -> $app : animation désactivée dans les réglages"); return }
-        // Mode « seulement au démarrage » : si l'app a déjà été ouverte, c'est sûrement
-        // une reprise -> on laisse l'ancienne méthode décider (elle ignore les reprises).
-        if (Reglages.seulementDemarrage(this) && app in dejaOuvertes) return
         // Le même appui signalé deux fois : l'animation tourne déjà pour cette app, on ne la recommence pas.
         if (vueEnCours != null && appAnimee == app) return
+        // Mode « seulement au démarrage » : si l'app a déjà été ouverte, on ne sait pas encore si elle
+        // va vraiment démarrer (écran de lancement) ou juste reprendre là où elle était. On prépare
+        // donc l'animation tout de suite, mais INVISIBLE ; la première fenêtre de l'app décidera
+        // (démarrage -> on l'affiche ; reprise -> on l'enlève).
+        val aConfirmer = Reglages.seulementDemarrage(this) && app in dejaOuvertes
         appCliquee = app
         clicA = SystemClock.uptimeMillis()
-        afficher(lancement, app, dejaPrete = false)      // d'abord l'animation, le journal après
-        noter("clic sur « ${textes.firstOrNull() ?: "?"} » -> $app : animation lancée")
+        afficher(lancement, app, dejaPrete = false, aConfirmer = aConfirmer)   // d'abord l'animation, le journal après
+        noter("clic sur « ${textes.firstOrNull() ?: "?"} » -> $app : " +
+            if (aConfirmer) "animation prête (démarrage ou reprise ?)" else "animation lancée")
     }
 
     private fun trouverApp(textes: List<String>): String? {
@@ -180,7 +183,17 @@ class AppWatcherService : AccessibilityService() {
                 appAnimee = app
                 animeeA[app] = SystemClock.uptimeMillis()
             }
-            if (app == appAnimee) {
+            // CONFIRMATION (mode « seulement au démarrage ») : la première fenêtre de l'app tranche.
+            if (vue.enAttente && app == appAnimee) {
+                if (classe == "FrameLayout") {
+                    vue.montrer()
+                    noter("  .. l'app démarre vraiment : animation affichée")
+                } else {
+                    noter("  .. simple reprise (écran $classe) : pas d'animation")
+                    retirer(getSystemService(Context.WINDOW_SERVICE) as WindowManager, "reprise")
+                }
+            }
+            if (vueEnCours === vue && app == appAnimee) {
                 appApparue = true
                 if (classe != "FrameLayout") {
                     vue.signalerPret()
@@ -255,7 +268,7 @@ class AppWatcherService : AccessibilityService() {
         appApparue = true      // ici, la fenêtre de l'app est déjà là
     }
 
-    private fun afficher(lancement: Lancement, app: String, dejaPrete: Boolean) {
+    private fun afficher(lancement: Lancement, app: String, dejaPrete: Boolean, aConfirmer: Boolean = false) {
         val gestionnaire = getSystemService(Context.WINDOW_SERVICE) as WindowManager
         retirer(gestionnaire, "nouvelle animation")
 
@@ -266,6 +279,7 @@ class AppWatcherService : AccessibilityService() {
         @Suppress("DEPRECATION") ecran.getRealSize(taille)
 
         val vue = AnimationView(this, lancement.scene, lancement.categorie, lancement.facteur)
+        if (aConfirmer) vue.attendreConfirmation()
         val reglages = WindowManager.LayoutParams(
             taille.x, taille.y,
             WindowManager.LayoutParams.TYPE_ACCESSIBILITY_OVERLAY,
@@ -297,6 +311,10 @@ class AppWatcherService : AccessibilityService() {
             appApparue = false
             if (dejaPrete) vue.signalerPret()
             vue.jouer { if (vueEnCours === vue) retirer(gestionnaire, "fin normale") }
+            // Sans confirmation au bout de 2 s (aucune fenêtre de l'app n'est arrivée) : on abandonne.
+            if (aConfirmer) minuteur.postDelayed({
+                if (vueEnCours === vue && vue.enAttente) retirer(gestionnaire, "pas de confirmation")
+            }, 2000)
             // Filet de sécurité : attente max + révélation + une marge d'une seconde.
             minuteur.postDelayed({
                 if (vueEnCours === vue) retirer(gestionnaire, "filet de sécurité")

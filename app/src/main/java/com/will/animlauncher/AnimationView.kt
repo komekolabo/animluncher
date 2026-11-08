@@ -12,7 +12,8 @@ import android.view.SurfaceView
 
 // L'ÉCRAN DE CHARGEMENT ANIMÉ, en plein écran, qui joue UNE scène en 3 phases :
 //   1. INTRO      : la scène apparaît (durée selon la catégorie)
-//   2. ATTENTE    : elle tourne en boucle tant que l'app charge (3 s maximum)
+//   2. ATTENTE    : elle tourne en boucle tant que l'app charge (3 s maximum),
+//                   et AU MOINS 1,2 s en tout, même si l'app est prête plus tôt : sinon on ne voit rien
 //   3. RÉVÉLATION : l'app est dévoilée (durée selon la catégorie)
 // Le service appelle signalerPret() quand le vrai écran de l'app est arrivé.
 // « facteur » = la vitesse choisie dans les réglages : 2 = deux fois plus lent (et plus long),
@@ -22,13 +23,20 @@ class AnimationView(context: Context, private val scene: Scene, categorie: Categ
 
     private val dureeIntro = (categorie.intro * facteur).toLong().coerceAtLeast(1L)
     private val dureeRevelation = (categorie.revelation * facteur).toLong().coerceAtLeast(1L)
-    private val dureeAttenteMax = maxOf(3000L, dureeIntro + 200L)
+    // Durée minimale avant la révélation (1,2 s, ajustée par la vitesse choisie dans les réglages).
+    private val dureeMin = (1200 * facteur).toLong()
+    private val dureeAttenteMax = maxOf(3000L, dureeIntro + 200L, dureeMin + 200L)
 
     private var quandFini: (() -> Unit)? = null
     private val principal = Handler(Looper.getMainLooper())
     private var fil: Thread? = null
     @Volatile private var arretee = false
     @Volatile private var pret = false
+    // EN ATTENTE DE CONFIRMATION : l'animation est prête mais invisible (et son temps ne court pas)
+    // tant que le service ne sait pas si l'app démarre vraiment ou si c'est une simple reprise.
+    @Volatile var enAttente = false
+        private set
+    @Volatile private var debut = 0L
 
     // MOUCHARD
     @Volatile var images = 0
@@ -50,6 +58,13 @@ class AnimationView(context: Context, private val scene: Scene, categorie: Categ
 
     fun jouer(fin: () -> Unit) { quandFini = fin }
     fun signalerPret() { pret = true }
+    fun attendreConfirmation() { enAttente = true }
+    // L'app démarre vraiment : on rend l'animation visible, et son temps part de maintenant.
+    fun montrer() {
+        if (!enAttente) return
+        debut = SystemClock.uptimeMillis()
+        enAttente = false
+    }
     fun arreter() { arretee = true }
 
     override fun surfaceCreated(h: SurfaceHolder) {
@@ -66,14 +81,23 @@ class AnimationView(context: Context, private val scene: Scene, categorie: Categ
 
     // LA BOUCLE : calcule où on en est, demande à la scène de dessiner, attend 16 ms, recommence.
     private fun boucleDeDessin() {
-        val debut = SystemClock.uptimeMillis()
+        if (debut == 0L) debut = SystemClock.uptimeMillis()
         var debutRevelation = 0L
 
         while (!arretee) {
+            // Invisible en attendant la confirmation : on dessine une image vide, et on recommence.
+            if (enAttente) {
+                val vide = try { holder.lockHardwareCanvas() } catch (_: Exception) { null } ?: break
+                try { vide.drawColor(Color.TRANSPARENT, PorterDuff.Mode.CLEAR) } finally { holder.unlockCanvasAndPost(vide) }
+                try { Thread.sleep(16) } catch (_: InterruptedException) { break }
+                continue
+            }
             val maintenant = SystemClock.uptimeMillis()
             val ecoule = maintenant - debut
+            // La révélation commence quand l'app est prête ET que l'animation a duré assez longtemps
+            // (au moins l'intro, et au moins la durée minimale) ; ou, au pire, après l'attente maximale.
             if (debutRevelation == 0L &&
-                ((ecoule >= dureeIntro && pret) || ecoule >= dureeAttenteMax)
+                ((ecoule >= maxOf(dureeIntro, dureeMin) && pret) || ecoule >= dureeAttenteMax)
             ) debutRevelation = maintenant
 
             val intro = (ecoule.toFloat() / dureeIntro).coerceIn(0f, 1f)
