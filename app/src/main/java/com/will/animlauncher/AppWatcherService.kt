@@ -41,6 +41,11 @@ class AppWatcherService : AccessibilityService() {
     private var appQuittee: String? = null
     private var quitteeA = 0L
     private val minuteur = Handler(Looper.getMainLooper())
+    // ANTI-REBOND : quand l'animation a été jouée pour une app, on note l'heure. Pendant 10 s,
+    // une nouvelle fenêtre de cette app ne la relance pas (certaines apps enchaînent plusieurs
+    // écrans en s'ouvrant, et l'écran d'accueil glisse parfois un signal entre deux).
+    // Un vrai nouvel appui sur l'icône, lui, relance toujours l'animation.
+    private val animeeA = HashMap<String, Long>()
 
     private val ignorees = setOf(
         "com.samsung.android.spay",
@@ -87,6 +92,8 @@ class AppWatcherService : AccessibilityService() {
         // Mode « seulement au démarrage » : si l'app a déjà été ouverte, c'est sûrement
         // une reprise -> on laisse l'ancienne méthode décider (elle ignore les reprises).
         if (Reglages.seulementDemarrage(this) && app in dejaOuvertes) return
+        // Le même appui signalé deux fois : l'animation tourne déjà pour cette app, on ne la recommence pas.
+        if (vueEnCours != null && appAnimee == app) return
         appCliquee = app
         clicA = SystemClock.uptimeMillis()
         afficher(lancement, app, dejaPrete = false)      // d'abord l'animation, le journal après
@@ -145,6 +152,7 @@ class AppWatcherService : AccessibilityService() {
             if (!appApparue && app != appAnimee && app != ecranAccueil && estVraieApp) {
                 noter("  .. relais : $appAnimee -> $app")
                 appAnimee = app
+                animeeA[app] = SystemClock.uptimeMillis()
             }
             if (app == appAnimee) {
                 appApparue = true
@@ -201,6 +209,15 @@ class AppWatcherService : AccessibilityService() {
             return
         }
 
+        // Anti-rebond : cette app vient déjà d'avoir son animation (moins de 10 s) -> on ne la rejoue pas.
+        animeeA[app]?.let { avant ->
+            val ecart = SystemClock.uptimeMillis() - avant
+            if (ecart < 10_000) {
+                noter("  (animation déjà jouée il y a $ecart ms : on ne la relance pas)")
+                return
+            }
+        }
+
         // Si c'est une simple reprise, l'app est déjà prête : version courte.
         afficher(lancement, app, dejaPrete = !demarrage)
         appApparue = true      // ici, la fenêtre de l'app est déjà là
@@ -244,6 +261,7 @@ class AppWatcherService : AccessibilityService() {
             gestionnaire.addView(vue, reglages)
             vueEnCours = vue
             appAnimee = app
+            animeeA[app] = SystemClock.uptimeMillis()
             appApparue = false
             if (dejaPrete) vue.signalerPret()
             vue.jouer { if (vueEnCours === vue) retirer(gestionnaire, "fin normale") }
