@@ -3,6 +3,7 @@ package com.will.animlauncher
 import android.accessibilityservice.AccessibilityService
 import android.content.Context
 import android.content.Intent
+import android.content.res.Configuration
 import android.graphics.PixelFormat
 import android.graphics.Point
 import android.hardware.display.DisplayManager
@@ -21,6 +22,7 @@ class AppWatcherService : AccessibilityService() {
 
     private var derniereApp: String? = null
     private var vueEnCours: AnimationView? = null
+    private var reglagesVue: WindowManager.LayoutParams? = null   // taille et position de l'animation
     private var appAnimee: String? = null      // l'app pour laquelle l'animation tourne
     private var appApparue = false             // la fenêtre de cette app est-elle déjà arrivée ?
     private val dejaOuvertes = HashSet<String>()   // apps déjà vues depuis le démarrage du service
@@ -328,11 +330,7 @@ class AppWatcherService : AccessibilityService() {
         val gestionnaire = getSystemService(Context.WINDOW_SERVICE) as WindowManager
         retirer(gestionnaire, "nouvelle animation")
 
-        // La VRAIE taille de l'écran, barres et encoche comprises.
-        val ecran = (getSystemService(Context.DISPLAY_SERVICE) as DisplayManager)
-            .getDisplay(Display.DEFAULT_DISPLAY)
-        val taille = Point()
-        @Suppress("DEPRECATION") ecran.getRealSize(taille)
+        val taille = tailleEcran()
 
         val vue = AnimationView(this, lancement.scene, lancement.categorie, lancement.facteur)
         if (aConfirmer) vue.attendreConfirmation()
@@ -362,6 +360,9 @@ class AppWatcherService : AccessibilityService() {
         try {
             gestionnaire.addView(vue, reglages)
             vueEnCours = vue
+            reglagesVue = reglages
+            // au cas où l'écran tournerait sans prévenir (ex. une app qui s'ouvre à l'horizontale)
+            for (delai in longArrayOf(300L, 700L, 1200L)) minuteur.postDelayed({ if (vueEnCours === vue) ajusterTaille() }, delai)
             appAnimee = app
             animeeA[app] = SystemClock.uptimeMillis()
             appApparue = false
@@ -385,6 +386,7 @@ class AppWatcherService : AccessibilityService() {
         vue.arreter()
         try { gestionnaire.removeView(vue) } catch (_: Exception) {}
         vueEnCours = null
+        reglagesVue = null
         appAnimee = null
         appApparue = false
         val ms = SystemClock.uptimeMillis() - vue.creeeA
@@ -396,6 +398,38 @@ class AppWatcherService : AccessibilityService() {
     private fun noter(texte: String) {
         Journal.noter(this, texte)
         Journal.programmerEnvoi(this)
+    }
+
+    // L'ÉCRAN TOURNE (ex. Balatro, qui ne s'affiche qu'à l'horizontale) : l'animation avait été
+    // créée à la taille de l'écran vertical, elle ne couvrait plus que la moitié de l'écran.
+    // On la redimensionne à la nouvelle taille de l'écran.
+    override fun onConfigurationChanged(nouvelle: Configuration) {
+        super.onConfigurationChanged(nouvelle)
+        ajusterTaille()
+    }
+
+    private fun ajusterTaille() {
+        val vue = vueEnCours ?: return
+        val reglages = reglagesVue ?: return
+        val taille = tailleEcran()
+        if (reglages.width == taille.x && reglages.height == taille.y) return
+        reglages.width = taille.x
+        reglages.height = taille.y
+        try {
+            (getSystemService(Context.WINDOW_SERVICE) as WindowManager).updateViewLayout(vue, reglages)
+            noter("  .. écran tourné : animation redimensionnée en ${taille.x} x ${taille.y}")
+        } catch (e: Exception) {
+            noter("ERREUR redimensionnement : ${e.message}")
+        }
+    }
+
+    // La VRAIE taille de l'écran, barres et encoche comprises (dans le sens actuel du téléphone).
+    private fun tailleEcran(): Point {
+        val ecran = (getSystemService(Context.DISPLAY_SERVICE) as DisplayManager)
+            .getDisplay(Display.DEFAULT_DISPLAY)
+        val taille = Point()
+        @Suppress("DEPRECATION") ecran.getRealSize(taille)
+        return taille
     }
 
     override fun onInterrupt() {}
