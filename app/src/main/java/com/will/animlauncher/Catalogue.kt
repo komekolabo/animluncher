@@ -17,9 +17,23 @@ class Entree(val categorie: Categorie, val fabrique: (Int) -> Scene, val variant
 // (2 = deux fois plus long que la durée par défaut, 0,5 = deux fois plus court).
 class Lancement(val scene: Scene, val categorie: Categorie, val facteur: Float)
 
+// Les variantes des IA (l'ordre compte : les réglages retiennent les variantes décochées par leur numéro,
+// donc on ajoute toujours les nouvelles À LA FIN).
+val CHATGPT_VARIANTES = listOf("Brume", "Collision de galaxies", "Lancement", "Benchmarks")
+fun chatgpt(numero: Int): Scene = when (numero) {
+    1 -> Collision(); 2 -> GrandPublic(); 3 -> Benchmarks(); else -> Brume()
+}
+val GEMINI_VARIANTES = listOf("Aurore", "TPU", "Puce quantique", "Puissance")
+fun gemini(numero: Int): Scene = when (numero) {
+    1 -> Tpu(); 2 -> Quantique(); 3 -> Puissance(); else -> Aurore()
+}
+
 // LE CATALOGUE : quelle animation pour quelle app (nom technique -> entrée).
 // Pour ajouter une app : une ligne de plus dans la liste.
 object Catalogue {
+    // Le film de la collision de galaxies est long à calculer : on le prépare en arrière-plan dès le départ.
+    init { FilmCollision.preparer() }
+
     private val E = Categorie.ESSENTIELLE
     private val C = Categorie.COURANTE
     private val S = Categorie.SECONDAIRE
@@ -37,11 +51,15 @@ object Catalogue {
     // « Transition » = juste une belle transition, la plus courte possible (voir ScenesTransition.kt).
     private val entrees: Map<String, Entree> = mapOf(
         // --- Lot 1 : les IA ---
-        "com.anthropic.claude" to v(E, MONDES.map { it.nom }) { Horizons(it) },   // un des 5 horizons, au hasard
+        // Claude : un des 5 horizons, ou « Autonomy » (la durée de travail autonome des IA), au hasard
+        "com.anthropic.claude" to v(E, MONDES.map { it.nom } + "Autonomie") { if (it in MONDES.indices) Horizons(it) else Autonomie() },
         "com.anthropic.aibo" to e(E) { Lucioles() },
-        "com.openai.chatgpt" to e(E) { Brume() },
-        "com.google.android.apps.bard" to e(E) { Aurore() },
-        "ai.x.grok" to v(E, GROK_VARIANTES) { grok(it) },   // trou noir spectaculaire ou version épurée, au hasard
+        // ChatGPT : 4 animations au hasard
+        "com.openai.chatgpt" to v(E, CHATGPT_VARIANTES) { chatgpt(it) },
+        // Gemini : 4 animations au hasard
+        "com.google.android.apps.bard" to v(E, GEMINI_VARIANTES) { gemini(it) },
+        // Grok : trou noir spectaculaire, version épurée, ou « Intelligence » (la courbe et le bonhomme), au hasard
+        "ai.x.grok" to v(E, GROK_VARIANTES + "Intelligence") { if (it == GROK_VARIANTES.size) Intelligence() else grok(it) },
         // --- Lot 2 : Google ---
         "com.google.android.googlequicksearchbox" to e(E) { Quatre() },
         "com.android.chrome" to e(E) { Tunnel() },
