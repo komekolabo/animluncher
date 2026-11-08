@@ -314,8 +314,16 @@ class AppWatcherService : AccessibilityService() {
         // sur l'écran d'accueil (moins de 2 s). Si le téléphone ne nous signale jamais
         // les appuis, on garde l'ancien comportement.
         if (clicsRecus && SystemClock.uptimeMillis() - dernierClicAccueil > 2000) {
-            noter("  (pas d'appui sur l'accueil juste avant : on ne lance rien)")
-            return
+            // SAUF pour certains WIDGETS (ex. celui de Strike), qui n'envoient aucun signal d'appui :
+            // si l'app DÉMARRE vraiment (écran de lancement) depuis l'accueil, on joue l'animation,
+            // à condition que ce ne soit pas l'app qu'on vient juste de quitter (mini-lecteur…).
+            val justeQuittee = app == appQuittee && SystemClock.uptimeMillis() - quitteeA < 1500
+            if (demarrage && !justeQuittee) {
+                noter("  (pas d'appui signalé, mais l'app démarre : sans doute un widget)")
+            } else {
+                noter("  (pas d'appui sur l'accueil juste avant : on ne lance rien)")
+                return
+            }
         }
         // Sans information d'appui : une fenêtre de l'app qu'on vient de quitter, dans les
         // 5 secondes, est presque toujours un reste de sa fermeture (mini-lecteur…), pas une ouverture.
