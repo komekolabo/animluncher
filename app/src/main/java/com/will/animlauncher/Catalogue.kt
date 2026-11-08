@@ -11,6 +11,7 @@ object Catalogue {
     private val C = Categorie.COURANTE
     private val S = Categorie.SECONDAIRE
     private val J = Categorie.JEU
+    private val X = Categorie.ECHECS
 
     private fun e(categorie: Categorie, fabrique: () -> Scene) = Entree(categorie, fabrique)
 
@@ -97,7 +98,7 @@ object Catalogue {
         // --- Lot 6 : jeux (environ 1 s) et utilitaires ---
         "com.playstack.balatro.android" to e(J) { Cartes() },
         "com.supercell.clashofclans" to e(J) { Torches() },
-        "com.chess" to e(J) { Sacrifice() },
+        "com.chess" to e(X) { CoupsBrillants() },   // une des 5 parties, au hasard
         "com.robtopx.geometryjumplite" to e(J) { Cube() },
         "com.robtopx.geometrydashmeltdown" to e(J) { Cube(rgb(255, 140, 50), true) },
         "com.BlackSaltGames.DREDGE" to e(J) { Etire(Lanterne(), 2.5f) },

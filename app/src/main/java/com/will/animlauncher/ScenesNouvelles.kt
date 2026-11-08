@@ -18,112 +18,6 @@ class Etire(private val scene: Scene, private val facteur: Float) : Scene() {
         scene.dessiner(c, o, Instant(i.secondes / facteur, i.intro, i.revelation))
 }
 
-// ===================== ÉCHECS : « Sacrifice de tour » (le mème) =====================
-// La tour fonce prendre le pion devant le roi : « !! ». Le roi la prend… et la dame arrive : mat.
-class Sacrifice : Scene() {
-
-    // Une pièce dessinée simplement (silhouette), centrée en (x, y), pour une case de taille s.
-    private fun piece(c: Canvas, o: Outils, genre: Int, x: Float, y: Float, s: Float, blanc: Boolean, alpha: Float, dp: Float) {
-        val corps = if (blanc) argb(255f * alpha, 228, 222, 206) else argb(255f * alpha, 28, 28, 32)
-        val bord = if (blanc) argb(255f * alpha, 40, 36, 30) else argb(160f * alpha, 200, 200, 210)
-        val p = o.pinceau(corps)
-        val b = o.pinceau(bord, 1.3f * dp)
-        val socle = RectF(x - s * 0.3f, y + s * 0.26f, x + s * 0.3f, y + s * 0.36f)
-        c.drawRoundRect(socle, 2f * dp, 2f * dp, p); c.drawRoundRect(socle, 2f * dp, 2f * dp, b)
-        val t = Path()
-        when (genre) {
-            PION -> {
-                t.moveTo(x - s * 0.2f, y + s * 0.26f); t.lineTo(x - s * 0.08f, y - s * 0.02f); t.lineTo(x + s * 0.08f, y - s * 0.02f); t.lineTo(x + s * 0.2f, y + s * 0.26f); t.close()
-                c.drawPath(t, p); c.drawPath(t, b)
-                c.drawCircle(x, y - s * 0.1f, s * 0.13f, p); c.drawCircle(x, y - s * 0.1f, s * 0.13f, b)
-            }
-            TOUR -> {
-                t.moveTo(x - s * 0.22f, y + s * 0.26f); t.lineTo(x - s * 0.18f, y - s * 0.16f); t.lineTo(x - s * 0.26f, y - s * 0.16f); t.lineTo(x - s * 0.26f, y - s * 0.34f)
-                for (k in 0 until 3) {                                 // les créneaux
-                    val xa = x - s * 0.26f + k * s * 0.2f
-                    t.lineTo(xa + s * 0.09f, y - s * 0.34f); t.lineTo(xa + s * 0.09f, y - s * 0.26f); t.lineTo(xa + s * 0.15f, y - s * 0.26f); t.lineTo(xa + s * 0.15f, y - s * 0.34f)
-                }
-                t.lineTo(x + s * 0.26f, y - s * 0.34f); t.lineTo(x + s * 0.26f, y - s * 0.16f); t.lineTo(x + s * 0.18f, y - s * 0.16f); t.lineTo(x + s * 0.22f, y + s * 0.26f); t.close()
-                c.drawPath(t, p); c.drawPath(t, b)
-            }
-            DAME -> {
-                t.moveTo(x - s * 0.24f, y + s * 0.26f); t.lineTo(x - s * 0.3f, y - s * 0.22f); t.lineTo(x - s * 0.12f, y - s * 0.02f)
-                t.lineTo(x, y - s * 0.3f); t.lineTo(x + s * 0.12f, y - s * 0.02f); t.lineTo(x + s * 0.3f, y - s * 0.22f); t.lineTo(x + s * 0.24f, y + s * 0.26f); t.close()
-                c.drawPath(t, p); c.drawPath(t, b)
-                for (d in arrayOf(floatArrayOf(-0.3f, -0.25f), floatArrayOf(0f, -0.33f), floatArrayOf(0.3f, -0.25f))) {   // la couronne
-                    c.drawCircle(x + d[0] * s, y + d[1] * s, s * 0.05f, p); c.drawCircle(x + d[0] * s, y + d[1] * s, s * 0.05f, b)
-                }
-            }
-            else -> {                                                 // le roi, avec sa croix
-                t.moveTo(x - s * 0.24f, y + s * 0.26f); t.lineTo(x - s * 0.28f, y - s * 0.12f); t.quadTo(x, y - s * 0.3f, x + s * 0.28f, y - s * 0.12f); t.lineTo(x + s * 0.24f, y + s * 0.26f); t.close()
-                c.drawPath(t, p); c.drawPath(t, b)
-                c.drawLine(x, y - s * 0.24f, x, y - s * 0.44f, o.pinceau(corps, 3f * dp))
-                c.drawLine(x - s * 0.08f, y - s * 0.36f, x + s * 0.08f, y - s * 0.36f, o.pinceau(corps, 3f * dp))
-            }
-        }
-    }
-
-    override fun dessiner(c: Canvas, o: Outils, i: Instant) {
-        val dp = o.dp; val sec = i.secondes; val intro = i.intro; val rev = i.revelation
-        val w = c.width.toFloat(); val h = c.height.toFloat()
-        degradeVertical(c, o, w, rgb(10, 12, 10), rgb(4, 5, 4), 0f, h)
-        val app = ralentit(intro)
-        val a = 1f - rev
-        val m = min(w, h)
-        val s = m * 0.15f                                   // une case ; on montre les colonnes c à h, rangées 8 à 3
-        val x0 = w / 2f - 3f * s; val y0 = h / 2f - 3f * s
-        fun cx(col: Int) = x0 + (col + 0.5f) * s
-        fun cy(lig: Int) = y0 + (lig + 0.5f) * s
-        val case = o.pinceau()
-        for (lig in 0 until 6) for (col in 0 until 6) {
-            case.color = if ((col + lig) % 2 == 0) argb(255f * app, 88, 112, 64) else argb(255f * app, 34, 44, 28)
-            c.drawRect(x0 + col * s, y0 + lig * s, x0 + (col + 1) * s, y0 + (lig + 1) * s, case)
-        }
-        // Les étapes de l'histoire, en secondes.
-        val tourT = doux(borne((sec - 0.03f) / 0.15f))      // la tour fonce de h3 à h7 et prend le pion
-        val roiT = doux(borne((sec - 0.22f) / 0.08f))       // le roi prend la tour (g8 -> h7)
-        val dameT = doux(borne((sec - 0.32f) / 0.12f))      // la dame arrive en h5 : échec et mat
-        val chute = ralentit(borne((sec - 0.46f) / 0.1f))   // le roi tombe
-        val hx = cx(5); val hy = cy(1)
-        val kx = mix(cx(4), hx, roiT); val ky = mix(cy(0), hy, roiT)
-        if (dameT > 0.9f) o.tache(c, hx, hy, s * 0.7f, s * 0.7f, 0.5f * a * (0.8f + 0.2f * sin(sec * 8f)), rgb(230, 60, 50))   // case du roi : mat
-        for (col in intArrayOf(3, 4)) piece(c, o, PION, cx(col), cy(1), s, false, app * a, dp)
-        if (tourT < 1f) {
-            piece(c, o, PION, hx, hy, s, false, app * a, dp)
-        } else {                                            // le pion pris s'envole en tournoyant
-            val vol = borne((sec - 0.18f) / 0.25f)
-            c.save(); c.translate(hx + vol * s * 2.5f, hy - vol * s * 1.5f + vol * vol * s * 3f); c.rotate(vol * 400f)
-            piece(c, o, PION, 0f, 0f, s, false, (1f - vol) * app * a, dp); c.restore()
-        }
-        if (roiT < 0.9f) {                                  // la tour blanche, avec sa traînée de vitesse
-            val y = mix(cy(5) + s * 2f, hy, tourT)
-            if (tourT > 0f && tourT < 1f) for (g in 1..5) o.halo(c, hx, y + g * s * 0.25f, s * 0.3f, 0.08f * (1f - g / 6f) * app * a, rgb(255, 230, 180))
-            piece(c, o, TOUR, hx, y, s, true, app * a * (1f - roiT), dp)
-        }
-        if (tourT >= 0.95f && sec < 0.33f) {                // l'impact
-            val t = borne((sec - 0.18f) / 0.15f)
-            c.drawCircle(hx, hy, s * (0.3f + t), o.lumiere(avecAlpha(rgb(255, 220, 160), 0.5f * (1f - t) * a), 2f * dp))
-        }
-        c.save(); c.translate(kx, ky + s * 0.3f); c.rotate(-90f * chute)   // le roi (couché à la fin)
-        piece(c, o, ROI, 0f, -s * 0.3f, s, false, app * a, dp); c.restore()
-        piece(c, o, DAME, mix(cx(3), cx(5), dameT), mix(cy(5), cy(3), dameT), s, true, app * a, dp)   // la dame f3 -> h5
-        val pop = ralentit(borne((sec - 0.17f) / 0.08f))   // « !! » : le coup brillant
-        if (pop > 0f) {
-            val bx = hx + s * 0.42f; val by = hy - s * 0.45f
-            val r = s * 0.24f * pop * (1f + 0.06f * sin(sec * 7f))
-            c.drawCircle(bx, by, r, o.pinceau(avecAlpha(rgb(30, 170, 160), a)))
-            c.drawCircle(bx, by, r, o.pinceau(avecAlpha(rgb(255, 255, 255), 0.8f * a), 1.5f * dp))
-            texte(c, "!!", bx, by, r * 1.1f, avecAlpha(rgb(255, 255, 255), a))
-            o.halo(c, bx, by, r * 2.2f, 0.25f * a, rgb(40, 200, 190))
-        }
-        if (chute > 0.5f) texte(c, "#", hx - s * 0.45f, hy - s * 0.45f, s * 0.35f, avecAlpha(rgb(240, 90, 80), (chute - 0.5f) * 2f * a))
-        o.vignette(c, w, h, 0.6f)
-        o.revelationDouce(c, hx, hy, rev, rgb(40, 200, 190))
-    }
-
-    companion object { const val PION = 0; const val TOUR = 1; const val DAME = 2; const val ROI = 3 }
-}
-
 // ===================== MAPS : « A* dans la ville » =====================
 // Une ville vue du ciel. L'algorithme A* (celui des GPS) cherche le chemin : on voit son arbre
 // de recherche pousser dans les rues, attiré vers la destination. Puis le trajet s'allume,
@@ -253,7 +147,7 @@ class AEtoile : Scene() {
             c.drawCircle(ex, yb - 22f * dp, 11f * dp, corps)
             val pied = Path(); pied.moveTo(ex - 9.5f * dp, yb - 17f * dp); pied.lineTo(ex, yb); pied.lineTo(ex + 9.5f * dp, yb - 17f * dp); pied.close()
             c.drawPath(pied, corps)
-            c.drawCircle(ex, yb - 22f * dp, 4f * dp, o.pinceau(avecAlpha(rgb(110, 20, 15), chute * a)))
+            c.drawCircle(ex, yb - 22f * dp, 4f * dp * app, o.pinceau(avecAlpha(rgb(110, 20, 15), chute * a)))
         } else {
             c.drawCircle(ex, ey, 4f * dp * app, o.lumiere(avecAlpha(ROUGE_G, 0.7f * app * a)))
         }
