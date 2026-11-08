@@ -54,6 +54,16 @@ object Catalogue {
         "com.sec.android.app.voicenote" to e(C) { Bande() },
         "com.samsung.android.app.reminder" to e(C) { Sablier() },
         "com.sec.android.app.shealth" to e(C) { Pouls() },
+        "com.sec.android.app.samsungapps" to e(S) { Galaxie() },
+        "com.samsung.android.app.find" to e(S) { Radar() },
+        "com.samsung.android.shealthmonitor" to e(S) { Jauge() },
+        "com.samsung.android.oneconnect" to e(S) { Maison() },
+        "com.samsung.android.app.watchmanager" to e(S) { Lunette() },
+        "com.samsung.android.voc" to e(S) { Cercle() },
+        "com.samsung.android.app.tips" to e(S) { Ampoule() },
+        "com.sec.android.easyMover" to e(S) { Transfert() },
+        "com.samsung.android.tvplus" to e(S) { Mire() },
+        "com.samsung.ecomm.global.gbr" to e(S) { Paquet() },
     )
 
     fun pour(app: String): Entree? = entrees[app]
