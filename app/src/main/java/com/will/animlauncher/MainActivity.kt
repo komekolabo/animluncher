@@ -1,6 +1,7 @@
 package com.will.animlauncher
 
 import android.app.Activity
+import android.app.AlertDialog
 import android.app.StatusBarManager
 import android.content.ClipData
 import android.content.ClipboardManager
@@ -75,8 +76,12 @@ class MainActivity : Activity() {
         }
 
         val boutonAccessibilite = Button(this).apply {
-            text = "Ouvrir les réglages d'accessibilité"
-            setOnClickListener { startActivity(Intent(Settings.ACTION_ACCESSIBILITY_SETTINGS)) }
+            text = if (BuildConfig.STORE) "Activer la détection" else "Ouvrir les réglages d'accessibilité"
+            // Version Store : Google exige un écran d'explication AVANT d'envoyer vers les réglages.
+            setOnClickListener {
+                if (BuildConfig.STORE) expliquerAccessibilite()
+                else startActivity(Intent(Settings.ACTION_ACCESSIBILITY_SETTINGS))
+            }
         }
 
         val boutonJournal = Button(this).apply {
@@ -118,10 +123,13 @@ class MainActivity : Activity() {
         colonne.addView(boutonVolet)
         colonne.addView(statut)
         colonne.addView(boutonAccessibilite)
-        colonne.addView(boutonJournal)
-        colonne.addView(boutonListe)
-        colonne.addView(statutStandard)
-        colonne.addView(boutonStandard)
+        // Les outils de développement (journal, liste des apps, mode standard) : version Perso seulement.
+        if (!BuildConfig.STORE) {
+            colonne.addView(boutonJournal)
+            colonne.addView(boutonListe)
+            colonne.addView(statutStandard)
+            colonne.addView(boutonStandard)
+        }
         colonne.addView(version)
 
         setContentView(ScrollView(this).apply {
@@ -139,7 +147,44 @@ class MainActivity : Activity() {
         } else {
             "⚠️ Détection désactivée : active AnimLauncher dans l'accessibilité."
         }
-        afficherEtatStandard()
+        if (!BuildConfig.STORE) afficherEtatStandard()
+    }
+
+    // ---------------- L'ÉCRAN D'EXPLICATION (version Store) ----------------
+    // Règle de Google Play pour les apps qui utilisent l'accessibilité sans être des outils pour
+    // personnes handicapées : avant d'envoyer vers les réglages, l'app doit expliquer clairement
+    // CE QU'ELLE FAIT avec, POURQUOI, et laisser ACCEPTER ou REFUSER. Ce texte doit rester séparé
+    // de toute autre information sur les données. Refuser ne bloque rien : on peut revenir plus tard.
+    private fun expliquerAccessibilite() {
+        val texte = """
+            AnimLauncher utilise le service d'accessibilité d'Android (API AccessibilityService).
+
+            Pourquoi ?
+            Pour savoir sur quelle icône de ton écran d'accueil tu appuies, et quelle application s'ouvre. C'est ce qui permet de lancer l'animation AVANT que l'application apparaisse. Aucune autre fonction d'Android ne prévient assez tôt.
+
+            Ce que l'app reçoit :
+            • le nom écrit sous l'icône que tu touches sur l'écran d'accueil ;
+            • le nom de l'application qui passe au premier plan.
+
+            Ce que l'app ne fait PAS :
+            • elle ne lit pas le contenu de tes écrans, ni ce que tu tapes (messages, mots de passe…) ;
+            • elle n'agit jamais à ta place ;
+            • rien n'est collecté, enregistré sur un serveur ou partagé : tout reste sur ton téléphone.
+
+            Tu peux désactiver ce service à tout moment dans Paramètres > Accessibilité.
+        """.trimIndent()
+        AlertDialog.Builder(this)
+            .setTitle("Pourquoi AnimLauncher a besoin de l'accessibilité")
+            .setMessage(texte)
+            .setCancelable(false)                       // il faut choisir : accepter ou refuser
+            .setPositiveButton("Accepter et activer") { _, _ ->
+                startActivity(Intent(Settings.ACTION_ACCESSIBILITY_SETTINGS))
+            }
+            .setNegativeButton("Refuser") { _, _ ->
+                statut.text = "Sans l'accessibilité, AnimLauncher ne peut pas jouer d'animation. " +
+                    "Tu peux changer d'avis quand tu veux avec le bouton ci-dessous."
+            }
+            .show()
     }
 
     // ---------------- MODE STANDARD ----------------
