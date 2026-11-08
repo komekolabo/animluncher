@@ -215,16 +215,31 @@ class MainActivity : Activity() {
         return installeur != "com.android.vending"           // « com.android.vending » = le Play Store
     }
 
-    // Ouvre DIRECTEMENT la page d'AnimLauncher dans l'accessibilité (avec son interrupteur),
-    // au lieu de la longue liste. Si le téléphone ne connaît pas ce raccourci, on ouvre la liste.
+    // Le chemin à suivre dans l'accessibilité pour trouver AnimLauncher. Il dépend de la marque :
+    // chez Samsung, les apps comme AnimLauncher sont rangées dans « Applications installées ».
+    private val estSamsung = Build.MANUFACTURER.equals("samsung", ignoreCase = true)
+    // (« get() » : calculé au moment où on s'en sert, car le nom de l'app n'est pas encore
+    //  disponible quand l'écran est construit. Le nom : « AnimLauncher » ou « AnimLauncher Perso ».)
+    private val cheminAccessibilite: String get() {
+        val nom = getString(R.string.app_name)
+        return if (estSamsung) "touche « Applications installées » (en bas), puis « $nom »"
+               else "cherche « $nom » (souvent dans « Applications téléchargées » ou « installées »)"
+    }
+
+    // Ouvre l'accessibilité. (Ouvrir DIRECTEMENT la page d'AnimLauncher est réservé aux apps
+    // système d'Android : on ouvre donc l'accessibilité, et on affiche le chemin à suivre.)
+    // Les deux « extras » demandent aux Paramètres de mettre AnimLauncher EN SURBRILLANCE dans la
+    // liste : ça marche sur les Pixel et beaucoup d'autres téléphones ; les autres les ignorent.
     private fun ouvrirPageAccessibilite() {
-        try {
-            startActivity(Intent("android.settings.ACCESSIBILITY_DETAILS_SETTINGS").putExtra(
-                Intent.EXTRA_COMPONENT_NAME,
-                ComponentName(this, AppWatcherService::class.java).flattenToString()))
-        } catch (_: Exception) {
-            startActivity(Intent(Settings.ACTION_ACCESSIBILITY_SETTINGS))
-        }
+        val service = ComponentName(this, AppWatcherService::class.java).flattenToString()
+        val intention = Intent(Settings.ACTION_ACCESSIBILITY_SETTINGS)
+            .putExtra(":settings:fragment_args_key", service)
+            .putExtra(":settings:show_fragment_args", Bundle().apply {
+                putString(":settings:fragment_args_key", service)
+            })
+        startActivity(intention)
+        // le rappel s'affiche par-dessus les Paramètres
+        Toast.makeText(this, "Dans l'accessibilité : " + cheminAccessibilite, Toast.LENGTH_LONG).show()
     }
 
     private fun ouvrirAccessibilite() {
@@ -257,9 +272,10 @@ class MainActivity : Activity() {
             "AnimLauncher apparaît grisé tant qu'on ne l'a pas débloqué. Fais les 3 étapes dans l'ordre :"))
 
         contenu.addView(texte("① Déclencher le blocage", 17f, 14))
-        contenu.addView(texte("Le bouton ouvre la page d'AnimLauncher. Un message « paramètre restreint » " +
-            "s'affiche : touche OK, puis reviens ici. (Sans cette étape, l'option ② n'apparaît pas.)"))
-        contenu.addView(bouton("Ouvrir la page d'AnimLauncher") { ouvrirPageAccessibilite() })
+        contenu.addView(texte("Le bouton ouvre l'accessibilité : $cheminAccessibilite (grisé). " +
+            "Un message « paramètre restreint » s'affiche : touche OK, puis reviens ici. " +
+            "(Sans cette étape, l'option ② n'apparaît pas.)"))
+        contenu.addView(bouton("Ouvrir l'accessibilité") { ouvrirPageAccessibilite() })
 
         contenu.addView(texte("② Autoriser", 17f, 14))
         contenu.addView(texte("Le bouton ouvre les infos de l'app. Touche les 3 points ⋮ EN HAUT À DROITE, " +
@@ -273,8 +289,9 @@ class MainActivity : Activity() {
         })
 
         contenu.addView(texte("③ Activer", 17f, 14))
-        contenu.addView(texte("AnimLauncher n'est plus grisé : active l'interrupteur. Ce guide se fermera tout seul."))
-        contenu.addView(bouton("Ouvrir la page d'AnimLauncher") { ouvrirPageAccessibilite() })
+        contenu.addView(texte("Retourne dans l'accessibilité : $cheminAccessibilite. Il n'est plus grisé : " +
+            "active l'interrupteur. Ce guide se fermera tout seul."))
+        contenu.addView(bouton("Ouvrir l'accessibilité") { ouvrirPageAccessibilite() })
 
         guide?.dismiss()
         guide = AlertDialog.Builder(this)
