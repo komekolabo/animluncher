@@ -46,7 +46,7 @@ val MONDES = listOf(
 private val ATMO_D = floatArrayOf(0f, 5f, 13f, 24f, 31f, 42f, 75f, 130f)
 private val PLANETE_ATMO = intArrayOf(rgb(210, 150, 110), rgb(190, 110, 70), rgb(150, 70, 50), rgb(110, 45, 75), rgb(55, 75, 140), rgb(35, 45, 105), rgb(20, 16, 50), rgb(7, 8, 13))
 // Les mondes dessinés en gravure ancienne (par la classe Gravure).
-private val GRAVURES = setOf("Vitrail", "Accélérateur", "Bibliothèque")
+private val GRAVURES = setOf("Cellule", "Vitrail", "Accélérateur", "Maths", "Bibliothèque")
 
 // Un dégradé vertical de y0 (couleur « haut ») à y1 (couleur « bas »), sur toute la largeur.
 private fun degrade(c: Canvas, o: Outils, w: Float, y0: Float, y1: Float, haut: Int, bas: Int) {
