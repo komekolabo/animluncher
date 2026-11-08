@@ -78,6 +78,21 @@ object Catalogue {
         "com.jonathanpuckey.radiogarden" to e(S) { Antenne() },
         "com.sony.songpal.mdr" to e(S) { Silence() },
         "com.microsoft.skydrive" to e(S) { Nuees() },
+        // --- Lot 5 : finance et crypto ---
+        "com.revolut.revolut" to e(C) { CarteMetal() },
+        "com.fullsix.android.labanquepostale.accountaccess" to e(C) { Timbre() },
+        "nl.degiro.trader" to e(C) { Chandeliers() },
+        "de.traderepublic.app" to e(C) { Courbe() },
+        "com.kraken.invest.app" to e(C) { Abysses() },
+        "com.ledger.live" to e(C) { ChaineBlocs() },
+        "com.kraken.pay.app" to e(S) { Piece() },
+        "com.bankeen" to e(S) { Piles() },
+        "eu.epicompany.wero.wallet" to e(S) { Pont() },
+        "zapsolutions.strike" to e(S) { Foudre() },
+        "com.cakewallet.cake_wallet" to e(S) { Strates() },
+        "network.bisq.mobile.node" to e(S) { Echange() },
+        "com.btcframe" to e(S) { Facettes() },
+        "com.microstrategy.stream" to e(S) { Isometrie() },
     )
 
     fun pour(app: String): Entree? = entrees[app]
