@@ -37,6 +37,8 @@ class AppWatcherService : AccessibilityService() {
     // Dernier appui (n'importe lequel) sur l'écran d'accueil, et en a-t-on déjà reçu ?
     private var dernierClicAccueil = 0L
     private var clicsRecus = false
+    // Dernier appui sur l'accueil qui n'était ni une icône connue ni un widget reconnu.
+    private var clicInconnuA = 0L
     // L'app qu'on vient de quitter (retour à l'accueil) et quand.
     private var appQuittee: String? = null
     private var quitteeA = 0L
@@ -104,8 +106,15 @@ class AppWatcherService : AccessibilityService() {
         if (SystemClock.uptimeMillis() - dernierClicAccueil > 5000) diagLignes = 0
         dernierClicAccueil = SystemClock.uptimeMillis()
         val textes = event.text.map { it.toString() } + listOfNotNull(event.contentDescription?.toString())
-        val app = trouverApp(textes)
+        var app = trouverApp(textes)
+        var parWidget = false
         if (app == null) {
+            // Pas une icône : c'est peut-être un WIDGET (voir appDuWidget).
+            app = appDuWidget(event)
+            parWidget = app != null
+        }
+        if (app == null) {
+            clicInconnuA = dernierClicAccueil
             noter("clic accueil « ${textes.joinToString(" / ")} » : pas une app connue")
             return
         }
@@ -121,12 +130,40 @@ class AppWatcherService : AccessibilityService() {
         // va vraiment démarrer (écran de lancement) ou juste reprendre là où elle était. On prépare
         // donc l'animation tout de suite, mais INVISIBLE ; la première fenêtre de l'app décidera
         // (démarrage -> on l'affiche ; reprise -> on l'enlève).
-        val aConfirmer = Reglages.seulementDemarrage(this) && app in dejaOuvertes
+        // Un widget, lui, ouvre toujours l'app volontairement : l'animation est jouée dans tous les cas.
+        val aConfirmer = !parWidget && Reglages.seulementDemarrage(this) && app in dejaOuvertes
         appCliquee = app
         clicA = SystemClock.uptimeMillis()
         afficher(lancement, app, dejaPrete = false, aConfirmer = aConfirmer)   // d'abord l'animation, le journal après
-        noter("clic sur « ${textes.firstOrNull() ?: "?"} » -> $app : " +
+        noter((if (parWidget) "clic sur un widget" else "clic sur « ${textes.firstOrNull() ?: "?"} »") + " -> $app : " +
             if (aConfirmer) "animation prête (démarrage ou reprise ?)" else "animation lancée")
+    }
+
+    // LES WIDGETS. Un widget est affiché par l'écran d'accueil, donc l'appui semble venir du
+    // lanceur, et son texte ("12:30", "Lecture"…) n'est pas le nom d'une app. Mais chaque élément
+    // d'un widget porte un identifiant qui commence par le nom technique de l'app qui l'a dessiné,
+    // par exemple "com.spotify.music:id/bouton_lecture". On regarde donc l'élément touché, puis
+    // ses parents (le cadre du widget), et on prend le premier identifiant qui vient d'une autre
+    // app que le lanceur. On ne lit rien d'autre de l'écran.
+    private fun appDuWidget(event: AccessibilityEvent): String? {
+        var noeud = try { event.source } catch (_: Exception) { null } ?: return null
+        val aVoir = ArrayDeque<android.view.accessibility.AccessibilityNodeInfo>()
+        // l'élément touché et ses parents…
+        for (niveau in 0 until 10) {
+            aVoir.add(noeud)
+            noeud = noeud.parent ?: break
+        }
+        // …puis les enfants directs de l'élément touché (si lui-même n'a pas d'identifiant)
+        val touche = aVoir.first()
+        for (i in 0 until minOf(touche.childCount, 20)) touche.getChild(i)?.let { aVoir.add(it) }
+        for (n in aVoir) {
+            val id = n.viewIdResourceName ?: continue
+            val pkg = id.substringBefore(":id/", "")
+            if (pkg.isEmpty() || pkg == ecranAccueil || pkg == "android" || pkg == packageName) continue
+            if (packageManager.getLaunchIntentForPackage(pkg) == null) continue
+            return pkg
+        }
+        return null
     }
 
     private fun trouverApp(textes: List<String>): String? {
@@ -232,7 +269,12 @@ class AppWatcherService : AccessibilityService() {
         if (!Reglages.actif(this)) return
         val lancement = Catalogue.lancement(this, app) ?: return
         if (precedente != ecranAccueil) return
-        if (Reglages.seulementDemarrage(this) && !demarrage) return
+        // Un appui sur l'accueil qui n'était pas une icône (sans doute un widget qu'on n'a pas su
+        // reconnaître) juste avant que l'app arrive : l'utilisateur l'a ouverte exprès -> animation,
+        // même si elle était déjà ouverte en arrière-plan.
+        val apresWidget = clicInconnuA == dernierClicAccueil && SystemClock.uptimeMillis() - clicInconnuA < 2500
+        if (apresWidget) noter("  (ouverte depuis un widget)")
+        if (Reglages.seulementDemarrage(this) && !demarrage && !apresWidget) return
         // Une app peut faire apparaître une fenêtre sans qu'on l'ait ouverte (mini-lecteur
         // de YouTube quand on la quitte, etc.). On n'anime donc que si on vient d'appuyer
         // sur l'écran d'accueil (moins de 2 s). Si le téléphone ne nous signale jamais

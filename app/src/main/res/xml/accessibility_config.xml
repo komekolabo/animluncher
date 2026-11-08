@@ -6,11 +6,13 @@
      Les autres types (appui long, sélection, focus) ne servent qu'au mouchard des dossiers :
        on les note dans le journal pour comprendre ce que le lanceur envoie.
      notificationTimeout=0 : événements livrés sans délai.
-     On ne lit pas le contenu des écrans (canRetrieveWindowContent=false) :
-     seul le nom de l'icône touchée nous est transmis. -->
+     canRetrieveWindowContent=true + flagReportViewIds : quand on touche un WIDGET sur l'écran
+       d'accueil, on lit l'identifiant de l'élément touché (ex. "com.spotify.music:id/lecture")
+       pour savoir quelle app il va ouvrir. Le service ne lit rien d'autre, et jamais dans les apps. -->
 <accessibility-service xmlns:android="http://schemas.android.com/apk/res/android"
     android:accessibilityEventTypes="typeWindowStateChanged|typeViewClicked|typeViewLongClicked|typeViewSelected|typeViewFocused|typeViewAccessibilityFocused"
     android:accessibilityFeedbackType="feedbackGeneric"
     android:notificationTimeout="0"
-    android:canRetrieveWindowContent="false"
+    android:canRetrieveWindowContent="true"
+    android:accessibilityFlags="flagReportViewIds"
     android:description="@string/description_service" />
