@@ -157,6 +157,11 @@ class MainActivity : Activity() {
             "⚠️ Détection désactivée : active AnimLauncher dans l'accessibilité."
         }
         if (!BuildConfig.STORE) afficherEtatStandard()
+        // Le guide « grisé » était ouvert et l'accessibilité est maintenant active : c'est gagné.
+        if (guide?.isShowing == true && serviceActif()) {
+            guide?.dismiss()
+            Toast.makeText(this, "✅ C'est activé ! Les animations sont prêtes.", Toast.LENGTH_LONG).show()
+        }
     }
 
     // ---------------- L'ÉCRAN D'EXPLICATION (version Store) ----------------
@@ -210,32 +215,72 @@ class MainActivity : Activity() {
         return installeur != "com.android.vending"           // « com.android.vending » = le Play Store
     }
 
+    // Ouvre DIRECTEMENT la page d'AnimLauncher dans l'accessibilité (avec son interrupteur),
+    // au lieu de la longue liste. Si le téléphone ne connaît pas ce raccourci, on ouvre la liste.
+    private fun ouvrirPageAccessibilite() {
+        try {
+            startActivity(Intent("android.settings.ACCESSIBILITY_DETAILS_SETTINGS").putExtra(
+                Intent.EXTRA_COMPONENT_NAME,
+                ComponentName(this, AppWatcherService::class.java).flattenToString()))
+        } catch (_: Exception) {
+            startActivity(Intent(Settings.ACTION_ACCESSIBILITY_SETTINGS))
+        }
+    }
+
     private fun ouvrirAccessibilite() {
         if (serviceActif() || !peutEtreRestreinte()) {
-            startActivity(Intent(Settings.ACTION_ACCESSIBILITY_SETTINGS))
+            ouvrirPageAccessibilite()
             return
         }
-        val texte = """
-            Si AnimLauncher apparaît GRISÉ (« Contrôlé par les paramètres restreints »), c'est normal : Android protège ainsi les apps installées en dehors du Play Store.
+        montrerGuide()
+    }
 
-            Pour le débloquer :
+    // LE GUIDE EN 3 ÉTAPES, avec un bouton par étape. Il reste ouvert pendant les allers-retours
+    // dans les Paramètres, et se ferme tout seul quand l'accessibilité est activée (voir onResume).
+    // (Une app ne peut pas appuyer à la place de l'utilisateur dans les Paramètres : on l'emmène
+    // donc au bon endroit, et on lui dit exactement où toucher.)
+    private var guide: AlertDialog? = null
 
-            1. Ouvre l'accessibilité, touche AnimLauncher (grisé), puis OK sur le message. Cette étape est obligatoire : elle fait apparaître l'option de l'étape 2.
+    private fun montrerGuide() {
+        val d = resources.displayMetrics.density
+        val contenu = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            setPadding((24 * d).toInt(), (8 * d).toInt(), (24 * d).toInt(), 0)
+        }
+        fun texte(t: String, taille: Float = 15f, haut: Int = 0) = TextView(this).apply {
+            text = t; textSize = taille; setPadding(0, (haut * d).toInt(), 0, (6 * d).toInt())
+        }
+        fun bouton(t: String, action: () -> Unit) = Button(this).apply {
+            text = t; isAllCaps = false; setOnClickListener { action() }
+        }
+        contenu.addView(texte("Android protège les apps installées en dehors du Play Store : " +
+            "AnimLauncher apparaît grisé tant qu'on ne l'a pas débloqué. Fais les 3 étapes dans l'ordre :"))
 
-            2. Ouvre les infos de l'app, touche les 3 points ⋮ en haut à droite, puis « Autoriser les paramètres restreints », et confirme.
+        contenu.addView(texte("① Déclencher le blocage", 17f, 14))
+        contenu.addView(texte("Le bouton ouvre la page d'AnimLauncher. Un message « paramètre restreint » " +
+            "s'affiche : touche OK, puis reviens ici. (Sans cette étape, l'option ② n'apparaît pas.)"))
+        contenu.addView(bouton("Ouvrir la page d'AnimLauncher") { ouvrirPageAccessibilite() })
 
-            3. Retourne dans l'accessibilité : AnimLauncher n'est plus grisé, tu peux l'activer.
-        """.trimIndent()
-        AlertDialog.Builder(this)
-            .setTitle("AnimLauncher est grisé ?")
-            .setMessage(texte)
-            .setPositiveButton("Étapes 1 et 3 : accessibilité") { _, _ ->
-                startActivity(Intent(Settings.ACTION_ACCESSIBILITY_SETTINGS))
-            }
-            .setNeutralButton("Étape 2 : infos de l'app") { _, _ ->
-                startActivity(Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS,
-                    android.net.Uri.parse("package:$packageName")))
-            }
+        contenu.addView(texte("② Autoriser", 17f, 14))
+        contenu.addView(texte("Le bouton ouvre les infos de l'app. Touche les 3 points ⋮ EN HAUT À DROITE, " +
+            "puis « Autoriser les paramètres restreints », et confirme."))
+        contenu.addView(bouton("Ouvrir les infos de l'app") {
+            startActivity(Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS,
+                android.net.Uri.parse("package:$packageName")))
+            // un rappel qui s'affiche par-dessus les Paramètres, le temps de trouver le menu
+            Toast.makeText(this, "Touche ⋮ en haut à droite, puis « Autoriser les paramètres restreints »",
+                Toast.LENGTH_LONG).show()
+        })
+
+        contenu.addView(texte("③ Activer", 17f, 14))
+        contenu.addView(texte("AnimLauncher n'est plus grisé : active l'interrupteur. Ce guide se fermera tout seul."))
+        contenu.addView(bouton("Ouvrir la page d'AnimLauncher") { ouvrirPageAccessibilite() })
+
+        guide?.dismiss()
+        guide = AlertDialog.Builder(this)
+            .setTitle("Débloquer AnimLauncher")
+            .setView(ScrollView(this).apply { addView(contenu) })
+            .setNegativeButton("Fermer", null)
             .show()
     }
 
