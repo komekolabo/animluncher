@@ -11,7 +11,8 @@ import kotlin.math.min
 import kotlin.math.sin
 import kotlin.random.Random
 
-// ÉCHECS : 5 coups brillants de vraies parties (1 sacrifice de tour + 4 coups célèbres).
+// ÉCHECS : 5 combinaisons célèbres de vraies parties, qui finissent toutes par un mat
+// (dont l'« Immortelle toujours verte » et son sacrifice de tour).
 // Une partie est tirée au hasard à chaque ouverture.
 
 // Un coup : case de départ, case d'arrivée, notation affichée.
@@ -22,16 +23,17 @@ class Coup(val de: String, val vers: String, val notation: String)
 class Partie(val titre: String, val fen: String, val coups: List<Coup>, val brillant: Int, val fin: String, val noirs: Boolean)
 
 val PARTIES = listOf(
-    Partie("Kasparov – Topalov · 1999", "b2r3r/k4p1p/p2q1np1/NppP4/3p1Q2/P4PPB/1PP4P/1K1RR3",
-        listOf(Coup("d1", "d4", "24. Txd4"), Coup("c5", "d4", "24... cxd4")), 0, "Sacrifice de tour", false),
+    Partie("Anderssen – Dufresne · 1852", "1r2k1r1/pbppnp1p/1bn2P2/8/Q7/B1PB1q2/P4PPP/3RR1K1",
+        listOf(Coup("e1", "e7", "20. Txe7+"), Coup("c6", "e7", "20... Cxe7"), Coup("a4", "d7", "21. Dxd7+"), Coup("e8", "d7", "21... Rxd7"),
+            Coup("d3", "f5", "22. Ff5+"), Coup("d7", "e8", "22... Re8"), Coup("f5", "d7", "23. Fd7+"), Coup("e8", "f8", "23... Rf8"), Coup("a3", "e7", "24. Fxe7#")), 0, "Échec et mat", false),
     Partie("Morphy – Brunswick & Isouard · 1858", "4kb1r/p2n1ppp/4q3/4p1B1/4P3/1Q6/PPP2PPP/2KR4",
         listOf(Coup("b3", "b8", "16. Db8+"), Coup("d7", "b8", "16... Cxb8"), Coup("d1", "d8", "17. Td8#")), 0, "Échec et mat", false),
-    Partie("Levitsky – Marshall · 1912", "5rk1/pp4pp/4p3/2R3Q1/3n4/2q4r/P1P2PPP/5RK1",
-        listOf(Coup("c3", "g3", "23... Dg3")), 0, "0-1 : les blancs abandonnent", true),
-    Partie("Topalov – Shirov · 1998", "8/8/4kpp1/3p1b2/p6P/2B5/6P1/6K1",
-        listOf(Coup("f5", "h3", "47... Fh3"), Coup("g2", "h3", "48. gxh3"), Coup("e6", "f5", "48... Rf5")), 0, "Le roi noir file vers les pions", true),
+    Partie("Anderssen – Kieseritzky · 1851", "r1bk2nr/p2p1pNp/n2B4/1p1NP2P/6P1/3P1Q2/P1P1K3/q5b1",
+        listOf(Coup("f3", "f6", "22. Df6+"), Coup("g8", "f6", "22... Cxf6"), Coup("d6", "e7", "23. Fe7#")), 0, "Échec et mat", false),
+    Partie("Legall – Saint-Brie · 1750", "rn1qkbnr/ppp2p1p/3p2p1/4p3/2B1P1b1/2N2N2/PPPP1PPP/R1BQK2R",
+        listOf(Coup("f3", "e5", "5. Cxe5"), Coup("g4", "d1", "5... Fxd1"), Coup("c4", "f7", "6. Fxf7+"), Coup("e8", "e7", "6... Re7"), Coup("c3", "d5", "7. Cd5#")), 0, "Échec et mat", false),
     Partie("Réti – Tartakower · 1910", "rnb1kb1r/pp3ppp/2p5/4q3/4n3/3Q4/PPPB1PPP/2KR1BNR",
-        listOf(Coup("d3", "d8", "9. Dd8+"), Coup("e8", "d8", "9... Rxd8"), Coup("d2", "g5", "10. Fg5++"), Coup("d8", "c7", "10... Rc7"), Coup("g5", "d8", "11. Fd8#")), 0, "Échec et mat", false),
+        listOf(Coup("d3", "d8", "9. Dd8+"), Coup("e8", "d8", "9... Rxd8"), Coup("d2", "g5", "10. Fg5+"), Coup("d8", "c7", "10... Rc7"), Coup("g5", "d8", "11. Fd8#")), 0, "Échec et mat", false),
 )
 
 // Lit une position FEN : case -> pièce (majuscule = blanc). Ex. "e1" -> 'K'.
@@ -154,15 +156,22 @@ class CoupsBrillants(numero: Int = -1) : Scene() {
         // Le déroulé : chaque coup dure d secondes (70 % de glissade, puis un temps d'arrêt).
         val coups = partie.coups
         val n = coups.size
-        val d = min(0.3f, 1f / n)
         val t0 = 0.25f
+        // Les coups de l'attaquant durent plus longtemps que les réponses (forcées) de l'adversaire :
+        // poids 1 pour l'attaquant, 0,6 pour la réponse. u = la durée d'un coup de poids 1.
+        val poids = FloatArray(n) { if (it % 2 == 0) 1f else 0.6f }
+        val u = min(0.3f, 1.15f / poids.sum())
+        val debuts = FloatArray(n)
+        for (k in 1 until n) debuts[k] = debuts[k - 1] + u * poids[k - 1]
+        for (k in 0 until n) debuts[k] += t0
+        val tFin = t0 + u * poids.sum()
         val pieces = lireFen(partie.fen)
         var enCours = -1; var avance = 0f
         for ((k, cp) in coups.withIndex()) {
-            val debut = t0 + k * d
+            val debut = debuts[k]
             if (sec < debut) break
             enCours = k
-            avance = doux(borne((sec - debut) / (d * 0.7f)))
+            avance = doux(borne((sec - debut) / (u * poids[k] * 0.7f)))
             if (avance >= 1f) pieces.remove(cp.de)?.let { pieces[cp.vers] = it }
         }
         if (enCours >= 0) {                               // surbrillance jaune du dernier coup
@@ -191,7 +200,7 @@ class CoupsBrillants(numero: Int = -1) : Scene() {
 
         // « !! » sur le coup brillant
         val vb = coups[partie.brillant].vers
-        val pop = ralentit(borne((sec - (t0 + partie.brillant * d + d * 0.7f)) / 0.1f))
+        val pop = ralentit(borne((sec - (debuts[partie.brillant] + u * poids[partie.brillant] * 0.7f)) / 0.1f))
         if (pop > 0f) {
             val bx = caseX(vb) + s * 0.32f; val by = caseY(vb) - s * 0.32f
             val r = s * 0.26f * pop * (1f + 0.05f * sin(sec * 7f))
@@ -209,7 +218,7 @@ class CoupsBrillants(numero: Int = -1) : Scene() {
             texte(c, coups[enCours].notation + if (brille) " !!" else "", w / 2f, y0 + B + s * 0.62f, taille * 1.2f,
                 avecAlpha(if (brille) rgb(90, 220, 205) else rgb(230, 230, 225), app * a))
         }
-        val fini = borne((sec - (t0 + n * d)) / 0.15f)
+        val fini = borne((sec - tFin) / 0.15f)
         if (fini > 0f) texte(c, partie.fin, w / 2f, y0 + B + s * 1.25f, taille * 0.85f,
             avecAlpha(if (partie.fin.contains("mat")) rgb(240, 120, 100) else rgb(200, 205, 195), fini * a))
         o.vignette(c, w, h, 0.5f)
