@@ -64,6 +64,20 @@ object Catalogue {
         "com.sec.android.easyMover" to e(S) { Transfert() },
         "com.samsung.android.tvplus" to e(S) { Mire() },
         "com.samsung.ecomm.global.gbr" to e(S) { Paquet() },
+        // --- Lot 4 : réseaux, musique, services ---
+        "com.whatsapp" to e(E) { AvionPapier() },
+        "com.spotify.music" to e(E) { Vinyle() },
+        "com.instagram.android" to e(C) { Pellicule() },
+        "com.twitter.android" to e(C) { Eclipse() },
+        "com.discord" to e(C) { EnseigneNeon() },
+        "ee.mtakso.client" to e(C) { Route() },
+        "com.duolingo" to e(C) { Flamme() },
+        "com.suno.android" to e(C) { Spectre() },
+        "com.github.android" to e(C) { Branches() },
+        "com.fabernovel.ratp" to e(C) { Quai() },
+        "com.jonathanpuckey.radiogarden" to e(S) { Antenne() },
+        "com.sony.songpal.mdr" to e(S) { Silence() },
+        "com.microsoft.skydrive" to e(S) { Nuees() },
     )
 
     fun pour(app: String): Entree? = entrees[app]
