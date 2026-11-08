@@ -14,6 +14,7 @@ import kotlin.math.cos
 import kotlin.math.hypot
 import kotlin.math.max
 import kotlin.math.min
+import kotlin.math.pow
 import kotlin.math.sin
 import kotlin.math.sqrt
 import kotlin.random.Random
@@ -39,11 +40,16 @@ private val QUADRIPOLE = rgb(165, 50, 50)
 private val COUCHES = intArrayOf(rgb(60, 150, 170), rgb(70, 150, 80), rgb(190, 120, 50))   // trajectographe, calorimètres
 private val CUIRS = intArrayOf(rgb(115, 30, 38), rgb(35, 78, 52), rgb(32, 48, 95), rgb(140, 92, 48), rgb(95, 40, 70), rgb(60, 60, 40))   // bordeaux, vert, marine, fauve, prune, olive
 private val BOIS = rgb(90, 55, 30)
-private val LAMPE = rgb(40, 95, 62)
-private val PAPIER = rgb(205, 188, 150)
+private val PIERRE = rgb(170, 135, 92)
+private val NUAGE = rgb(125, 130, 150)
+private val RAMPE = rgb(205, 175, 125)
+// Babel : des lettres de toutes les langues (latin, grec, cyrillique, hébreu, arabe, chinois/japonais).
+// Android va chercher tout seul une police qui sait dessiner chaque écriture.
+private val ECRITURES = listOf("abcdefgh&§¶", "αβγδλπΩΣψ", "бжзЯЮфш", "אבגדהשת", "بتجدسعق", "語書言文字本")
+private val TEINTES_ECRITURES = intArrayOf(rgb(220, 178, 92), rgb(150, 180, 230), rgb(225, 150, 140), rgb(150, 200, 150), rgb(215, 160, 210), rgb(200, 200, 160))
 
 // Le coloriage à la main : un aplat transparent posé sous les traits.
-private fun lavis(c: Canvas, o: Outils, chemin: Path, couleur: Int, a: Float) = c.drawPath(chemin, o.pinceau(avecAlpha(couleur, a)))
+private fun lavisBrut(c: Canvas, o: Outils, chemin: Path, couleur: Int, a: Float) = c.drawPath(chemin, o.pinceau(avecAlpha(couleur, a)))
 
 // Écrit un texte centré en (x, y), dans une police à empattements (comme dans les vieux livres).
 private fun ecrireGravure(c: Canvas, s: String, x: Float, y: Float, taille: Float, couleur: Int, police: Typeface = ITALIQUE) {
@@ -53,7 +59,7 @@ private fun ecrireGravure(c: Canvas, s: String, x: Float, y: Float, taille: Floa
 }
 
 // Remplit une forme de traits parallèles (angle en degrés, esp = écart entre les traits) : les hachures.
-private fun hachures(c: Canvas, chemin: Path, angle: Float, esp: Float, p: Paint) {
+private fun hachuresBrutes(c: Canvas, chemin: Path, angle: Float, esp: Float, p: Paint) {
     val b = RectF(); chemin.computeBounds(b, true)
     c.save(); c.clipPath(chemin)
     val xc = b.centerX(); val yc = b.centerY(); val l = hypot(b.width(), b.height()) / 2 + 2
@@ -74,9 +80,11 @@ class Gravure(private val nom: String, private val courbure: Float) {
     private val teintes = IntArray(400) { r.nextInt(VERRES.size) }          // et la couleur de chaque verre
     private val cuirs = IntArray(500) { r.nextInt(CUIRS.size) }             // la couleur de chaque reliure
     private val livres = List(500) { floatArrayOf(entre(0.012f, 0.026f), entre(0.72f, 0.95f), r.nextInt(3).toFloat(), if (r.nextFloat() < 0.12f) entre(-0.12f, 0.12f) else 0f) }
-    private val alphabet = "abcdefghijklmnopqrstuvwxyzéèàçœ&§¶ABCDEFGHIJ"
-    private val lettres = List(30) { floatArrayOf(entre(-0.25f, 0.25f), r.nextFloat(), entre(0.7f, 1.4f), r.nextFloat() * 6.28f) }
-    private val caracteres = List(30) { alphabet[r.nextInt(alphabet.length)].toString() }
+    private val leger = nom != "Vitrail"          // la collision et Babel : moins de hachures, plus de couleur
+    // les lettres de Babel : [écriture, écart, phase, taille, oscillation] et le caractère lui-même
+    private val lettres = List(42) { floatArrayOf(r.nextInt(ECRITURES.size).toFloat(), entre(-1f, 1f), r.nextFloat(), entre(0.8f, 1.5f), r.nextFloat() * 6.28f) }
+    private val caracteres = lettres.map { l -> val e = ECRITURES[l[0].toInt()]; e[r.nextInt(e.length)].toString() }
+    private val nuages = List(4) { floatArrayOf(r.nextFloat(), entre(0.22f, 0.4f), entre(0.12f, 0.2f), entre(-1f, 1f)) }
     private val poussieres = List(30) { floatArrayOf(r.nextFloat(), entre(0.05f, 0.6f), r.nextFloat() * 6.28f) }
     private val reperes = List(6) { floatArrayOf(entre(0.1f, 0.9f), entre(0.12f, 0.5f)) }
     private val etiquettes = listOf("e⁻", "e⁺", "μ⁻", "π⁺", "", "", "", "", "")
@@ -94,6 +102,15 @@ class Gravure(private val nom: String, private val courbure: Float) {
         pts
     }
 
+    // Moins gravé pour la collision et Babel : des hachures plus espacées et plus discrètes…
+    private fun hachures(c: Canvas, chemin: Path, angle: Float, esp: Float, p: Paint) {
+        if (!leger) { hachuresBrutes(c, chemin, angle, esp, p); return }
+        val q = Paint(p); q.alpha = (p.alpha * 0.4f).toInt()
+        hachuresBrutes(c, chemin, angle, esp * 1.7f, q)
+    }
+    // … et des couleurs un peu plus franches.
+    private fun lavis(c: Canvas, o: Outils, chemin: Path, couleur: Int, a: Float) = lavisBrut(c, o, chemin, couleur, min(0.95f, a * (if (leger) 1.3f else 1f)))
+
     fun dessiner(c: Canvas, o: Outils, i: Instant) {
         val dp = o.dp; val sec = i.secondes; val intro = i.intro; val rev = i.revelation
         val w = c.width.toFloat(); val h = c.height.toFloat()
@@ -107,7 +124,8 @@ class Gravure(private val nom: String, private val courbure: Float) {
         val app = doux(intro); val vis = app * (1f - rev)
         val tr = doux(borne(sec / 0.6f))                 // l'impression avance du centre vers les bords
         val tmax = asin(min(1f, (w / 2 + 20f * dp) / rayon))
-        fun encre(a: Float, ep: Float = 1f, col: Int = ENCRE) = o.pinceau(avecAlpha(col, a), ep * dp)
+        val kE = if (leger) 0.8f else 1f                // l'encre aussi est un peu plus légère
+        fun encre(a: Float, ep: Float = 1f, col: Int = ENCRE) = o.pinceau(avecAlpha(col, a * kE), ep * dp)
         fun pt(rr: Float, th: Float) = floatArrayOf(cx + rr * sin(th), cy - rr * cos(th))
         fun crete(x: Float) = cy - sqrt(max(0f, rayon * rayon - (x - cx) * (x - cx)))
         fun ligne(a: FloatArray, b: FloatArray, p: Paint) = c.drawLine(a[0], a[1], b[0], b[1], p)
@@ -123,7 +141,7 @@ class Gravure(private val nom: String, private val courbure: Float) {
         val titres = when (nom) {
             "Vitrail" -> "PL. XII — LA ROSACE" to "Verrière gothique, d'après nature"
             "Accélérateur" -> "FIG. 2 — COLLISION DE PARTICULES" to "Traces relevées dans une chambre à bulles"
-            else -> "PL. VII — LA BIBLIOTHÈQUE" to "Rayonnages et livre ouvert"
+            else -> "PL. VII — LA BIBLIOTHÈQUE DE BABEL" to "Tous les livres, dans toutes les langues"
         }
         ecrireGravure(c, titres.first, cx, mg + 0.05f * h, 0.034f * m, avecAlpha(ENCRE, 0.85f * vis), CAPITALES)
         ecrireGravure(c, titres.second, cx, mg + 0.05f * h + 0.045f * m, 0.028f * m, avecAlpha(ENCRE, 0.6f * vis))
@@ -202,27 +220,7 @@ class Gravure(private val nom: String, private val courbure: Float) {
                     }
                 }
             }
-            else -> {                                   // la bibliothèque
-                val lx = cx; val ly = haut - 0.42f * h; val s = 0.06f * m   // la lampe suspendue
-                c.drawLine(lx, mg, lx, ly - 0.04f * m, encre(0.7f * vis))
-                val lampe = Path()
-                lampe.moveTo(lx - s * 0.2f, ly - s * 0.7f); lampe.lineTo(lx + s * 0.2f, ly - s * 0.7f)
-                lampe.quadTo(lx + s * 0.4f, ly - s * 0.1f, lx + s, ly); lampe.lineTo(lx - s, ly)
-                lampe.quadTo(lx - s * 0.4f, ly - s * 0.1f, lx - s * 0.2f, ly - s * 0.7f); lampe.close()
-                lavis(c, o, lampe, LAMPE, 0.8f * vis)                 // l'abat-jour vert des salles de lecture
-                hachures(c, lampe, 70f, 2.5f * dp, encre(0.6f * vis, 0.8f)); c.drawPath(lampe, encre(0.9f * vis, 1.2f, OR))
-                val cone = Path(); cone.moveTo(lx - s, ly); cone.lineTo(lx + s, ly); cone.lineTo(lx + 0.45f * w, haut); cone.lineTo(lx - 0.45f * w, haut); cone.close()
-                val lav = o.pinceau()
-                lav.shader = LinearGradient(0f, ly, 0f, haut, avecAlpha(OR, 0.2f * vis), avecAlpha(OR, 0.05f * vis), Shader.TileMode.CLAMP)
-                c.drawPath(cone, lav)
-                hachures(c, cone, 90f, 8f * dp, encre(0.14f * vis, 0.7f, OR))     // le cône de lumière doré
-                for ((k, l) in lettres.withIndex()) {  // les lettres qui s'envolent du livre
-                    val f = modulo(l[1] + sec * 0.35f, 1f)
-                    val x = cx + (l[0] + 0.15f * sin(l[3] + f * 4f)) * w * (0.3f + f)
-                    val y = haut - 0.06f * h - f * 0.5f * h
-                    ecrireGravure(c, caracteres[k], x, y, 0.04f * m * l[2], avecAlpha(OR, vis * sin(PI.toFloat() * f) * 0.9f))
-                }
-            }
+            else -> babel(c, o, cx, crete(cx) + 2f * dp, w, h, m, dp, sec, vis) { a, ep, col -> encre(a, ep, col) }   // la tour de Babel
         }
 
         // ---------- la courbe ----------
@@ -253,36 +251,6 @@ class Gravure(private val nom: String, private val courbure: Float) {
                 c.drawCircle(p[0], p[1], 3.2f * dp, o.pinceau(avecAlpha(col, vis)))
                 for (q in 1..3) ligne(pt(rt + (q - 2) * 3f * dp, th - sens * 0.05f), pt(rt + (q - 2) * 3f * dp, th - sens * 0.015f), encre(0.6f * vis, 0.8f, col))
             }
-        }
-        if (nom == "Bibliothèque" && rev < 0.25f) {    // le livre ouvert, gravé, qui tourne ses pages
-            val fondu = (1f - rev * 4f) * app
-            val bx = cx; val by = crete(cx) + 2f * dp
-            val L = 0.3f * m; val H = 0.11f * m
-            val fond = o.pinceau(SOL)
-            for (sgn in floatArrayOf(-1f, 1f)) {
-                val page = Path()
-                page.moveTo(bx, by); page.quadTo(bx + sgn * L * 0.5f, by - H * 0.35f, bx + sgn * L, by - H * 0.15f)
-                page.lineTo(bx + sgn * L, by - H * 1.15f); page.quadTo(bx + sgn * L * 0.5f, by - H * 1.35f, bx, by - H); page.close()
-                c.drawPath(page, fond)
-                lavis(c, o, page, PAPIER, 0.22f * fondu)            // le papier crème du livre
-                c.drawPath(page, encre(fondu, 1.3f))
-                for (li in 0 until 7) {               // les lignes de texte
-                    val fr = 0.22f + li * 0.1f
-                    val y0 = by - H * fr; val yb = by - H * 0.15f - H * fr
-                    val q = Path(); q.moveTo(bx + sgn * L * 0.12f, y0 - H * 0.06f)
-                    q.quadTo(bx + sgn * L * 0.5f, y0 - H * 0.3f, bx + sgn * L * 0.86f, yb + H * 0.02f)
-                    c.drawPath(q, encre(0.55f * fondu, 0.8f))
-                }
-            }
-            val tour = modulo(sec * 0.8f, 1f)         // une page qui se tourne
-            val px = bx + L * cos(PI.toFloat() * tour); val bosse = H * 0.3f * sin(PI.toFloat() * tour)
-            val page = Path()
-            page.moveTo(bx, by); page.quadTo((bx + px) / 2, by - H * 0.35f - bosse, px, by - H * 0.15f)
-            page.lineTo(px, by - H * 1.15f); page.quadTo((bx + px) / 2, by - H * 1.35f - bosse, bx, by - H); page.close()
-            c.drawPath(page, fond)
-            lavis(c, o, page, PAPIER, 0.3f * fondu)
-            hachures(c, page, 20f, 4f * dp, encre(0.3f * fondu, 0.7f))
-            c.drawPath(page, encre(fondu, 1.2f))
         }
         c.restore()     // fin de l'impression
 
@@ -428,39 +396,128 @@ class Gravure(private val nom: String, private val courbure: Float) {
                 }
             }
             else -> {
-                // des étagères gravées : chaque livre est un dos hachuré, avec ses filets
-                val hauteurEtagere = 0.075f * h
-                var idx = 0
-                val fond = o.pinceau(SOL)
-                for (k in 0 until 6) {
-                    val rBas = rayon - (k + 1) * hauteurEtagere - 0.01f * h
-                    val planche = Path(); planche.addCircle(cx, cy, rBas, Path.Direction.CW); planche.addCircle(cx, cy, rBas - 0.008f * h, Path.Direction.CW)
-                    planche.fillType = Path.FillType.EVEN_ODD
-                    lavis(c, o, planche, BOIS, 0.8f * app)                // la planche en bois
-                    c.drawCircle(cx, cy, rBas, encre(0.85f * app, 1.4f))
-                    c.drawCircle(cx, cy, rBas - 0.008f * h, encre(0.5f * app, 0.8f))
-                    var th = -tmax
-                    while (th < tmax) {
-                        val lv = livres[idx % 500]; idx++
-                        val dth = lv[0] * w / rBas
-                        val hauteur = hauteurEtagere * 0.9f * lv[1]
-                        val p = pt(rBas + 0.002f * h, th + dth / 2)
-                        c.save(); c.translate(p[0], p[1]); c.rotate((th + dth / 2 + lv[3]) * 180f / PI.toFloat())
-                        val larg = lv[0] * w * 0.9f
-                        val dos = Path(); dos.addRect(-larg / 2, -hauteur, larg / 2, 0f, Path.Direction.CW)
-                        lavis(c, o, dos, CUIRS[cuirs[(idx - 1) % 500]], 0.8f * app)   // la reliure en cuir
-                        hachures(c, dos, 90f, floatArrayOf(2.6f, 3.8f, 5.5f)[lv[2].toInt()] * dp, encre(0.4f * app, 0.6f))
-                        c.drawPath(dos, encre(0.85f * app, 1f))
-                        for (f in floatArrayOf(0.12f, 0.17f, 0.83f, 0.88f)) c.drawLine(-larg / 2, -hauteur * f, larg / 2, -hauteur * f, encre(0.85f * app, 0.8f, OR))   // les filets dorés
-                        if (idx % 3 == 0) {            // une étiquette sur certains dos
-                            c.drawRect(-larg * 0.28f, -hauteur * 0.6f, larg * 0.28f, -hauteur * 0.4f, fond)
-                            c.drawRect(-larg * 0.28f, -hauteur * 0.6f, larg * 0.28f, -hauteur * 0.4f, encre(0.85f * app, 0.8f, OR))
+                // sous la courbe : les galeries hexagonales de la Bibliothèque de Babel (Borges),
+                // chacune tapissée de livres, avec son puits central bordé d'une rambarde
+                val R = 0.11f * m; val hx = sqrt(3f) * R
+                val fond = o.pinceau(SOL); val vide = o.pinceau(FOND)
+                fun hexagone(x: Float, y: Float, r: Float): Path {
+                    val p = Path()
+                    for (k in 0 until 6) {
+                        val a = k * PI.toFloat() / 3
+                        if (k == 0) p.moveTo(x + r * cos(a), y + r * sin(a)) else p.lineTo(x + r * cos(a), y + r * sin(a))
+                    }
+                    p.close(); return p
+                }
+                var colonne = 0; var xc = -R
+                while (xc < w + R) {
+                    var yc = haut - 0.01f * h + (if (colonne % 2 == 1) hx / 2 else 0f)
+                    while (yc < h + hx) {
+                        val hexa = hexagone(xc, yc, R); val dedans = hexagone(xc, yc, 0.84f * R)
+                        lavis(c, o, hexa, BOIS, 0.55f * app)              // le cadre en bois
+                        c.drawPath(dedans, fond)
+                        c.save(); c.clipPath(dedans)
+                        var idx = modulo((colonne * 37 + yc.toInt()).toFloat(), 500f).toInt()
+                        for (rang in 0 until 4) {                     // quatre rayonnages de livres
+                            val yb = yc - 0.84f * hx / 2 + (rang + 1) * 0.84f * hx / 4
+                            val hl = 0.84f * hx / 4 * 0.85f
+                            var x = xc - 0.84f * R
+                            while (x < xc + 0.84f * R) {
+                                val lv = livres[idx % 500]; idx++
+                                val lb = lv[0] * w * 0.55f; val hb = hl * lv[1]
+                                val dos = Path(); dos.addRect(x, yb - hb, x + lb * 0.92f, yb, Path.Direction.CW)
+                                lavis(c, o, dos, CUIRS[cuirs[idx % 500]], 0.8f * app)
+                                c.drawLine(x, yb - hb * 0.85f, x + lb * 0.92f, yb - hb * 0.85f, encre(0.6f * app, 0.6f, OR))
+                                x += lb
+                            }
+                            c.drawLine(xc - R, yb, xc + R, yb, encre(0.7f * app, 1f))
                         }
                         c.restore()
-                        th += dth
+                        val puits = 0.26f * R                          // le puits central et sa rambarde
+                        c.drawCircle(xc, yc, puits, vide)
+                        c.drawCircle(xc, yc, puits, encre(0.85f * app, 1.2f))
+                        for (k in 0 until 12) {
+                            val a = k * PI.toFloat() / 6
+                            c.drawLine(xc + puits * cos(a), yc + puits * sin(a), xc + puits * 1.25f * cos(a), yc + puits * 1.25f * sin(a), encre(0.6f * app, 0.8f))
+                        }
+                        c.drawCircle(xc, yc, puits * 1.25f, encre(0.7f * app, 0.9f))
+                        c.drawPath(hexa, encre(0.9f * app, 1.4f)); c.drawPath(dedans, encre(0.6f * app, 0.8f))
+                        yc += hx
                     }
+                    xc += 1.5f * R; colonne++
                 }
             }
+        }
+    }
+
+    // La tour de Babel, faite de bibliothèques : elle se construit étage par étage,
+    // des nuages la traversent, et des lettres de toutes les langues s'en échappent.
+    private fun babel(c: Canvas, o: Outils, cx: Float, base: Float, w: Float, h: Float, m: Float, dp: Float, sec: Float, vis: Float,
+                      encreC: (Float, Float, Int) -> Paint) {
+        fun encre(a: Float, ep: Float, col: Int = ENCRE) = encreC(a, ep, col)
+        val etages = 7; val hE = 0.05f * h; val larg0 = 0.68f * w
+        val croissance = borne(sec / 0.9f) * etages
+        o.halo(c, cx, base - 0.2f * h, 0.45f * w, 0.18f * vis, OR)          // la lueur du couchant derrière
+        val fond = o.pinceau(SOL)
+        var sommet = base
+        for (k in 0 until etages) {
+            val f = borne(croissance - k)
+            if (f <= 0f) break
+            val y1 = base - k * hE; val y0 = y1 - hE * f; sommet = y0
+            val lb = larg0 * 0.86f.pow(k) / 2; val lt = lb * 0.965f
+            val etage = Path(); etage.moveTo(cx - lb, y1); etage.lineTo(cx + lb, y1)
+            etage.lineTo(cx + mix(lb, lt, f), y0); etage.lineTo(cx - mix(lb, lt, f), y0); etage.close()
+            lavis(c, o, etage, PIERRE, 0.5f * vis)
+            hachures(c, etage, 0f, 5f * dp, encre(0.45f * vis, 0.6f))           // les assises de pierre
+            val na = max(3, (2 * lb / (0.045f * w)).toInt())
+            val pas = 2 * lb / na; val aw = pas * 0.55f
+            if (f > 0.75f) {                                                   // les arcades, pleines de livres
+                for (j in 0 until na) {
+                    val ax = cx - lb + (j + 0.5f) * pas
+                    val yb = y1 - 0.08f * hE; val yh = y1 - 0.78f * hE
+                    val arche = Path(); arche.moveTo(ax - aw / 2, yb); arche.lineTo(ax - aw / 2, yh + aw / 2)
+                    arche.arcTo(RectF(ax - aw / 2, yh, ax + aw / 2, yh + aw), 180f, 180f, false)
+                    arche.lineTo(ax + aw / 2, yb); arche.close()
+                    c.drawPath(arche, fond)
+                    val lg = aw / 4
+                    for (q in 0 until 4) {
+                        val dos = Path()
+                        dos.addRect(ax - aw / 2 + q * lg + 0.5f, yb - (yb - yh) * (0.55f + 0.1f * ((j + q + k) % 3)), ax - aw / 2 + (q + 0.85f) * lg, yb, Path.Direction.CW)
+                        lavis(c, o, dos, CUIRS[(k * 13 + j * 5 + q) % CUIRS.size], 0.85f * vis)
+                    }
+                    c.drawPath(arche, encre(0.8f * vis, 0.9f))
+                }
+            }
+            if (f >= 1f) {                                                     // la rampe qui s'enroule autour de la tour
+                val rampe = Path()
+                rampe.moveTo(cx - lb, y1 - 0.05f * hE); rampe.lineTo(cx + lt, y0 + 0.12f * hE)
+                rampe.lineTo(cx + lt, y0 + 0.28f * hE); rampe.lineTo(cx - lb, y1); rampe.close()
+                lavis(c, o, rampe, RAMPE, 0.55f * vis)
+                c.drawPath(rampe, encre(0.75f * vis, 0.8f))
+            }
+            c.drawPath(etage, encre(0.9f * vis, 1.2f))
+        }
+        if (croissance > 1f) {                                                 // l'échafaudage du chantier, au sommet
+            val lt = larg0 * 0.86f.pow(min(etages, croissance.toInt()) - 1) / 2 * 0.8f
+            for (j in -2..2) { val x = cx + j * lt / 2; c.drawLine(x, sommet, x, sommet - 0.035f * h, encre(0.7f * vis, 0.9f)) }
+            c.drawLine(cx - lt, sommet - 0.03f * h, cx + lt, sommet - 0.03f * h, encre(0.6f * vis, 0.8f))
+            c.drawLine(cx - lt, sommet, cx, sommet - 0.03f * h, encre(0.5f * vis, 0.7f))
+        }
+        for (n in nuages) {                                                    // des nuages qui traversent la tour
+            val x = (modulo(n[0] + n[3] * sec * 0.04f, 1.3f) - 0.15f) * w; val y = base - n[1] * h
+            for (q in 0 until 4) {
+                val milieu = q == 1 || q == 2
+                val bx = x + (q - 1.5f) * n[2] * w * 0.3f; val by = y - (if (milieu) 0.012f * h else 0f)
+                val rr = n[2] * w * (if (milieu) 0.22f else 0.16f)
+                val ov = Path(); ov.addOval(RectF(bx - rr, by - rr * 0.45f, bx + rr, by + rr * 0.45f), Path.Direction.CW)
+                lavis(c, o, ov, NUAGE, 0.32f * vis)
+                c.drawPath(ov, encre(0.35f * vis, 0.7f))
+            }
+        }
+        for ((k, l) in lettres.withIndex()) {                                  // la confusion des langues
+            val f = modulo(l[2] + sec * 0.3f, 1f)
+            val x = cx + l[1] * w * (0.04f + 0.45f * f) + 0.02f * w * sin(l[4] + f * 6f)
+            val y = sommet - 0.02f * h - f * (sommet - 0.16f * h)
+            ecrireGravure(c, caracteres[k], x, y, 0.038f * m * l[3], avecAlpha(TEINTES_ECRITURES[l[0].toInt()], vis * sin(PI.toFloat() * f) * 0.9f))
         }
     }
 }
