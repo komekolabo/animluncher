@@ -9,6 +9,13 @@ Objectif : la publier sur le Google Play Store, avec une pub non invasive.
   Les commentaires du code sont en français et pédagogiques (garder ce style).
 - **Animations** : thèmes sombres, **jamais de flash lumineux**, mouvements doux.
 - Avant d'intégrer une nouvelle animation : lui montrer une **vidéo d'aperçu VERTICALE (portrait) uniquement**.
+  Aperçus faits avec skia-python (même moteur que le Canvas Android) + ffmpeg : un petit « moteur » Python
+  qui imite `Outils.kt` (halo, tache, révélations…), écran 540 x 1320, vitesse réelle puis ralenti x0,5.
+  Il ne vit pas dans le repo : à recréer si besoin (la session précédente l'avait dans /home/claude/apercu).
+- **Les arcs / horizons / anneaux de planète en bas d'écran sont réservés aux animations de Claude.**
+- **Varier les révélations** (pas toujours un cercle) : Outils propose cercle doux, balayage, bandes,
+  trame de points, colonnes, tuiles, fente.
+- Textes affichés dans les animations : **en anglais**.
 - Il n'a **pas Android Studio** : tout se compile sur GitHub (voir plus bas). Il teste sur son téléphone.
 
 ## Les deux versions (Gradle « flavors », voir app/build.gradle.kts)
@@ -35,6 +42,11 @@ Objectif : la publier sur le Google Play Store, avec une pub non invasive.
 - `Outils.kt` : `Scene`, `Instant` (secondes, intro 0→1, revelation 0→1), `Categorie` (durées),
   et les outils de dessin (halo, tache, poussières, bokeh, vignette, révélations douces…).
 - `Scenes*.kt` : les animations, par lots (IA, Google, système, social, finance, jeux…).
+  Lot 2 des IA : `ScenesEspace.kt` (ChatGPT : Collision de galaxies — film précalculé en arrière-plan —
+  et Lancement), `ScenesPuces.kt` (Gemini : TPU, Quantique), `ScenesCourseIA.kt` (la course à l'IA en
+  chiffres : Benchmarks/ChatGPT, Autonomy/Claude, Power/Gemini, Intelligence/Grok).
+  Les variantes d'une app sont tirées au hasard ; on ajoute les nouvelles À LA FIN de la liste
+  (les réglages retiennent les variantes décochées par leur numéro).
   Chaque scène hérite de `Scene` et dessine **toute l'image à chaque instant** (pas d'état caché).
   Elles sont calibrées sur un écran « modèle » de 540 de large (k = largeur / 540).
 - `Reglages.kt` : kill switch, « seulement au démarrage », réglages par app (durée, variantes).
