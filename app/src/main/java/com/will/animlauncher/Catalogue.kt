@@ -41,7 +41,7 @@ object Catalogue {
         "com.anthropic.aibo" to e(E) { Lucioles() },
         "com.openai.chatgpt" to e(E) { Brume() },
         "com.google.android.apps.bard" to e(E) { Aurore() },
-        "ai.x.grok" to e(E) { Singularite() },
+        "ai.x.grok" to v(E, GROK_VARIANTES) { grok(it) },   // trou noir spectaculaire ou version épurée, au hasard
         // --- Lot 2 : Google ---
         "com.google.android.googlequicksearchbox" to e(E) { Quatre() },
         "com.android.chrome" to e(E) { Tunnel() },
