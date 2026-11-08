@@ -22,4 +22,31 @@ object Reglages {
     fun definirSeulementDemarrage(c: Context, valeur: Boolean) {
         carnet(c).edit().putBoolean(CLE_DEMARRAGE, valeur).apply()
     }
+
+    // ---------------- RÉGLAGES APP PAR APP ----------------
+    // Chaque réglage est rangé sous une clé qui contient le nom technique de l'app,
+    // par exemple "off_com.anthropic.claude".
+
+    // L'animation de cette app est-elle activée ? (oui par défaut)
+    fun appActive(c: Context, app: String): Boolean = !carnet(c).getBoolean("off_$app", false)
+    fun definirAppActive(c: Context, app: String, active: Boolean) {
+        carnet(c).edit().putBoolean("off_$app", !active).apply()
+    }
+
+    // La durée choisie pour cette app, en millisecondes. -1 = la durée par défaut.
+    // 0 = pas d'animation du tout.
+    fun duree(c: Context, app: String): Int = carnet(c).getInt("duree_$app", -1)
+    fun definirDuree(c: Context, app: String, ms: Int) {
+        carnet(c).edit().putInt("duree_$app", ms).apply()
+    }
+
+    // Les variantes désactivées (leurs numéros : 0, 1, 2…) pour les apps qui en ont plusieurs.
+    fun variantesDesactivees(c: Context, app: String): Set<Int> =
+        (carnet(c).getStringSet("var_$app", emptySet()) ?: emptySet()).mapNotNull { it.toIntOrNull() }.toSet()
+    fun definirVariante(c: Context, app: String, numero: Int, active: Boolean) {
+        val liste = variantesDesactivees(c, app).toMutableSet()
+        if (active) liste.remove(numero) else liste.add(numero)
+        // on range une COPIE neuve : Android n'enregistre pas les modifications d'un ensemble existant
+        carnet(c).edit().putStringSet("var_$app", liste.map { it.toString() }.toSet()).apply()
+    }
 }

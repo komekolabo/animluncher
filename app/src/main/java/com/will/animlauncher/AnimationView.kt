@@ -15,12 +15,14 @@ import android.view.SurfaceView
 //   2. ATTENTE    : elle tourne en boucle tant que l'app charge (3 s maximum)
 //   3. RÉVÉLATION : l'app est dévoilée (durée selon la catégorie)
 // Le service appelle signalerPret() quand le vrai écran de l'app est arrivé.
-class AnimationView(context: Context, private val scene: Scene, categorie: Categorie) :
+// « facteur » = la vitesse choisie dans les réglages : 2 = deux fois plus lent (et plus long),
+// 0,5 = deux fois plus rapide. 1 = la durée par défaut.
+class AnimationView(context: Context, private val scene: Scene, categorie: Categorie, private val facteur: Float = 1f) :
     SurfaceView(context), SurfaceHolder.Callback {
 
-    private val dureeIntro = categorie.intro
-    private val dureeRevelation = categorie.revelation
-    private val dureeAttenteMax = 3000L
+    private val dureeIntro = (categorie.intro * facteur).toLong().coerceAtLeast(1L)
+    private val dureeRevelation = (categorie.revelation * facteur).toLong().coerceAtLeast(1L)
+    private val dureeAttenteMax = maxOf(3000L, dureeIntro + 200L)
 
     private var quandFini: (() -> Unit)? = null
     private val principal = Handler(Looper.getMainLooper())
@@ -42,6 +44,9 @@ class AnimationView(context: Context, private val scene: Scene, categorie: Categ
         holder.setFormat(PixelFormat.TRANSLUCENT)
         holder.addCallback(this)
     }
+
+    // La durée maximale possible (attente comprise) : sert au filet de sécurité du service.
+    val dureeMax: Long get() = dureeAttenteMax + dureeRevelation
 
     fun jouer(fin: () -> Unit) { quandFini = fin }
     fun signalerPret() { pret = true }
@@ -78,7 +83,8 @@ class AnimationView(context: Context, private val scene: Scene, categorie: Categ
             val toile = try { holder.lockHardwareCanvas() } catch (_: Exception) { null } ?: break
             try {
                 toile.drawColor(Color.TRANSPARENT, PorterDuff.Mode.CLEAR)
-                scene.dessiner(toile, outils, Instant(ecoule / 1000f, intro, revelation))
+                // le temps de la scène avance moins vite si l'animation est rallongée (facteur > 1)
+                scene.dessiner(toile, outils, Instant(ecoule / 1000f / facteur, intro, revelation))
             } catch (_: Exception) {
                 // une erreur de dessin ne doit jamais bloquer l'écran : on arrête l'animation
                 arretee = true

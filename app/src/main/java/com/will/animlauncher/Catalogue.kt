@@ -1,8 +1,19 @@
 package com.will.animlauncher
 
+import android.content.Context
+
 // Une entrée du catalogue : la catégorie de durée, et de quoi fabriquer la scène.
-// "() -> Scene" = une petite fonction qui crée une scène neuve à chaque ouverture.
-class Entree(val categorie: Categorie, val fabrique: () -> Scene)
+// "(Int) -> Scene" = une petite fonction qui crée une scène neuve à chaque ouverture ;
+// le nombre qu'on lui donne est le numéro de la variante (pour les apps qui en ont plusieurs).
+// "variantes" = le nom de chaque variante (liste vide si l'app n'a qu'une animation).
+class Entree(val categorie: Categorie, val fabrique: (Int) -> Scene, val variantes: List<String> = emptyList()) {
+    // La durée par défaut (apparition + révélation), en millisecondes.
+    val dureeDefaut: Int get() = (categorie.intro + categorie.revelation).toInt()
+}
+
+// Ce qu'il faut pour jouer une animation : la scène, sa catégorie, et le facteur de vitesse
+// (2 = deux fois plus long que la durée par défaut, 0,5 = deux fois plus court).
+class Lancement(val scene: Scene, val categorie: Categorie, val facteur: Float)
 
 // LE CATALOGUE : quelle animation pour quelle app (nom technique -> entrée).
 // Pour ajouter une app : une ligne de plus dans la liste.
@@ -13,11 +24,13 @@ object Catalogue {
     private val J = Categorie.JEU
     private val X = Categorie.ECHECS
 
-    private fun e(categorie: Categorie, fabrique: () -> Scene) = Entree(categorie, fabrique)
+    private fun e(categorie: Categorie, fabrique: () -> Scene) = Entree(categorie, { _ -> fabrique() })
+    // Une app à plusieurs variantes : on donne leurs noms, et la fonction reçoit le numéro choisi.
+    private fun v(categorie: Categorie, variantes: List<String>, fabrique: (Int) -> Scene) = Entree(categorie, fabrique, variantes)
 
     private val entrees: Map<String, Entree> = mapOf(
         // --- Lot 1 : les IA ---
-        "com.anthropic.claude" to e(E) { Horizons() },   // un des 5 horizons, au hasard
+        "com.anthropic.claude" to v(E, MONDES.map { it.nom }) { Horizons(it) },   // un des 5 horizons, au hasard
         "com.anthropic.aibo" to e(E) { Lucioles() },
         "com.openai.chatgpt" to e(E) { Brume() },
         "com.google.android.apps.bard" to e(E) { Aurore() },
@@ -25,7 +38,7 @@ object Catalogue {
         // --- Lot 2 : Google ---
         "com.google.android.googlequicksearchbox" to e(E) { Quatre() },
         "com.android.chrome" to e(E) { Tunnel() },
-        "com.google.android.apps.maps" to e(E) { Capitales() },   // une des 5 capitales, au hasard
+        "com.google.android.apps.maps" to v(E, listOf("Paris", "Londres", "Washington", "Amsterdam", "Moscou")) { Capitales(it) },   // une des 5 capitales, au hasard
         "com.google.android.gm" to e(E) { Pli() },
         "com.google.android.apps.photos" to e(E) { PoseLongue() },
         "app.revanced.android.youtube" to e(E) { Cinema() },
@@ -98,7 +111,7 @@ object Catalogue {
         // --- Lot 6 : jeux (environ 1 s) et utilitaires ---
         "com.playstack.balatro.android" to e(J) { Cartes() },
         "com.supercell.clashofclans" to e(J) { Torches() },
-        "com.chess" to e(X) { CoupsBrillants() },   // une des 5 parties, au hasard
+        "com.chess" to v(X, PARTIES.map { it.titre }) { CoupsBrillants(it) },   // une des 5 parties, au hasard
         "com.robtopx.geometryjumplite" to e(J) { Cube() },
         "com.robtopx.geometrydashmeltdown" to e(J) { Cube(rgb(255, 140, 50), true) },
         "com.BlackSaltGames.DREDGE" to e(J) { Etire(Lanterne(), 2.5f) },
@@ -118,4 +131,22 @@ object Catalogue {
     )
 
     fun pour(app: String): Entree? = entrees[app]
+
+    // Prépare l'animation d'une app en tenant compte des réglages de l'utilisateur.
+    // Renvoie null s'il ne faut rien jouer : pas d'animation pour cette app, animation
+    // désactivée, durée réglée à 0 s, ou toutes les variantes décochées.
+    fun lancement(c: Context, app: String): Lancement? {
+        val e = entrees[app] ?: return null
+        if (!Reglages.appActive(c, app)) return null
+        val ms = Reglages.duree(c, app).let { if (it < 0) e.dureeDefaut else it }
+        if (ms <= 0) return null
+        var numero = -1
+        if (e.variantes.isNotEmpty()) {
+            val eteintes = Reglages.variantesDesactivees(c, app)
+            val permises = e.variantes.indices.filter { it !in eteintes }
+            if (permises.isEmpty()) return null
+            numero = permises.random()          // une variante au hasard parmi celles qui sont cochées
+        }
+        return Lancement(e.fabrique(numero), e.categorie, ms.toFloat() / e.dureeDefaut)
+    }
 }
