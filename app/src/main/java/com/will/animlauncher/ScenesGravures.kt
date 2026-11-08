@@ -41,8 +41,6 @@ private val COUCHES = intArrayOf(rgb(60, 150, 170), rgb(70, 150, 80), rgb(190, 1
 private val CUIRS = intArrayOf(rgb(115, 30, 38), rgb(35, 78, 52), rgb(32, 48, 95), rgb(140, 92, 48), rgb(95, 40, 70), rgb(60, 60, 40))   // bordeaux, vert, marine, fauve, prune, olive
 private val BOIS = rgb(90, 55, 30)
 private val PIERRE = rgb(170, 135, 92)
-private val NUAGE = rgb(125, 130, 150)
-private val RAMPE = rgb(205, 175, 125)
 // Babel : des lettres de toutes les langues (latin, grec, cyrillique, hébreu, arabe, chinois/japonais).
 // Android va chercher tout seul une police qui sait dessiner chaque écriture.
 private val ECRITURES = listOf("abcdefgh&§¶", "αβγδλπΩΣψ", "бжзЯЮфш", "אבגדהשת", "بتجدسعق", "語書言文字本")
@@ -241,6 +239,8 @@ class Gravure(private val nom: String, private val courbure: Float) {
         }
 
         // ---------- au-dessus de la courbe ----------
+        if (nom == "Bibliothèque" && rev < 0.3f)                  // la ville au pied de la tour
+            ville(c, o, cx, { x -> crete(x) }, w, m, dp, sec, vis * (1f - rev / 0.3f)) { a, ep, col -> encre(a, ep, col) }
         if (nom == "Accélérateur" && rCorps > 0f && sec < 0.45f) {   // les deux paquets de particules qui foncent
             val rt = rCorps - 0.012f * h
             val f = doux(borne(sec / 0.45f))
@@ -449,75 +449,137 @@ class Gravure(private val nom: String, private val courbure: Float) {
         }
     }
 
-    // La tour de Babel, faite de bibliothèques : elle se construit étage par étage,
-    // des nuages la traversent, et des lettres de toutes les langues s'en échappent.
+    // La tour de Babel, à la manière de Bruegel : une tour ronde en volume, éclairée par le couchant,
+    // qui se construit étage par étage et transperce les nuages. Des lettres de toutes les langues
+    // s'en échappent : la confusion des langues.
     private fun babel(c: Canvas, o: Outils, cx: Float, base: Float, w: Float, h: Float, m: Float, dp: Float, sec: Float, vis: Float,
                       encreC: (Float, Float, Int) -> Paint) {
         fun encre(a: Float, ep: Float, col: Int = ENCRE) = encreC(a, ep, col)
-        val etages = 7; val hE = 0.05f * h; val larg0 = 0.68f * w
+        // --- le ciel du couchant, à l'intérieur du cadre et sous la légende
+        val mg = 16f * dp
+        val pmil = min(0.9f, max(0.05f, 0.18f * h / max(1f, base - 0.12f * h)))
+        val ciel = o.pinceau()
+        ciel.shader = LinearGradient(0f, 0.12f * h, 0f, base,
+            intArrayOf(avecAlpha(rgb(22, 20, 34), 0f), avecAlpha(rgb(26, 22, 34), vis), avecAlpha(rgb(130, 82, 45), vis)), floatArrayOf(0f, pmil, 1f), Shader.TileMode.CLAMP)
+        c.drawRect(mg, mg, w - mg, base + 2f, ciel)
+        val sx = cx - 0.3f * w; val sy = base - 0.12f * h            // le soleil bas, derrière la tour
+        o.halo(c, sx, sy, 0.35f * m, 0.25f * vis, rgb(230, 150, 80))
+        c.drawCircle(sx, sy, 0.045f * m, o.pinceau(avecAlpha(rgb(235, 170, 100), 0.55f * vis)))
+        val collines = arrayOf(floatArrayOf(-0.55f, 0.05f), floatArrayOf(0.6f, 0.065f), floatArrayOf(-0.15f, 0.03f))
+        val teintesCollines = intArrayOf(rgb(60, 45, 50), rgb(52, 40, 46), rgb(75, 52, 50))
+        for ((k, col) in collines.withIndex())                       // des collines au loin
+            c.drawOval(RectF(cx + col[0] * w - 0.5f * w, base - col[1] * h, cx + col[0] * w + 0.5f * w, base + col[1] * h), o.pinceau(avecAlpha(teintesCollines[k], vis)))
+        for (k in 0 until 5) {                                       // des oiseaux
+            val bx = modulo(0.15f + 0.17f * k + sec * 0.03f, 1f) * w; val by = base - (0.3f + 0.05f * sin(k * 2.3f)) * h
+            val b = 3.5f * dp; val bat = sin(sec * 8f + k) * 0.6f
+            val ois = Path(); ois.moveTo(bx - b, by - b * bat); ois.quadTo(bx - b * 0.4f, by - b * 0.5f, bx, by); ois.quadTo(bx + b * 0.4f, by - b * 0.5f, bx + b, by - b * bat)
+            c.drawPath(ois, encre(0.6f * vis, 1.1f))
+        }
+        nuagesBabel(c, o, base, w, h, sec, vis, encreC, true)
+
+        // --- la tour : des étages ronds (des cylindres vus de face), de plus en plus étroits
+        val etages = 9; val hE = 0.045f * h; val lb0 = 0.42f * m
         val croissance = borne(sec / 0.9f) * etages
-        o.halo(c, cx, base - 0.2f * h, 0.45f * w, 0.18f * vis, OR)          // la lueur du couchant derrière
-        val fond = o.pinceau(SOL)
+        val bombe = 0.14f * hE                                        // le bombé des étages ronds
+        val socle = Path(); socle.addRect(cx - lb0 * 1.08f, base - 0.012f * h, cx + lb0 * 1.08f, base + 2f * dp, Path.Direction.CW)
+        lavis(c, o, socle, PIERRE, 0.5f * vis); c.drawPath(socle, encre(0.8f * vis, 1f))
+        val vide = o.pinceau(avecAlpha(FOND, 0.9f * vis))
         var sommet = base
         for (k in 0 until etages) {
             val f = borne(croissance - k)
             if (f <= 0f) break
-            val y1 = base - k * hE; val y0 = y1 - hE * f; sommet = y0
-            val lb = larg0 * 0.86f.pow(k) / 2; val lt = lb * 0.965f
-            val etage = Path(); etage.moveTo(cx - lb, y1); etage.lineTo(cx + lb, y1)
-            etage.lineTo(cx + mix(lb, lt, f), y0); etage.lineTo(cx - mix(lb, lt, f), y0); etage.close()
-            lavis(c, o, etage, PIERRE, 0.5f * vis)
-            hachures(c, etage, 0f, 5f * dp, encre(0.45f * vis, 0.6f))           // les assises de pierre
-            val na = max(3, (2 * lb / (0.045f * w)).toInt())
-            val pas = 2 * lb / na; val aw = pas * 0.55f
-            if (f > 0.75f) {                                                   // les arcades, pleines de livres
+            val y1 = base - 0.012f * h - k * hE; val y0 = y1 - hE * f; sommet = y0
+            val lb = lb0 * 0.86f.pow(k); val lt = mix(lb, lb * 0.965f, f)
+            val etage = Path(); etage.moveTo(cx - lb, y1); etage.quadTo(cx, y1 + 2 * bombe, cx + lb, y1)
+            etage.lineTo(cx + lt, y0); etage.quadTo(cx, y0 + 2 * bombe, cx - lt, y0); etage.close()
+            val volume = o.pinceau()                                  // éclairé à gauche par le couchant, dans l'ombre à droite
+            volume.shader = LinearGradient(cx - lb, 0f, cx + lb, 0f,
+                intArrayOf(avecAlpha(rgb(205, 165, 110), 0.85f * vis), avecAlpha(rgb(165, 125, 82), 0.8f * vis), avecAlpha(rgb(70, 50, 38), 0.85f * vis)), floatArrayOf(0f, 0.4f, 1f), Shader.TileMode.CLAMP)
+            c.drawPath(etage, volume)
+            hachures(c, etage, 0f, 5f * dp, encre(0.4f * vis, 0.6f))
+            if (f > 0.75f) {                                          // les arcades, qui tournent avec le cylindre
+                val na = 9 + (etages - k) / 2
                 for (j in 0 until na) {
-                    val ax = cx - lb + (j + 0.5f) * pas
-                    val yb = y1 - 0.08f * hE; val yh = y1 - 0.78f * hE
+                    val th = -PI.toFloat() / 2 + (j + 0.5f) * PI.toFloat() / na
+                    val ax = cx + lb * 0.93f * sin(th); val aw = (lb * PI.toFloat() / na) * 0.5f * cos(th)
+                    if (aw < 1.2f * dp) continue
+                    val yb = y1 - 0.1f * hE + bombe * cos(th); val yh = yb - 0.62f * hE
                     val arche = Path(); arche.moveTo(ax - aw / 2, yb); arche.lineTo(ax - aw / 2, yh + aw / 2)
-                    arche.arcTo(RectF(ax - aw / 2, yh, ax + aw / 2, yh + aw), 180f, 180f, false)
-                    arche.lineTo(ax + aw / 2, yb); arche.close()
-                    c.drawPath(arche, fond)
-                    val lg = aw / 4
-                    for (q in 0 until 4) {
+                    arche.arcTo(RectF(ax - aw / 2, yh, ax + aw / 2, yh + aw), 180f, 180f, false); arche.lineTo(ax + aw / 2, yb); arche.close()
+                    c.drawPath(arche, vide)
+                    val lg = aw / 3
+                    for (q in 0 until 3) {                            // quelques livres au fond de chaque arcade
                         val dos = Path()
-                        dos.addRect(ax - aw / 2 + q * lg + 0.5f, yb - (yb - yh) * (0.55f + 0.1f * ((j + q + k) % 3)), ax - aw / 2 + (q + 0.85f) * lg, yb, Path.Direction.CW)
-                        lavis(c, o, dos, CUIRS[(k * 13 + j * 5 + q) % CUIRS.size], 0.85f * vis)
+                        dos.addRect(ax - aw / 2 + q * lg + 0.4f, yb - (yb - yh) * (0.4f + 0.1f * ((j + q + k) % 3)), ax - aw / 2 + (q + 0.8f) * lg, yb, Path.Direction.CW)
+                        lavis(c, o, dos, CUIRS[(k * 13 + j * 5 + q) % CUIRS.size], 0.7f * vis)
                     }
-                    c.drawPath(arche, encre(0.8f * vis, 0.9f))
+                    c.drawPath(arche, encre(0.7f * vis, 0.8f))
                 }
             }
-            if (f >= 1f) {                                                     // la rampe qui s'enroule autour de la tour
-                val rampe = Path()
-                rampe.moveTo(cx - lb, y1 - 0.05f * hE); rampe.lineTo(cx + lt, y0 + 0.12f * hE)
-                rampe.lineTo(cx + lt, y0 + 0.28f * hE); rampe.lineTo(cx - lb, y1); rampe.close()
-                lavis(c, o, rampe, RAMPE, 0.55f * vis)
-                c.drawPath(rampe, encre(0.75f * vis, 0.8f))
+            if (f >= 1f) {                                            // la rampe en spirale, qui monte de gauche à droite
+                val n = 24
+                val hx = FloatArray(n + 1); val hy = FloatArray(n + 1)
+                for (q in 0..n) {
+                    val t = q.toFloat() / n; val th = -PI.toFloat() / 2 + t * PI.toFloat()
+                    hx[q] = cx + mix(lb, lt, t) * sin(th)
+                    hy[q] = mix(y1, y0, t) + bombe * cos(th)
+                }
+                val rampe = Path(); rampe.moveTo(hx[0], hy[0] - 0.04f * hE)
+                for (q in 1..n) rampe.lineTo(hx[q], hy[q] - 0.04f * hE)
+                for (q in n downTo 0) rampe.lineTo(hx[q], hy[q] + 0.12f * hE)
+                rampe.close()
+                lavis(c, o, rampe, rgb(215, 185, 135), 0.6f * vis)
+                c.drawPath(rampe, encre(0.7f * vis, 0.8f))
             }
             c.drawPath(etage, encre(0.9f * vis, 1.2f))
         }
-        if (croissance > 1f) {                                                 // l'échafaudage du chantier, au sommet
-            val lt = larg0 * 0.86f.pow(min(etages, croissance.toInt()) - 1) / 2 * 0.8f
-            for (j in -2..2) { val x = cx + j * lt / 2; c.drawLine(x, sommet, x, sommet - 0.035f * h, encre(0.7f * vis, 0.9f)) }
-            c.drawLine(cx - lt, sommet - 0.03f * h, cx + lt, sommet - 0.03f * h, encre(0.6f * vis, 0.8f))
-            c.drawLine(cx - lt, sommet, cx, sommet - 0.03f * h, encre(0.5f * vis, 0.7f))
+        if (croissance > 1f) {                                        // le chantier au sommet : échafaudage et grue à roue
+            val lt = lb0 * 0.86f.pow(min(etages, croissance.toInt()) - 1) * 0.75f
+            for (j in -3..3) { val x = cx + j * lt / 3; c.drawLine(x, sommet, x, sommet - 0.03f * h, encre(0.7f * vis, 0.9f)) }
+            c.drawLine(cx - lt, sommet - 0.026f * h, cx + lt, sommet - 0.026f * h, encre(0.6f * vis, 0.8f))
+            val mx = cx + lt * 0.5f
+            c.drawLine(mx, sommet, mx, sommet - 0.07f * h, encre(0.8f * vis, 1.2f))                       // le mât de la grue
+            c.drawLine(mx, sommet - 0.07f * h, mx - 0.12f * m, sommet - 0.05f * h, encre(0.8f * vis, 1.1f))  // sa flèche
+            c.drawLine(mx - 0.12f * m, sommet - 0.05f * h, mx - 0.12f * m, sommet - 0.05f * h + 0.03f * h * (0.6f + 0.4f * sin(sec * 2f)), encre(0.6f * vis, 0.7f))
+            c.drawCircle(mx, sommet - 0.012f * h, 0.012f * h, encre(0.7f * vis, 0.9f))                       // la roue
         }
-        for (n in nuages) {                                                    // des nuages qui traversent la tour
-            val x = (modulo(n[0] + n[3] * sec * 0.04f, 1.3f) - 0.15f) * w; val y = base - n[1] * h
-            for (q in 0 until 4) {
-                val milieu = q == 1 || q == 2
-                val bx = x + (q - 1.5f) * n[2] * w * 0.3f; val by = y - (if (milieu) 0.012f * h else 0f)
-                val rr = n[2] * w * (if (milieu) 0.22f else 0.16f)
-                val ov = Path(); ov.addOval(RectF(bx - rr, by - rr * 0.45f, bx + rr, by + rr * 0.45f), Path.Direction.CW)
-                lavis(c, o, ov, NUAGE, 0.32f * vis)
-                c.drawPath(ov, encre(0.35f * vis, 0.7f))
-            }
-        }
-        for ((k, l) in lettres.withIndex()) {                                  // la confusion des langues
+        nuagesBabel(c, o, base, w, h, sec, vis, encreC, false)       // des nuages passent devant : la tour les transperce
+        for ((k, l) in lettres.withIndex()) {                         // la confusion des langues
             val f = modulo(l[2] + sec * 0.3f, 1f)
             val x = cx + l[1] * w * (0.04f + 0.45f * f) + 0.02f * w * sin(l[4] + f * 6f)
-            val y = sommet - 0.02f * h - f * (sommet - 0.16f * h)
+            val y = sommet - 0.03f * h - f * (sommet - 0.16f * h)
             ecrireGravure(c, caracteres[k], x, y, 0.038f * m * l[3], avecAlpha(TEINTES_ECRITURES[l[0].toInt()], vis * sin(PI.toFloat() * f) * 0.9f))
+        }
+    }
+
+    // Des nuages en lavis : les uns derrière la tour, les autres devant.
+    private fun nuagesBabel(c: Canvas, o: Outils, base: Float, w: Float, h: Float, sec: Float, vis: Float, encreC: (Float, Float, Int) -> Paint, derriere: Boolean) {
+        for ((k, n) in nuages.withIndex()) {
+            if ((k % 2 == 0) != derriere) continue
+            val x = (modulo(n[0] + n[3] * sec * 0.04f, 1.4f) - 0.2f) * w; val y = base - (n[1] + 0.05f) * h
+            for (q in 0 until 5) {
+                val bx = x + (q - 2) * n[2] * w * 0.28f; val rr = n[2] * w * (if (q in 1..3) 0.24f else 0.16f)
+                val by = y - (if (q == 2) 0.014f * h else if (q == 1 || q == 3) 0.006f * h else 0f)
+                val ov = Path(); ov.addOval(RectF(bx - rr, by - rr * 0.42f, bx + rr, by + rr * 0.42f), Path.Direction.CW)
+                lavis(c, o, ov, if (derriere) rgb(150, 130, 130) else rgb(175, 150, 140), (if (derriere) 0.3f else 0.45f) * vis)
+                c.drawPath(ov, encreC(0.3f * vis, 0.7f, ENCRE))
+            }
+        }
+    }
+
+    // La ville au pied de la tour : des maisons et leurs fenêtres allumées, de part et d'autre.
+    private fun ville(c: Canvas, o: Outils, cx: Float, crete: (Float) -> Float, w: Float, m: Float, dp: Float, sec: Float, vis: Float, encreC: (Float, Float, Int) -> Paint) {
+        for (k in 0 until 16) {
+            val sgn = if (k % 2 == 1) -1f else 1f
+            val x = cx + sgn * (0.44f * m + (k / 2) * 0.055f * w)
+            if (x < -0.05f * w || x > 1.05f * w) continue
+            val y = crete(x) + 2f * dp
+            val lw = 0.04f * m * (1 + 0.3f * ((k * 7) % 3)); val lh = 0.03f * m * (1 + 0.4f * ((k * 5) % 3))
+            val mai = Path(); mai.moveTo(x - lw / 2, y); mai.lineTo(x - lw / 2, y - lh); mai.lineTo(x, y - lh - lw * 0.5f); mai.lineTo(x + lw / 2, y - lh); mai.lineTo(x + lw / 2, y); mai.close()
+            c.drawPath(mai, o.pinceau(avecAlpha(rgb(40, 30, 24), vis)))
+            c.drawPath(mai, encreC(0.6f * vis, 0.8f, ENCRE))
+            val a = vis * (0.75f + 0.25f * sin(sec * 3f + k))
+            c.drawRect(x - 1.5f * dp, y - lh * 0.6f - 1.5f * dp, x + 1.5f * dp, y - lh * 0.6f + 1.5f * dp, o.pinceau(avecAlpha(rgb(240, 190, 110), 0.85f * a)))
         }
     }
 }
