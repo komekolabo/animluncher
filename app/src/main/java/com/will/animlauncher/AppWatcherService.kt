@@ -25,6 +25,15 @@ class AppWatcherService : AccessibilityService() {
     private var derniereApp: String? = null
     private var vueEnCours: AnimationView? = null
     private var appAnimee: String? = null      // l'app pour laquelle l'animation tourne
+    private var appApparue = false             // la fenêtre de cette app est-elle déjà arrivée ?
+    private val dejaOuvertes = HashSet<String>()   // apps déjà vues depuis le démarrage du service
+
+    // Nom affiché sous l'icône -> nom technique de l'app (ex. "Claude" -> "com.anthropic.claude").
+    private var noms: Map<String, String> = emptyMap()
+    private var nomsCalculesA = 0L
+    // Dernière app lancée par un clic (pour ne pas rejouer l'animation quand sa fenêtre arrive).
+    private var appCliquee: String? = null
+    private var clicA = 0L
     private val minuteur = Handler(Looper.getMainLooper())
 
     private val ignorees = setOf(
@@ -40,32 +49,112 @@ class AppWatcherService : AccessibilityService() {
 
     override fun onServiceConnected() {
         noter("=== Service démarré (allumage ou réactivation) ===")
+        noms = calculerNoms()      // préparé à l'avance : le clic doit être traité instantanément
     }
 
     override fun onAccessibilityEvent(event: AccessibilityEvent) {
-        if (event.eventType != AccessibilityEvent.TYPE_WINDOW_STATE_CHANGED) return
+        when (event.eventType) {
+            AccessibilityEvent.TYPE_VIEW_CLICKED -> clic(event)
+            AccessibilityEvent.TYPE_WINDOW_STATE_CHANGED -> fenetre(event)
+        }
+    }
+
+    // 1) LE CLIC SUR L'ICÔNE. Le lanceur (l'écran d'accueil) nous dit sur quoi on a appuyé,
+    // AVANT que l'app ne s'ouvre. On retrouve l'app grâce au nom écrit sous l'icône,
+    // et l'animation démarre tout de suite : elle couvre l'ouverture de l'app.
+    private fun clic(event: AccessibilityEvent) {
+        if (event.packageName?.toString() != ecranAccueil) return
+        val textes = event.text.map { it.toString() } + listOfNotNull(event.contentDescription?.toString())
+        val app = trouverApp(textes) ?: return
+        if (app in ignorees) return
+        if (!Reglages.actif(this)) return
+        val entree = Catalogue.pour(app) ?: return
+        // Mode « seulement au démarrage » : si l'app a déjà été ouverte, c'est sûrement
+        // une reprise -> on laisse l'ancienne méthode décider (elle ignore les reprises).
+        if (Reglages.seulementDemarrage(this) && app in dejaOuvertes) return
+        appCliquee = app
+        clicA = SystemClock.uptimeMillis()
+        afficher(entree, app, dejaPrete = false)      // d'abord l'animation, le journal après
+        noter("clic sur « ${textes.firstOrNull() ?: "?"} » -> $app : animation lancée")
+    }
+
+    private fun trouverApp(textes: List<String>): String? {
+        chercher(textes)?.let { return it }
+        // Pas trouvé (un dossier, un widget… ou une app installée depuis) :
+        // on refait la liste, au plus une fois toutes les 30 secondes.
+        val maintenant = SystemClock.uptimeMillis()
+        if (maintenant - nomsCalculesA < 30_000) return null
+        noms = calculerNoms()
+        return chercher(textes)
+    }
+
+    private fun chercher(textes: List<String>): String? {
+        for (t in textes) {
+            val propre = t.trim()
+            noms[propre]?.let { return it }
+            // Samsung ajoute parfois des infos après une virgule ("Claude, 2 notifications")
+            noms[propre.substringBefore(',').trim()]?.let { return it }
+        }
+        return null
+    }
+
+    // Toutes les apps de l'écran d'accueil : nom affiché -> nom technique.
+    // Si deux apps ont le même nom (ex. deux « Wallet »), on garde celle qui a une animation.
+    private fun calculerNoms(): Map<String, String> {
+        val intention = Intent(Intent.ACTION_MAIN).addCategory(Intent.CATEGORY_LAUNCHER)
+        nomsCalculesA = SystemClock.uptimeMillis()
+        val resultat = HashMap<String, String>()
+        for (info in packageManager.queryIntentActivities(intention, 0)) {
+            val nom = info.loadLabel(packageManager).toString().trim()
+            val pkg = info.activityInfo.packageName
+            if (resultat[nom] == null || Catalogue.pour(pkg) != null) resultat[nom] = pkg
+        }
+        return resultat
+    }
+
+    // 2) LES CHANGEMENTS DE FENÊTRE : l'app qui passe au premier plan.
+    private fun fenetre(event: AccessibilityEvent) {
         val app = event.packageName?.toString() ?: return
         if (app == packageName || app in ignorees) return
         val classe = event.className?.toString()?.substringAfterLast('.') ?: "?"
 
         // L'APP EST-ELLE PRÊTE ? Dès que le vrai écran de l'app arrive (autre chose que
-        // l'écran de lancement), ou qu'une autre app passe devant, on lance la révélation.
+        // l'écran de lancement FrameLayout), on lance la révélation. Si l'utilisateur part
+        // ailleurs après l'arrivée de l'app, on révèle aussi. Avant l'arrivée de l'app, on
+        // ignore les autres fenêtres (le lanceur bouge encore pendant le clic).
+        val estVraieApp = app == ecranAccueil ||
+            packageManager.getLaunchIntentForPackage(app) != null
         vueEnCours?.let { vue ->
-            if (app != appAnimee || classe != "FrameLayout") {
-                vue.signalerPret()
-                if (app == appAnimee) {
+            // RELAIS : certaines icônes ouvrent en fait une autre app (ex. Gemini s'ouvre
+            // dans l'app Google). Si une autre vraie app arrive avant celle attendue, on la suit.
+            if (!appApparue && app != appAnimee && app != ecranAccueil && estVraieApp) {
+                noter("  .. relais : $appAnimee -> $app")
+                appAnimee = app
+            }
+            if (app == appAnimee) {
+                appApparue = true
+                if (classe != "FrameLayout") {
+                    vue.signalerPret()
                     noter("  .. app prête après ${SystemClock.uptimeMillis() - vue.creeeA} ms (écran $classe)")
                 }
+            } else if (appApparue) {
+                vue.signalerPret()
             }
         }
 
-        val estVraieApp = app == ecranAccueil ||
-            packageManager.getLaunchIntentForPackage(app) != null
         if (!estVraieApp) return
 
         if (app == derniereApp) return
         val precedente = derniereApp
         derniereApp = app
+        if (app != ecranAccueil) dejaOuvertes.add(app)
+
+        // L'animation tourne déjà pour cette app (lancée au clic) : rien de plus à faire.
+        if ((vueEnCours != null && appAnimee == app) ||
+            (app == appCliquee && SystemClock.uptimeMillis() - clicA < 6000)) {
+            noter("$app | écran $classe | animation déjà lancée au clic")
+            return
+        }
 
         if (app == ecranAccueil) {
             noter(app)
@@ -83,6 +172,7 @@ class AppWatcherService : AccessibilityService() {
 
         // Si c'est une simple reprise, l'app est déjà prête : version courte.
         afficher(entree, app, dejaPrete = !demarrage)
+        appApparue = true      // ici, la fenêtre de l'app est déjà là
     }
 
     private fun afficher(entree: Entree, app: String, dejaPrete: Boolean) {
@@ -123,6 +213,7 @@ class AppWatcherService : AccessibilityService() {
             gestionnaire.addView(vue, reglages)
             vueEnCours = vue
             appAnimee = app
+            appApparue = false
             if (dejaPrete) vue.signalerPret()
             vue.jouer { if (vueEnCours === vue) retirer(gestionnaire, "fin normale") }
             // Filet de sécurité : 3 s d'attente max + intro + révélation + marge.
@@ -140,6 +231,7 @@ class AppWatcherService : AccessibilityService() {
         try { gestionnaire.removeView(vue) } catch (_: Exception) {}
         vueEnCours = null
         appAnimee = null
+        appApparue = false
         val ms = SystemClock.uptimeMillis() - vue.creeeA
         val surface = if (vue.surfaceCreee) "surface OK" else "PAS de surface"
         noter("  -> ${vue.images} images, $surface, $ms ms, $raison")
