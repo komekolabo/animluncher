@@ -34,6 +34,12 @@ class AppWatcherService : AccessibilityService() {
     // Dernière app lancée par un clic (pour ne pas rejouer l'animation quand sa fenêtre arrive).
     private var appCliquee: String? = null
     private var clicA = 0L
+    // Dernier appui (n'importe lequel) sur l'écran d'accueil, et en a-t-on déjà reçu ?
+    private var dernierClicAccueil = 0L
+    private var clicsRecus = false
+    // L'app qu'on vient de quitter (retour à l'accueil) et quand.
+    private var appQuittee: String? = null
+    private var quitteeA = 0L
     private val minuteur = Handler(Looper.getMainLooper())
 
     private val ignorees = setOf(
@@ -64,8 +70,14 @@ class AppWatcherService : AccessibilityService() {
     // et l'animation démarre tout de suite : elle couvre l'ouverture de l'app.
     private fun clic(event: AccessibilityEvent) {
         if (event.packageName?.toString() != ecranAccueil) return
+        clicsRecus = true
+        dernierClicAccueil = SystemClock.uptimeMillis()
         val textes = event.text.map { it.toString() } + listOfNotNull(event.contentDescription?.toString())
-        val app = trouverApp(textes) ?: return
+        val app = trouverApp(textes)
+        if (app == null) {
+            noter("clic accueil « ${textes.joinToString(" / ")} » : pas une app connue")
+            return
+        }
         if (app in ignorees) return
         if (!Reglages.actif(this)) return
         val entree = Catalogue.pour(app) ?: return
@@ -158,6 +170,8 @@ class AppWatcherService : AccessibilityService() {
 
         if (app == ecranAccueil) {
             noter(app)
+            appQuittee = precedente
+            quitteeA = SystemClock.uptimeMillis()
             return
         }
 
@@ -169,6 +183,20 @@ class AppWatcherService : AccessibilityService() {
         val entree = Catalogue.pour(app) ?: return
         if (precedente != ecranAccueil) return
         if (Reglages.seulementDemarrage(this) && !demarrage) return
+        // Une app peut faire apparaître une fenêtre sans qu'on l'ait ouverte (mini-lecteur
+        // de YouTube quand on la quitte, etc.). On n'anime donc que si on vient d'appuyer
+        // sur l'écran d'accueil (moins de 2 s). Si le téléphone ne nous signale jamais
+        // les appuis, on garde l'ancien comportement.
+        if (clicsRecus && SystemClock.uptimeMillis() - dernierClicAccueil > 2000) {
+            noter("  (pas d'appui sur l'accueil juste avant : on ne lance rien)")
+            return
+        }
+        // Sans information d'appui : une fenêtre de l'app qu'on vient de quitter, dans les
+        // 5 secondes, est presque toujours un reste de sa fermeture (mini-lecteur…), pas une ouverture.
+        if (!clicsRecus && app == appQuittee && SystemClock.uptimeMillis() - quitteeA < 5000) {
+            noter("  (fenêtre de l'app qu'on vient de quitter : on ne lance rien)")
+            return
+        }
 
         // Si c'est une simple reprise, l'app est déjà prête : version courte.
         afficher(entree, app, dejaPrete = !demarrage)
