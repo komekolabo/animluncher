@@ -29,6 +29,7 @@ class MainActivity : Activity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        noterPositionIcone(intent)
 
         val colonne = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
@@ -144,6 +145,26 @@ class MainActivity : Activity() {
             setBackgroundColor(Color.parseColor("#1B2340"))
             addView(colonne)
         })
+    }
+
+    // TEST : OÙ EST NOTRE ICÔNE ? Quand on touche une icône, l'écran d'accueil glisse en général,
+    // dans la demande d'ouverture (l'« intent »), le rectangle exact de l'icône touchée à l'écran
+    // (« sourceBounds », en pixels : gauche, haut, droite, bas). C'est ce qui lui sert à faire
+    // grossir l'app depuis l'icône. On l'écrit simplement dans le journal pour vérifier que le
+    // lanceur Samsung le donne bien, et que les chiffres tombent au bon endroit.
+    // Attention : ça ne marche qu'au vrai démarrage de l'écran principal. Si AnimLauncher était
+    // encore ouverte en arrière-plan, Android la ramène sans nouvelle demande, donc sans rectangle.
+    private fun noterPositionIcone(demande: Intent?) {
+        val r = demande?.sourceBounds
+        val ecran = resources.displayMetrics
+        if (r == null) {
+            Journal.noter(this, "position de l'icône : non transmise par l'écran d'accueil")
+        } else {
+            Journal.noter(this, "position de l'icône : gauche ${r.left}, haut ${r.top}, " +
+                "droite ${r.right}, bas ${r.bottom} (taille ${r.width()} x ${r.height()}) " +
+                "sur un écran de ${ecran.widthPixels} x ${ecran.heightPixels}")
+        }
+        Journal.programmerEnvoi(this)
     }
 
     override fun onResume() {
