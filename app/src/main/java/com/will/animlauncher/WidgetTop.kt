@@ -271,6 +271,7 @@ object WidgetTop {
     // On arrive sur l'écran d'accueil : on met le widget à jour si besoin, et l'animation commence.
     fun surAccueil(contexte: Context) {
         val c = contexte.applicationContext
+        WidgetDossier.surAccueil(c)               // les autres dossiers (pages de 9 apps, voir WidgetDossier.kt)
         minuteur.post {
             if (enMarche) return@post
             enMarche = true
@@ -282,6 +283,7 @@ object WidgetTop {
 
     // On quitte l'accueil (ou l'écran s'éteint) : on arrête tout, pour ne pas user la batterie.
     fun pause() {
+        WidgetDossier.pause()
         minuteur.post {
             enMarche = false
             minuteur.removeCallbacksAndMessages(JETON)

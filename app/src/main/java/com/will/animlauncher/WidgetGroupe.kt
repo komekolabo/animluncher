@@ -68,6 +68,10 @@ class WidgetGroupe : AppWidgetProvider() {
                 WidgetTop.demander(c, forcer = true)
                 return WidgetTop.base(c, id, groupe)
             }
+            // LES AUTRES DOSSIERS (10/11) : la boucle avec les VRAIES icônes des apps (voir WidgetDossier.kt).
+            // Ses images sont dessinées à part et arrivent un instant après ; en attendant (ou si le dessin
+            // échoue), le widget montre l'ancienne animation de l'étoile, préparée juste en dessous.
+            WidgetDossier.demander(c, groupe, forcer = true)
             val v = RemoteViews(c.packageName, R.layout.widget_groupe)
             v.setTextViewText(R.id.widget_groupe_nom, Groupes.categorie(groupe)?.nom ?: "?")
             // LA COULEUR CHOISIE (roue du dossier) : on « teinte » le galet et l'étoile animée.
@@ -105,6 +109,13 @@ class WidgetGroupe : AppWidgetProvider() {
             val carnet = c.getSharedPreferences(CARNET, Context.MODE_PRIVATE)
             return AppWidgetManager.getInstance(c).getAppWidgetIds(ComponentName(c, WidgetGroupe::class.java))
                 .filter { (carnet.getString("groupe_$it", "ia") ?: "ia") == groupe }.toIntArray()
+        }
+
+        // Les groupes qui ont au moins un widget posé sur l'accueil.
+        fun groupesPoses(c: Context): Set<String> {
+            val carnet = c.getSharedPreferences(CARNET, Context.MODE_PRIVATE)
+            return AppWidgetManager.getInstance(c).getAppWidgetIds(ComponentName(c, WidgetGroupe::class.java))
+                .map { carnet.getString("groupe_$it", "ia") ?: "ia" }.toSet()
         }
 
         // Repeint tous les widgets posés pour ce groupe (après un changement de couleur dans le dossier).
