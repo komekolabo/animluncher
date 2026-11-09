@@ -2,6 +2,7 @@ package com.will.animlauncher
 
 import android.accessibilityservice.AccessibilityService
 import android.content.Context
+import android.content.Intent
 import android.graphics.Canvas
 import android.graphics.Color
 import android.graphics.LinearGradient
@@ -17,6 +18,7 @@ import android.os.Handler
 import android.os.Looper
 import android.os.SystemClock
 import android.view.Gravity
+import android.view.MotionEvent
 import android.view.View
 import android.view.WindowManager
 import android.view.accessibility.AccessibilityEvent
@@ -186,6 +188,8 @@ class IconeVivante(private val service: AccessibilityService) {
     // Doit-on afficher le logo vivant maintenant ?
     private fun evaluer(raison: String) {
         if (!surAccueil) return
+        // un changement de page est en cours : c'est la fin du défilement qui décidera
+        if (SystemClock.uptimeMillis() - defileA < 450) return
         if (!Reglages.actif(service)) return pas("animations coupées (interrupteur général)")
         if (!IconeAccueil.actif(service)) return pas("interrupteur de l'essai coupé")
         val r = IconeAccueil.rect(service)
@@ -225,23 +229,30 @@ class IconeVivante(private val service: AccessibilityService) {
     }
 
     private fun montrer(r: Rect, raison: String) {
-        // Le rectangle reçu contient l'icône ET son nom écrit dessous. On vise le carré de l'icône :
-        // centré en largeur, et son centre à 40 % de la hauteur. On le fait un tout petit peu plus grand
-        // que la vraie icône (72 % de la largeur de la case) pour bien la recouvrir. (78 % : trop grand,
-        // vu sur la capture du 09/11 : environ 194 pixels pour une icône d'environ 172.)
-        val cote = (r.width() * 0.72f).toInt()
+        // Le rectangle reçu contient l'icône ET son nom écrit dessous. Mesuré sur la capture du 09/11
+        // (case de 249 x 290) : l'icône fait 70 % de la largeur de la case, elle est centrée en
+        // largeur, et son centre est à 42,5 % de la hauteur. Notre fenêtre déborde de MARGE pixels de
+        // chaque côté pour bien recouvrir la vraie icône (le dessin, lui, garde la taille exacte).
+        val icone = (r.width() * 0.70f).toInt()
+        val cote = icone + 2 * VueIconeVivante.MARGE
         val cx = r.centerX()
-        val cy = r.top + (r.height() * 0.40f).toInt()
+        val cy = r.top + (r.height() * 0.425f).toInt()
         val x = cx - cote / 2
         val y = cy - cote / 2
         val dejaLa = vue != null
         if (vue == null) {
             val v = VueIconeVivante(service)
+            v.auToucher = { e -> toucher(e, r) }
             val p = WindowManager.LayoutParams(
                 cote, cote,
                 WindowManager.LayoutParams.TYPE_ACCESSIBILITY_OVERLAY,
-                // laisse passer les appuis, ne prend pas le clavier, coordonnées de tout l'écran
-                WindowManager.LayoutParams.FLAG_NOT_TOUCHABLE or
+                // NOT_TOUCH_MODAL : les appuis AILLEURS que sur le logo vont à l'écran d'accueil, comme
+                // d'habitude. WATCH_OUTSIDE_TOUCH : mais on est PRÉVENU dès qu'un doigt se pose ailleurs
+                // (avant même que la page commence à bouger) : on cache le logo tout de suite.
+                // (Avant, on attendait le signal de défilement, qui arrive trop tard : on voyait le logo
+                // une demi-seconde sur l'autre page.) Pas de clavier, coordonnées de tout l'écran.
+                WindowManager.LayoutParams.FLAG_NOT_TOUCH_MODAL or
+                    WindowManager.LayoutParams.FLAG_WATCH_OUTSIDE_TOUCH or
                     WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE or
                     WindowManager.LayoutParams.FLAG_LAYOUT_IN_SCREEN or
                     WindowManager.LayoutParams.FLAG_LAYOUT_NO_LIMITS,
@@ -272,6 +283,53 @@ class IconeVivante(private val service: AccessibilityService) {
         if (!dejaLa) noter("  (icône vivante affichée en $x, $y, côté $cote : $raison)")
     }
 
+    // LES APPUIS. Le logo est posé sur l'icône : c'est lui qui reçoit les doigts posés dessus.
+    //  - un doigt posé AILLEURS (« outside ») : on cache le logo tout de suite ; s'il ne se passe
+    //    rien de spécial, il revient 0,9 s plus tard ;
+    //  - un appui court SUR le logo : on ouvre AnimLauncher nous-mêmes (comme l'aurait fait l'icône) ;
+    //  - un appui long ou un glissé SUR le logo : on le retire, pour que tu puisses refaire le geste
+    //    sur la vraie icône dessous (la déplacer, changer de page…).
+    private var appuiA = 0L
+    private var appuiX = 0f
+    private var appuiY = 0f
+    // (On retire la fenêtre avec « post » : juste APRÈS avoir fini de traiter le doigt, car retirer une
+    // fenêtre pendant qu'Android lui envoie un appui peut le faire planter.)
+    private fun toucher(e: MotionEvent, r: Rect): Boolean {
+        when (e.actionMasked) {
+            MotionEvent.ACTION_OUTSIDE -> {
+                minuteur.post { cacher("doigt posé ailleurs") }
+                minuteur.postDelayed({ evaluer("après un appui ailleurs") }, 900)
+            }
+            MotionEvent.ACTION_DOWN -> {
+                appuiA = SystemClock.uptimeMillis(); appuiX = e.rawX; appuiY = e.rawY
+                val ici = appuiA
+                minuteur.postDelayed({ if (appuiA == ici) { appuiA = 0L; cacher("appui long sur le logo") } }, 450)
+            }
+            MotionEvent.ACTION_MOVE -> {
+                if (appuiA != 0L && (abs(e.rawX - appuiX) > 30 || abs(e.rawY - appuiY) > 30)) {
+                    appuiA = 0L; minuteur.post { cacher("glissé depuis le logo") }
+                }
+            }
+            MotionEvent.ACTION_UP -> {
+                if (appuiA != 0L) {
+                    appuiA = 0L
+                    minuteur.post { ouvrirAnimLauncher(r) }
+                }
+            }
+            MotionEvent.ACTION_CANCEL -> appuiA = 0L
+        }
+        return true
+    }
+
+    // Ouvre AnimLauncher comme si on avait touché son icône (on transmet aussi le rectangle de l'icône).
+    private fun ouvrirAnimLauncher(r: Rect) {
+        cacher("ouverture d'AnimLauncher")
+        val intention = service.packageManager.getLaunchIntentForPackage(service.packageName) ?: return
+        intention.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+        intention.sourceBounds = Rect(r)
+        try { service.startActivity(intention) } catch (e: Exception) { noter("ERREUR ouverture : ${e.message}") }
+    }
+
     // On retire la fenêtre (plutôt que la cacher) : rien ne tourne quand elle n'est pas là.
     // « pourquoi » : noté dans le journal (les 15 premières fois), pour comprendre ce qui la retire.
     private var notesRetrait = 0
@@ -291,6 +349,14 @@ class IconeVivante(private val service: AccessibilityService) {
 // LE DESSIN : le logo « Étincelle halo » qui lévite doucement, et dont le triangle fait
 // de temps en temps un tiers de tour (120 degrés : il retombe pile sur la même forme).
 class VueIconeVivante(context: Context) : View(context) {
+
+    companion object {
+        const val MARGE = 3      // pixels de débordement autour de la vraie icône (pour bien la couvrir)
+    }
+
+    // Ce qu'on fait quand un doigt touche (ou se pose ailleurs) : réglé par IconeVivante.
+    var auToucher: ((MotionEvent) -> Boolean)? = null
+    override fun onTouchEvent(event: MotionEvent): Boolean = auToucher?.invoke(event) ?: false
 
     private val debut = SystemClock.uptimeMillis()
     private val fond = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = context.getColor(R.color.logo_fond) }
@@ -329,9 +395,9 @@ class VueIconeVivante(context: Context) : View(context) {
         c.drawRoundRect(carre, cote * 0.32f, cote * 0.32f, fond)
 
         // 2) on passe dans la grille 108 x 108 de l'icône. La partie visible d'une icône Android
-        //    fait 72 de large ; notre fenêtre est ~5 % plus grande que l'icône, d'où 72 x 1,05.
+        //    fait 72 de large, et elle occupe toute la vraie icône (la fenêtre moins ses marges).
         c.save()
-        val k = cote / (72f * 1.05f)
+        val k = (cote - 2 * MARGE) / 72f
         c.translate(cote / 2f, cote / 2f)
         c.scale(k, k)
         c.translate(-54f, -54f)
