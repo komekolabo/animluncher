@@ -334,6 +334,10 @@ class AppWatcherService : AccessibilityService() {
             afficher(lancement, app, dejaPrete = false)
             return
         }
+        if (demarrage && app == refuseeApp && SystemClock.uptimeMillis() - refuseeA < 300) {
+            refuseeApp = null
+            noter("  (écran de démarrage, mais $app l'affiche à chaque fois : impossible de savoir si elle était fermée)")
+        }
         // Un appui sur l'accueil qui n'était pas une icône (sans doute un widget qu'on n'a pas su
         // reconnaître) juste avant que l'app arrive : l'utilisateur l'a ouverte exprès -> animation,
         // même si elle était déjà ouverte en arrière-plan.
