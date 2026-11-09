@@ -27,8 +27,9 @@ import kotlin.math.floor
 //  │ ┌──────────────────────┐ ┌─ │
 //  │ │ 01                   │ │   │   3 GRANDES CARTES qu'on fait glisser du doigt :
 //  │ │     (animation)      │ │   │   1. Animations d'apps  2. Logos animés  3. Fonds d'écran
-//  │ │ Titre                │ │   │   Chacune : numéro, animation, titre, phrase, chiffre, bouton.
-//  │ │ [   bouton blanc   ] │ │   │   Le bord de la carte suivante dépasse : on comprend qu'on peut glisser.
+//  │ │ Titre                │ │   │   Chacune : numéro, animation, titre, phrase, chiffre.
+//  │ │ chiffre           (→)│ │   │   Un appui N'IMPORTE OÙ sur la carte ouvre sa partie.
+//  │ │                      │ │   │   Le bord de la carte suivante dépasse : on comprend qu'on peut glisser.
 //  │ └──────────────────────┘ └─ │
 //  │          ━  •  •             │   les points (on peut appuyer dessus)
 //  │   ( Animations ON  [●] )     │   l'interrupteur général (le kill switch)
@@ -211,7 +212,9 @@ class MainActivity : Activity() {
 
     // Le cadre commun d'une carte : un rectangle très arrondi, un léger dégradé, un fin contour.
     // « clipToOutline » : ce qui dépasse (les animations) est coupé selon l'arrondi.
-    private fun cadre(lueur: Int): FrameLayout = FrameLayout(this).apply {
+    // TOUTE la carte est un bouton : un appui n'importe où lance « action » (plus de bouton blanc).
+    // Glisser le doigt, lui, fait toujours défiler les cartes : Android fait la différence tout seul.
+    private fun cadre(lueur: Int, nom: String, action: () -> Unit): FrameLayout = FrameLayout(this).apply {
         background = GradientDrawable(GradientDrawable.Orientation.TOP_BOTTOM,
             intArrayOf(lueur, Color.rgb(11, 11, 13))).apply {
             gradientType = GradientDrawable.RADIAL_GRADIENT
@@ -222,33 +225,47 @@ class MainActivity : Activity() {
         }
         outlineProvider = ViewOutlineProvider.BACKGROUND
         clipToOutline = true
+        // l'effet d'appui d'Android (une onde discrète), posé PAR-DESSUS le contenu de la carte
+        val a = obtainStyledAttributes(intArrayOf(android.R.attr.selectableItemBackground))
+        foreground = a.getDrawable(0)
+        a.recycle()
+        contentDescription = nom          // ce que lit un lecteur d'écran
+        isClickable = true
+        setOnClickListener { action() }
     }
 
     // Le numéro en haut à gauche (01, 02, 03).
     private fun numero(n: String) = Style.texte(this, n, 12f, Style.MUET, gras = true).apply { letterSpacing = 0.12f }
 
-    // Le bas d'une carte : titre (sur 2 lignes), phrase, chiffre, bouton blanc.
-    private fun texteBas(titre: String, phrase: String, chiffre: TextView, bouton: String, action: () -> Unit): LinearLayout =
+    // Le bas d'une carte : titre (sur 2 lignes), phrase, puis une ligne avec le chiffre à gauche
+    // et une petite flèche ronde à droite (elle rappelle que la carte s'ouvre d'un appui).
+    private fun texteBas(titre: String, phrase: String, chiffre: TextView): LinearLayout =
         LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
-            setPadding(px(24f), 0, px(24f), px(24f))
+            setPadding(px(24f), 0, px(24f), px(22f))
             addView(Style.texte(this@MainActivity, titre, 32f, Style.TEXTE, gras = true).apply { setLineSpacing(0f, 0.95f) })
             addView(Style.texte(this@MainActivity, phrase, 13.5f, Style.MUET).apply {
-                setLineSpacing(0f, 1.15f); setPadding(0, px(8f), 0, px(6f))
+                setLineSpacing(0f, 1.15f); setPadding(0, px(8f), 0, px(10f))
             })
-            addView(chiffre)
-            addView(Style.boutonBlanc(this@MainActivity, bouton, action),
-                LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, px(50f)).apply { topMargin = px(14f) })
+            addView(LinearLayout(this@MainActivity).apply {
+                orientation = LinearLayout.HORIZONTAL
+                gravity = Gravity.CENTER_VERTICAL
+                addView(chiffre, LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f))
+                addView(Style.texte(this@MainActivity, "→", 17f, Style.TEXTE).apply {
+                    gravity = Gravity.CENTER
+                    background = Style.arrondi(this@MainActivity, Color.argb(40, 255, 255, 255), 20f, Color.rgb(63, 63, 70))
+                }, LinearLayout.LayoutParams(px(40f), px(40f)).apply { leftMargin = px(10f) })
+            })
         }
 
     // Une carte « classique » : numéro en haut, animation au milieu (elle prend la place libre), texte en bas.
-    private fun carteEmpilee(lueur: Int, num: String, animation: View, bas: View): FrameLayout {
+    private fun carteEmpilee(lueur: Int, num: String, nom: String, animation: View, bas: View, action: () -> Unit): FrameLayout {
         val colonne = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
             addView(animation, LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, 0, 1f))
             addView(bas)
         }
-        return cadre(lueur).apply {
+        return cadre(lueur, nom, action).apply {
             addView(colonne)
             addView(numero(num), FrameLayout.LayoutParams(ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT).apply {
                 leftMargin = px(24f); topMargin = px(22f)
@@ -262,9 +279,9 @@ class MainActivity : Activity() {
     private fun carteApps(): FrameLayout {
         demo = DemoAnimations(this)
         chiffreApps = Style.texte(this, "", 12.5f, Style.DOUX)
-        return carteEmpilee(Color.rgb(23, 16, 13), "01", demo,
-            texteBas("Animations\nd'apps", "Une animation plein écran à chaque app que tu ouvres.",
-                chiffreApps, "Gérer les animations") { ouvrir(AppsActivity::class.java) })
+        return carteEmpilee(Color.rgb(23, 16, 13), "01", "Animations d'apps", demo,
+            texteBas("Animations\nd'apps", "Une animation plein écran à chaque app que tu ouvres.", chiffreApps)
+        ) { ouvrir(AppsActivity::class.java) }
     }
 
     // CARTE 2 : logos animés → les dossiers animés (et un lien pour poser le logo sur l'accueil).
@@ -274,8 +291,9 @@ class MainActivity : Activity() {
             addView(DessinGalets(this@MainActivity))
             addView(LogoAnime(this@MainActivity), FrameLayout.LayoutParams(taille, taille, Gravity.CENTER))
         }
-        val lien = Style.texte(this, "Poser le logo animé sur l'accueil ›", 12.5f, Style.DOUX).apply {
-            setPadding(0, px(4f), 0, px(4f))
+        // (ce petit lien a sa propre action : un appui dessus n'ouvre pas la carte)
+        val lien = Style.texte(this, "Poser le logo sur l'accueil ›", 12.5f, Style.DOUX).apply {
+            setPadding(0, px(10f), 0, px(10f))
             setOnClickListener {
                 if (!LogoWidget.proposer(this@MainActivity)) {
                     Toast.makeText(this@MainActivity, "Appuie longuement sur un endroit vide de l'accueil, " +
@@ -283,22 +301,21 @@ class MainActivity : Activity() {
                 }
             }
         }
-        return carteEmpilee(Color.rgb(18, 20, 26), "02", scene,
-            texteBas("Logos\nanimés", "Des icônes vivantes sur ton écran d'accueil : logo, galets d'apps et dossiers.",
-                lien, "Voir les dossiers animés") { ouvrir(GroupesActivity::class.java) })
+        return carteEmpilee(Color.rgb(18, 20, 26), "02", "Logos animés", scene,
+            texteBas("Logos\nanimés", "Des icônes vivantes sur ton écran d'accueil : logo, galets d'apps et dossiers.", lien)
+        ) { ouvrir(GroupesActivity::class.java) }
     }
 
     // CARTE 3 : fonds d'écran. Ici, la carte ENTIÈRE est un fond animé ; le texte est posé
     // par-dessus, sur un dégradé noir pour rester lisible.
     private fun carteFonds(): FrameLayout {
         val chiffre = Style.texte(this, "Bientôt dans l'app, puis la communauté", 12.5f, Style.DOUX)
-        val bas = texteBas("Fonds\nd'écran", "Animés, sombres et légers pour la batterie. Celui-ci en est un.",
-            chiffre, "Voir les fonds d'écran") { ouvrir(FondsActivity::class.java) }.apply {
-            setPadding(px(24f), px(60f), px(24f), px(24f))
+        val bas = texteBas("Fonds\nd'écran", "Animés, sombres et légers pour la batterie. Celui-ci en est un.", chiffre).apply {
+            setPadding(px(24f), px(60f), px(24f), px(22f))
             background = GradientDrawable(GradientDrawable.Orientation.TOP_BOTTOM,
                 intArrayOf(Color.TRANSPARENT, Color.argb(230, 0, 0, 0), Color.argb(230, 0, 0, 0)))
         }
-        return cadre(Color.rgb(3, 3, 4)).apply {
+        return cadre(Color.rgb(3, 3, 4), "Fonds d'écran") { ouvrir(FondsActivity::class.java) }.apply {
             addView(DessinFonds(this@MainActivity))
             addView(numero("03"), FrameLayout.LayoutParams(ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT).apply {
                 leftMargin = px(24f); topMargin = px(22f)
