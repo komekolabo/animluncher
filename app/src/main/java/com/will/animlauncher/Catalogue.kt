@@ -110,7 +110,7 @@ object Catalogue {
         "com.kraken.pay.app" to e(S) { Piece() },
         "com.bankeen" to e(S) { Piles() },
         "eu.epicompany.wero.wallet" to e(S) { Transition(rgb(230, 220, 70)) },   // minimale
-        "zapsolutions.strike" to e(S) { StrikeNoirBlanc() },
+        "zapsolutions.strike" to v(S, STRIKE_VARIANTES) { strike(it) },   // DCA, histoire du bitcoin ou météorite, au hasard
         "com.cakewallet.cake_wallet" to e(S) { Strates() },
         "network.bisq.mobile.node" to e(S) { Echange() },
         "com.btcframe" to e(S) { Facettes() },
