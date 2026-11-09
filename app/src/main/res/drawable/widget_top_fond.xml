@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Le fond du widget « top 3 » : un galet presque noir, visible pendant les fondus entre deux vues. -->
+<shape xmlns:android="http://schemas.android.com/apk/res/android" android:shape="rectangle">
+    <solid android:color="#0A0A0E" />
+    <corners android:radius="17.4dp" />
+</shape>

@@ -61,6 +61,12 @@ class WidgetGroupe : AppWidgetProvider() {
         // Le widget : le nom du groupe, et « un appui = ouvrir le dossier de ce groupe ».
         fun vues(c: Context, id: Int): RemoteViews {
             val groupe = c.getSharedPreferences(CARNET, Context.MODE_PRIVATE).getString("groupe_$id", "ia") ?: "ia"
+            // LE DOSSIER GAMES a son propre widget : l'intro du téléphone puis le top 3 des jeux (voir WidgetTop.kt).
+            // On pose tout de suite sa base (nom + appui), et ses images arrivent une seconde après.
+            if (groupe == WidgetTop.GROUPE) {
+                WidgetTop.demander(c, forcer = true)
+                return WidgetTop.base(c, id, groupe)
+            }
             val v = RemoteViews(c.packageName, R.layout.widget_groupe)
             v.setTextViewText(R.id.widget_groupe_nom, Groupes.categorie(groupe)?.nom ?: "?")
             // LA COULEUR CHOISIE (roue du dossier) : on « teinte » le galet et l'étoile animée.
@@ -78,19 +84,31 @@ class WidgetGroupe : AppWidgetProvider() {
                 v.setColorStateList(R.id.widget_groupe_galet, "setImageTintList", ColorStateList.valueOf(sombre))
                 v.setBlendMode(R.id.widget_groupe_galet, "setImageTintBlendMode", BlendMode.SRC_ATOP)
             }
+            v.setOnClickPendingIntent(R.id.widget_groupe_racine, clic(c, id, groupe))
+            return v
+        }
+
+        // « Un appui sur le widget = ouvrir le dossier de ce groupe ».
+        fun clic(c: Context, id: Int, groupe: String): PendingIntent {
             // NEW_TASK + CLEAR_TASK : le dossier s'ouvre toujours seul, dans sa propre tâche
             // (jamais par-dessus l'écran principal d'AnimLauncher).
             val ouvrir = Intent(c, DossierActivity::class.java).putExtra("groupe", groupe)
                 .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK)
             // MUTABLE (et pas IMMUTABLE) : sinon Android ne peut pas y ajouter la PLACE du widget sur l'écran
             // (« sourceBounds »), et l'étoile du dossier ne sait pas d'où partir ni où revenir (vu le 09/11).
-            v.setOnClickPendingIntent(R.id.widget_groupe_racine, PendingIntent.getActivity(c, id, ouvrir,
-                PendingIntent.FLAG_MUTABLE or PendingIntent.FLAG_UPDATE_CURRENT))
-            return v
+            return PendingIntent.getActivity(c, id, ouvrir, PendingIntent.FLAG_MUTABLE or PendingIntent.FLAG_UPDATE_CURRENT)
+        }
+
+        // Les numéros des widgets posés pour un groupe.
+        fun idsDuGroupe(c: Context, groupe: String): IntArray {
+            val carnet = c.getSharedPreferences(CARNET, Context.MODE_PRIVATE)
+            return AppWidgetManager.getInstance(c).getAppWidgetIds(ComponentName(c, WidgetGroupe::class.java))
+                .filter { (carnet.getString("groupe_$it", "ia") ?: "ia") == groupe }.toIntArray()
         }
 
         // Repeint tous les widgets posés pour ce groupe (après un changement de couleur dans le dossier).
         fun rafraichir(c: Context, groupe: String) {
+            if (groupe == WidgetTop.GROUPE) return      // le widget « top 3 » des jeux ne suit pas (encore) la roue des couleurs
             val gestionnaire = AppWidgetManager.getInstance(c)
             val carnet = c.getSharedPreferences(CARNET, Context.MODE_PRIVATE)
             for (id in gestionnaire.getAppWidgetIds(ComponentName(c, WidgetGroupe::class.java))) {

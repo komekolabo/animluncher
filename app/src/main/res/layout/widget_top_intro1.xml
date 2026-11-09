@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- UNE INTRO du widget « top 3 » (voir WidgetTop.kt) : un folioscope. AnimLauncher y range les images de
+     l'intro du monde n°1, et cette visionneuse les fait défiler toute seule, une toutes les 80 ms. -->
+<ViewFlipper xmlns:android="http://schemas.android.com/apk/res/android"
+    android:id="@+id/top_intro1"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:autoStart="true"
+    android:flipInterval="80" />

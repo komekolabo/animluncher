@@ -1,0 +1,41 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- LE WIDGET « TOP 3 » DU DOSSIER GAMES (09/11, voir WidgetTop.kt). Même gabarit que le widget « dossier
+     animé » : un galet de 62 dp, puis le nom du dossier dessous. Dans le galet, une « visionneuse »
+     (top_scene) : elle montre UNE vue à la fois (une intro ou la carte d'un jeu), avec un fondu entre deux.
+     C'est AnimLauncher qui lui ajoute ses vues, et qui lui dit laquelle montrer. -->
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:id="@+id/top_racine"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:gravity="center"
+    android:orientation="vertical">
+
+    <FrameLayout
+        android:layout_width="62dp"
+        android:layout_height="62dp"
+        android:background="@drawable/widget_top_fond">
+
+        <ViewFlipper
+            android:id="@+id/top_scene"
+            android:layout_width="match_parent"
+            android:layout_height="match_parent"
+            android:inAnimation="@anim/top_entre"
+            android:outAnimation="@anim/top_sort" />
+    </FrameLayout>
+
+    <TextView
+        android:id="@+id/top_nom"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="4dp"
+        android:ellipsize="end"
+        android:fontFamily="sans-serif"
+        android:maxLines="1"
+        android:shadowColor="#99000000"
+        android:shadowDx="0"
+        android:shadowDy="1"
+        android:shadowRadius="3"
+        android:text="Games"
+        android:textColor="#FFFFFF"
+        android:textSize="13sp" />
+</LinearLayout>
