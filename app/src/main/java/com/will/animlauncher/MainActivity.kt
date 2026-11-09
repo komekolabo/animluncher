@@ -3,7 +3,6 @@ package com.will.animlauncher
 import android.app.Activity
 import android.content.Intent
 import android.graphics.Color
-import android.graphics.drawable.Drawable
 import android.graphics.drawable.GradientDrawable
 import android.os.Bundle
 import android.provider.Settings
@@ -49,7 +48,7 @@ class MainActivity : Activity() {
     private val points = ArrayList<View>()
 
     // ce qui change quand on revient sur l'écran
-    private lateinit var dessinApps: DessinApps
+    private lateinit var demo: DemoAnimations      // la démo en boucle de la carte 1 (voir DemoAccueil.kt)
     private lateinit var chiffreApps: TextView
     private lateinit var etat: TextView
     private lateinit var interrupteur: Switch
@@ -202,11 +201,10 @@ class MainActivity : Activity() {
         majAuto = false
         majEtat()
         alerte.visibility = if (serviceActif()) View.GONE else View.VISIBLE
-        // les chiffres et les icônes de la carte 1
+        // les chiffres de la carte 1
         val jouables = appsJouables()
         val avecAnimation = appsAvecAnimation()
         chiffreApps.text = "${jouables.size} actives · ${avecAnimation.size - jouables.size} coupées"
-        dessinApps.icones = jouables.take(5).mapNotNull { icone(it) }
     }
 
     // ================= LES CARTES =================
@@ -259,10 +257,12 @@ class MainActivity : Activity() {
     }
 
     // CARTE 1 : animations d'apps → la liste des apps.
+    // Au centre, la démo : un mini téléphone qui joue en boucle les vraies animations
+    // de Maps, Claude, des échecs, de Duolingo et de ChatGPT (voir DemoAccueil.kt).
     private fun carteApps(): FrameLayout {
-        dessinApps = DessinApps(this)
+        demo = DemoAnimations(this)
         chiffreApps = Style.texte(this, "", 12.5f, Style.DOUX)
-        return carteEmpilee(Color.rgb(23, 16, 13), "01", dessinApps,
+        return carteEmpilee(Color.rgb(23, 16, 13), "01", demo,
             texteBas("Animations\nd'apps", "Une animation plein écran à chaque app que tu ouvres.",
                 chiffreApps, "Gérer les animations") { ouvrir(AppsActivity::class.java) })
     }
@@ -439,9 +439,6 @@ class MainActivity : Activity() {
         e != null && Reglages.appActive(this, app) && Reglages.duree(this, app) != 0 &&
             !(e.variantes.isNotEmpty() && Reglages.variantesDesactivees(this, app).size >= e.variantes.size)
     }
-
-    private fun icone(app: String): Drawable? =
-        try { packageManager.getApplicationIcon(app) } catch (_: Exception) { null }
 
     private fun serviceActif(): Boolean {
         val actifs = Settings.Secure.getString(contentResolver, Settings.Secure.ENABLED_ACCESSIBILITY_SERVICES)
