@@ -8,22 +8,21 @@ import android.content.res.Configuration
 import android.graphics.BlurMaskFilter
 import android.graphics.Canvas
 import android.graphics.Color
-import android.graphics.ComposeShader
-import android.graphics.LinearGradient
 import android.graphics.Paint
-import android.graphics.Path
 import android.graphics.PixelFormat
+import android.graphics.Point
 import android.graphics.PorterDuff
 import android.graphics.PorterDuffXfermode
-import android.graphics.Shader
+import android.hardware.display.DisplayManager
 import android.media.AudioManager
 import android.os.Build
 import android.os.Handler
 import android.os.Looper
 import android.os.SystemClock
+import android.view.Display
+import android.view.Gravity
 import android.view.RoundedCorner
 import android.view.View
-import android.view.ViewGroup
 import android.view.WindowInsets
 import android.view.WindowManager
 import kotlin.math.PI
@@ -42,14 +41,16 @@ import kotlin.math.sin
 // tout, comme le rideau des animations. Elle ne capte aucun appui (on clique « à travers »).
 //   - Elle ne dessine QUE quand de la musique joue (sinon : rien, zéro batterie).
 //   - Elle s'efface en PLEIN ÉCRAN (vidéo, jeu : la barre d'état est cachée) et en mode paysage.
-//   - 4 styles au choix (validés par Will sur aperçu le 10/11) : Aurore, Cordes, Verre liquide, Prisme.
-//     Chacun réagit différemment aux graves, à la mélodie et aux aigus (voir EcouteSon.kt).
-//   - Rien en bas de l'écran : les arcs / lueurs du bas sont réservés aux animations de Claude.
+//   - Un seul dessin, le PRISME (validé par Will sur aperçu le 10/11, à la place des 4 styles d'avant) :
+//     une fine ligne lumineuse qui fait le TOUR COMPLET de l'écran, à 5 dp du bord. La bande entre la
+//     ligne et le bord se remplit de couleur selon le son, et la lumière déborde un peu vers l'intérieur.
+//     Rangé « comme un piano » : graves en bas, mélodie sur les côtés, aigus en haut (voir EcouteSon.kt).
+//   - 2 palettes au choix : CHAUDE (braise -> orange -> or) et FROIDE (violet -> bleu -> turquoise).
 //
-// Le choix (allumé ou non, quel style) est rangé dans un carnet à part, « son ».
+// Le choix (allumé ou non, quelle palette) est rangé dans un carnet à part, « son ».
 object ReactionSonore {
     private const val CARNET = "son"
-    const val STYLES = 4
+    const val STYLES = 2          // 0 = chaud, 1 = froid
 
     private fun carnet(c: Context) = c.applicationContext.getSharedPreferences(CARNET, Context.MODE_PRIVATE)
 
@@ -59,7 +60,7 @@ object ReactionSonore {
         synchroniser(c)
     }
 
-    @Volatile var style = 0          // le style en cours (lu à chaque image par la fenêtre)
+    @Volatile var style = 0          // la palette en cours (0 = chaude, 1 = froide), lue à chaque image
         private set
     fun lireStyle(c: Context): Int = carnet(c).getInt("style", 0).coerceIn(0, STYLES - 1).also { style = it }
     fun definirStyle(c: Context, numero: Int) {
@@ -106,10 +107,30 @@ object ReactionSonore {
         } else retirer()
     }
 
+    // La taille RÉELLE de l'écran, barre de navigation comprise (comme le rideau des animations) :
+    // le tour lumineux doit aussi passer tout en bas.
+    private fun tailleEcran(s: Context): Point {
+        val ecran = (s.getSystemService(Context.DISPLAY_SERVICE) as DisplayManager).getDisplay(Display.DEFAULT_DISPLAY)
+        val taille = Point()
+        @Suppress("DEPRECATION") ecran.getRealSize(taille)
+        return taille
+    }
+
+    // L'écran a tourné ou changé de taille : on remet la fenêtre aux bonnes dimensions.
+    fun ajuster() {
+        val v = vue ?: return
+        val reglages = v.layoutParams as? WindowManager.LayoutParams ?: return
+        val taille = tailleEcran(v.context)
+        if (reglages.width == taille.x && reglages.height == taille.y) return
+        reglages.width = taille.x; reglages.height = taille.y
+        try { (v.context.getSystemService(Context.WINDOW_SERVICE) as WindowManager).updateViewLayout(v, reglages) } catch (_: Exception) {}
+    }
+
     private fun poser(s: Context) {
         val gestionnaire = s.getSystemService(Context.WINDOW_SERVICE) as WindowManager
+        val taille = tailleEcran(s)
         val reglages = WindowManager.LayoutParams(
-            ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT,
+            taille.x, taille.y,
             WindowManager.LayoutParams.TYPE_ACCESSIBILITY_OVERLAY,
             WindowManager.LayoutParams.FLAG_NOT_TOUCHABLE or          // les appuis passent à travers
                 WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE or
@@ -118,9 +139,11 @@ object ReactionSonore {
                 WindowManager.LayoutParams.FLAG_HARDWARE_ACCELERATED,
             PixelFormat.TRANSLUCENT
         )
-        // la fenêtre va jusque sous l'encoche / le poinçon de l'appareil photo
+        reglages.gravity = Gravity.TOP or Gravity.START
+        // la fenêtre va jusque sous l'encoche / le poinçon de l'appareil photo, et sous les barres
         if (Build.VERSION.SDK_INT >= 30) {
             reglages.layoutInDisplayCutoutMode = WindowManager.LayoutParams.LAYOUT_IN_DISPLAY_CUTOUT_MODE_ALWAYS
+            reglages.setFitInsetsTypes(0)
         } else if (Build.VERSION.SDK_INT >= 28) {
             reglages.layoutInDisplayCutoutMode = WindowManager.LayoutParams.LAYOUT_IN_DISPLAY_CUTOUT_MODE_SHORT_EDGES
         }
@@ -144,7 +167,7 @@ object ReactionSonore {
     }
 }
 
-// LA FENÊTRE qui dessine les bords. « View » = un rectangle de l'écran qui sait se dessiner (onDraw).
+// LA FENÊTRE qui dessine le tour lumineux. « View » = un rectangle de l'écran qui sait se dessiner (onDraw).
 class VueSonore(context: Context) : View(context) {
 
     private val d = resources.displayMetrics.density          // 1 dp = d pixels
@@ -165,121 +188,104 @@ class VueSonore(context: Context) : View(context) {
     private var m = 0f                   // médiums (mélodie)
     private var a = 0f                   // aigus
     private var h = 0.5f                 // hauteur de la note
-    private var ressort = 0f             // les graves façon « ressort » (gonfle, dépasse un peu, revient)
-    private var vitesseRessort = 0f
     private var tClaque = -9f            // l'instant du dernier son sec
     private var claque = 0f
 
     // la mémoire des dernières images : permet de demander « combien valaient les graves il y a 0,2 s ? »
-    // (c'est ce qui fait REMONTER une vague le long du bord)
+    // (c'est ce qui fait REMONTER la vague des basses du bas vers le haut, des deux côtés)
     private val memoireG = FloatArray(256)
-    private val memoireR = FloatArray(256)
     private var rang = 0
     private var imagesParSeconde = 60f
 
-    // ---------- les couleurs (grave = doré … aigu = bleu glacé) ----------
-    private val OR = Color.rgb(240, 196, 140)
-    private val ROSE = Color.rgb(222, 125, 165)
-    private val TURQ = Color.rgb(120, 200, 210)
-    private val GLACE = Color.rgb(190, 212, 255)
-    private fun transparent(c: Int) = Color.argb(0, Color.red(c), Color.green(c), Color.blue(c))
+    // ---------- les 2 PALETTES : 4 couleurs, du grave (bas de l'écran) à l'aigu (haut) ----------
+    private val PALETTES = arrayOf(
+        intArrayOf(Color.rgb(255, 96, 64), Color.rgb(255, 150, 72), Color.rgb(255, 200, 120), Color.rgb(255, 232, 205)),   // chaude : braise -> orange -> or -> blanc chaud
+        intArrayOf(Color.rgb(132, 110, 255), Color.rgb(84, 156, 255), Color.rgb(104, 216, 222), Color.rgb(214, 236, 255))  // froide : violet -> bleu -> turquoise -> glace
+    )
 
     // ---------- les pinceaux, créés une seule fois ----------
     private val ajout = PorterDuffXfermode(PorterDuff.Mode.ADD)     // la lumière s'ADDITIONNE (comme de vraies lampes)
-    private val flouLarge = BlurMaskFilter(14f * d, BlurMaskFilter.Blur.NORMAL)
-    private val flouMoyen = BlurMaskFilter(5f * d, BlurMaskFilter.Blur.NORMAL)
+    private val flouLarge = BlurMaskFilter(16f * d, BlurMaskFilter.Blur.NORMAL)
+    private val flouMoyen = BlurMaskFilter(4f * d, BlurMaskFilter.Blur.NORMAL)
     private val flouFin = BlurMaskFilter(2.5f * d, BlurMaskFilter.Blur.NORMAL)
     private val trait = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-        style = Paint.Style.STROKE; strokeCap = Paint.Cap.ROUND; strokeJoin = Paint.Join.ROUND; xfermode = ajout
+        style = Paint.Style.STROKE; strokeCap = Paint.Cap.ROUND; xfermode = ajout
+    }
+    private val bande = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        style = Paint.Style.STROKE; strokeCap = Paint.Cap.BUTT; xfermode = ajout     // bouts carrés : les morceaux se touchent sans se chevaucher
     }
     private val plein = Paint(Paint.ANTI_ALIAS_FLAG).apply { style = Paint.Style.FILL; xfermode = ajout }
-    private val chemin = Path()
-    private val chemin2 = Path()
 
-    // ---------- ce qui dépend de la taille de l'écran ----------
+    // ---------- LE TOUR, découpé en N petits segments (calculé quand la taille de l'écran est connue) ----------
+    private val N = 180
+    private val marge = 5f * d                   // la ligne est à 5 dp du bord ; la BANDE colorée est entre les deux
+    private val lx = FloatArray(N + 1)           // la ligne
+    private val ly = FloatArray(N + 1)
+    private val bx = FloatArray(N + 1)           // le milieu de la bande (à mi-chemin entre la ligne et le bord)
+    private val by = FloatArray(N + 1)
+    private val couleurs = Array(2) { IntArray(N) }      // la couleur de chaque segment, pour chaque palette
+    private val freq = FloatArray(N)                      // où est le segment sur le « piano » : 0 = bas (grave) … 1 = haut (aigu)
+    private val hasard = FloatArray(N) { ((it * 7919) % 101) / 100f }
+    private val intensites = FloatArray(N)
     private var w = 0f
     private var ht = 0f
-    private var y0 = 0f                  // les bords vivent entre y0 (7 % de la hauteur)…
-    private var y1 = 0f                  // …et y1 (83 %) : rien tout en bas
-    private var degrade: Shader? = null          // glacé en haut -> doré en bas, effacé aux deux bouts
-    private var blancDoux: Shader? = null        // blanc, effacé aux deux bouts (le « cœur » des traits)
-    private val voile = arrayOfNulls<Shader>(2)  // un voile coloré qui s'efface en s'éloignant du bord (gauche, droite)
-    private val verre = arrayOfNulls<Shader>(2)
-    private val N = 160                          // le néon du Prisme, découpé en 160 petits segments
-    private val nx = FloatArray(N + 1)
-    private val ny = FloatArray(N + 1)
-    private val couleurSegment = IntArray(N)
-    private val hasard = FloatArray(N) { ((it * 7919) % 101) / 100f }
-
-    // 34 petits éclats pour les aigus : (côté, hauteur, distance au bord en dp, décalage, taille)
-    private val etoiles = Array(34) { i ->
-        val r = java.util.Random(11L + i * 31L)
-        floatArrayOf(r.nextInt(2).toFloat(), 0.04f + 0.51f * r.nextFloat(), 6f + 34f * r.nextFloat(), r.nextFloat(), 2f + 2.5f * r.nextFloat())
-    }
 
     override fun onSizeChanged(largeur: Int, hauteur: Int, ancienneL: Int, ancienneH: Int) {
         w = largeur.toFloat(); ht = hauteur.toFloat()
-        y0 = ht * 0.07f; y1 = ht * 0.83f
-        degrade = LinearGradient(0f, y0, 0f, y1,
-            intArrayOf(transparent(GLACE), GLACE, TURQ, ROSE, OR, transparent(OR)),
-            floatArrayOf(0f, 0.14f, 0.42f, 0.66f, 0.86f, 1f), Shader.TileMode.CLAMP)
-        blancDoux = LinearGradient(0f, y0, 0f, y1,
-            intArrayOf(Color.argb(0, 255, 255, 255), Color.WHITE, Color.WHITE, Color.argb(0, 255, 255, 255)),
-            floatArrayOf(0f, 0.14f, 0.86f, 1f), Shader.TileMode.CLAMP)
-        val couleurs = LinearGradient(0f, y0, 0f, y1, intArrayOf(GLACE, TURQ, ROSE, OR), null, Shader.TileMode.CLAMP)
-        for (cote in 0..1) {
-            val bord = if (cote == 0) 0f else w
-            val sens = if (cote == 0) 1f else -1f
-            // « ComposeShader » combine deux dégradés : les couleurs (de haut en bas) et la transparence (du bord vers l'intérieur)
-            voile[cote] = ComposeShader(couleurs,
-                LinearGradient(bord, 0f, bord + sens * 96f * d, 0f, Color.BLACK, Color.TRANSPARENT, Shader.TileMode.CLAMP),
-                PorterDuff.Mode.DST_IN)
-            verre[cote] = ComposeShader(couleurs,
-                LinearGradient(bord, 0f, bord + sens * 40f * d, 0f, Color.argb(120, 0, 0, 0), Color.argb(14, 0, 0, 0), Shader.TileMode.CLAMP),
-                PorterDuff.Mode.DST_IN)
-        }
-        preparerNeon()
-    }
-
-    // Le trajet du néon du Prisme : il monte le long du bord gauche, suit l'arrondi de l'écran,
-    // traverse le haut, et redescend à droite. (s va de 0 à 1 le long de ce trajet.)
-    private fun preparerNeon() {
-        val marge = 5f * d
-        var coin = 28f * d
+        // l'arrondi des coins de l'écran (Android le connaît depuis la version 12) : la ligne le suit
+        var coin = 40f * d
         if (Build.VERSION.SDK_INT >= 31) {
-            try { display?.getRoundedCorner(RoundedCorner.POSITION_TOP_LEFT)?.let { coin = it.radius.toFloat() } } catch (_: Throwable) {}
+            try { display?.getRoundedCorner(RoundedCorner.POSITION_TOP_LEFT)?.let { if (it.radius > 0) coin = it.radius.toFloat() } } catch (_: Throwable) {}
         }
-        val r = max(coin - marge, 10f * d)
-        val cote = y1 - marge - r
-        val haut = w - 2 * marge - 2 * r
-        val arc = (PI / 2).toFloat() * r
-        val total = 2 * cote + 2 * arc + haut
         for (k in 0..N) {
-            var p = k.toFloat() / N * total
-            if (p < cote) { nx[k] = marge; ny[k] = y1 - p; continue }
-            p -= cote
-            if (p < arc) { val an = PI.toFloat() - p / r; nx[k] = marge + r + r * cos(an); ny[k] = marge + r - r * sin(an); continue }
-            p -= arc
-            if (p < haut) { nx[k] = marge + r + p; ny[k] = marge; continue }
-            p -= haut
-            if (p < arc) { val an = (PI / 2).toFloat() - p / r; nx[k] = w - marge - r + r * cos(an); ny[k] = marge + r - r * sin(an); continue }
-            nx[k] = w - marge; ny[k] = marge + r + (p - arc)
+            val s = k.toFloat() / N
+            pointDuTour(s, marge, coin).let { lx[k] = it[0]; ly[k] = it[1] }
+            pointDuTour(s, marge / 2f, coin).let { bx[k] = it[0]; by[k] = it[1] }
         }
-        for (k in 0 until N) couleurSegment[k] = couleurFrequence(frequenceSegment(k))
+        for (k in 0 until N) {
+            freq[k] = 1f - abs(2f * (k + 0.5f) / N - 1f)
+            for (p in 0..1) couleurs[p][k] = teinte(PALETTES[p], freq[k])
+        }
     }
-    // Où est ce segment sur le « piano » ? 0 = bas des côtés (grave) … 1 = milieu du haut (aigu)
-    private fun frequenceSegment(k: Int): Float = 1f - abs(2f * (k + 0.5f) / N - 1f)
 
+    // Un point du tour, à « m » pixels du bord. s = 0 : en bas au milieu ; on monte par la GAUCHE,
+    // s = 0,5 : en haut au milieu ; on redescend par la DROITE ; s = 1 : retour en bas au milieu.
+    // Le tour est fait de 9 morceaux : demi-bas, coin, côté, coin, haut, coin, côté, coin, demi-bas.
+    private fun pointDuTour(s: Float, m: Float, coin: Float): FloatArray {
+        val r = max(coin - m, 4f * d)
+        val demiBas = w / 2f - m - r
+        val cote = ht - 2f * m - 2f * r
+        val arc = (PI / 2).toFloat() * r
+        val longueurs = floatArrayOf(demiBas, arc, cote, arc, 2f * demiBas, arc, cote, arc, demiBas)
+        var reste = s.coerceIn(0f, 1f) * longueurs.sum()
+        var i = 0
+        while (i < 8 && reste > longueurs[i]) { reste -= longueurs[i]; i++ }
+        val f = if (longueurs[i] > 0f) reste / longueurs[i] else 0f
+        val demiPi = (PI / 2).toFloat()
+        return when (i) {
+            0 -> floatArrayOf(w / 2f - f * demiBas, ht - m)
+            1 -> { val an = demiPi + f * demiPi; floatArrayOf(m + r + r * cos(an), ht - m - r + r * sin(an)) }
+            2 -> floatArrayOf(m, ht - m - r - f * cote)
+            3 -> { val an = PI.toFloat() + f * demiPi; floatArrayOf(m + r + r * cos(an), m + r + r * sin(an)) }
+            4 -> floatArrayOf(m + r + f * 2f * demiBas, m)
+            5 -> { val an = 3f * demiPi + f * demiPi; floatArrayOf(w - m - r + r * cos(an), m + r + r * sin(an)) }
+            6 -> floatArrayOf(w - m, m + r + f * cote)
+            7 -> { val an = f * demiPi; floatArrayOf(w - m - r + r * cos(an), ht - m - r + r * sin(an)) }
+            else -> floatArrayOf(w - m - r - f * demiBas, ht - m)
+        }
+    }
+
+    // La couleur d'une palette à une position 0..1 (on glisse doucement d'une couleur à la suivante).
+    private fun teinte(pal: IntArray, f: Float): Int {
+        val x = f.coerceIn(0f, 0.999f) * 3f
+        val i = x.toInt()
+        return melange(pal[i], pal[i + 1], x - i)
+    }
     private fun melange(c1: Int, c2: Int, k: Float): Int {
         val x = k.coerceIn(0f, 1f)
         return Color.rgb((Color.red(c1) + (Color.red(c2) - Color.red(c1)) * x).toInt(),
             (Color.green(c1) + (Color.green(c2) - Color.green(c1)) * x).toInt(),
             (Color.blue(c1) + (Color.blue(c2) - Color.blue(c1)) * x).toInt())
-    }
-    private fun couleurFrequence(f: Float): Int = when {
-        f < 0.33f -> melange(OR, ROSE, f / 0.33f)
-        f < 0.66f -> melange(ROSE, TURQ, (f - 0.33f) / 0.33f)
-        else -> melange(TURQ, GLACE, (f - 0.66f) / 0.34f)
     }
 
     // ---------- quand jouer ? (vérifié une fois par seconde) ----------
@@ -366,7 +372,8 @@ class VueSonore(context: Context) : View(context) {
 
     override fun onConfigurationChanged(nouvelle: Configuration?) {
         super.onConfigurationChanged(nouvelle)
-        verifier()                                                   // l'écran vient peut-être de tourner
+        ReactionSonore.ajuster()                                     // l'écran a peut-être tourné : nouvelle taille
+        verifier()
     }
 
     // ---------- petits outils de calcul ----------
@@ -374,49 +381,23 @@ class VueSonore(context: Context) : View(context) {
         val e = (x - centre) / largeur
         return exp(-e * e)
     }
-    // s'efface en haut et en bas (« max(0…) » : sin(π) peut tomber un cheveu sous 0, et la puissance d'un négatif n'existe pas)
-    private fun bordsDoux(u: Float): Float = max(0f, sin(PI.toFloat() * u.coerceIn(0f, 1f))).pow(0.7f)
-    private fun ilYA(memoire: FloatArray, secondes: Float): Float {
+    private fun ilYA(secondes: Float): Float {
         val images = (secondes * imagesParSeconde).toInt().coerceIn(0, 255)
-        return memoire[(rang - images) and 255]
+        return memoireG[(rang - images) and 255]
     }
     private fun opacite(x: Float): Int = (x * presence * 255f).toInt().coerceIn(0, 255)
 
-    // Un TRAIT DE LUMIÈRE : grand halo + halo serré + trait + cœur presque blanc.
-    private fun lumiere(c: Canvas, p: Path, shader: Shader?, couleur: Int, epaisseur: Float, force: Float, coeur: Boolean = true) {
-        trait.shader = shader
-        trait.color = couleur
-        trait.strokeWidth = epaisseur * 9f * d; trait.maskFilter = flouLarge; trait.alpha = opacite(0.12f * force); c.drawPath(p, trait)
-        trait.strokeWidth = epaisseur * 4f * d; trait.maskFilter = flouMoyen; trait.alpha = opacite(0.26f * force); c.drawPath(p, trait)
-        trait.strokeWidth = epaisseur * d; trait.maskFilter = null; trait.alpha = opacite(0.95f * force); c.drawPath(p, trait)
-        if (coeur) {
-            trait.shader = blancDoux; trait.color = Color.WHITE
-            trait.strokeWidth = epaisseur * 0.4f * d; trait.alpha = opacite(0.5f * force); c.drawPath(p, trait)
-        }
-        trait.shader = null
-    }
-
-    // Un petit ÉCLAT en étoile à 4 branches.
+    // Un petit ÉCLAT en étoile à 4 branches (sur les aigus).
     private fun eclat(c: Canvas, x: Float, y: Float, taille: Float, force: Float, couleur: Int) {
         if (force * presence < 0.02f) return
-        plein.shader = null; plein.color = couleur
+        plein.color = couleur
         plein.maskFilter = flouFin; plein.alpha = opacite(force * 0.6f); c.drawCircle(x, y, taille * 0.6f * d, plein)
         plein.maskFilter = null
-        trait.shader = null; trait.maskFilter = null; trait.color = couleur
+        trait.maskFilter = null; trait.color = couleur
         trait.strokeWidth = 0.8f * d; trait.alpha = opacite(force)
         c.drawLine(x - taille * d, y, x + taille * d, y, trait)
         c.drawLine(x, y - taille * d, x, y + taille * d, trait)
         plein.color = Color.WHITE; plein.alpha = opacite(force); c.drawCircle(x, y, 0.9f * d, plein)
-    }
-
-    // Les aigus : les éclats s'allument tour à tour, plutôt en haut des bords.
-    private fun scintiller(c: Canvas, portee: Float) {
-        if (a < 0.03f) return
-        for (e in etoiles) {
-            val onde = max(0f, sin(t * 1.7f + e[3] * 40f))
-            val x = if (e[0] < 0.5f) e[2] * portee * d else w - e[2] * portee * d
-            eclat(c, x, y0 + (y1 - y0) * e[1], e[4], a * onde * onde * 0.9f, GLACE)
-        }
     }
 
     // ---------- UNE IMAGE ----------
@@ -440,191 +421,70 @@ class VueSonore(context: Context) : View(context) {
         m += (EcouteSon.medium - m) * min(1f, dt * (if (EcouteSon.medium > m) 25f else 5f))
         a += (EcouteSon.aigu - a) * min(1f, dt * (if (EcouteSon.aigu > a) 40f else 12f))
         h += (EcouteSon.hauteur - h) * min(1f, dt * 8f)
-        // le ressort : il court après les graves avec de l'élan (formule d'un ressort amorti)
-        vitesseRessort += (170f * (g - ressort) - 13f * vitesseRessort) * dt
-        ressort = (ressort + vitesseRessort * dt).coerceIn(0f, 1.3f)
         // un son sec : on retient l'instant (au plus un toutes les 0,25 s)
         if (EcouteSon.claque > 0.5f && t - tClaque > 0.25f) tClaque = t
         claque = exp(-(t - tClaque) / 0.14f)
         rang = (rang + 1) and 255
         memoireG[rang] = g
-        memoireR[rang] = ressort
 
-        when (ReactionSonore.style) {
-            1 -> cordes(c)
-            2 -> verreLiquide(c)
-            3 -> prisme(c)
-            else -> aurore(c)
-        }
+        prisme(c, couleurs[ReactionSonore.style.coerceIn(0, 1)], PALETTES[ReactionSonore.style.coerceIn(0, 1)][3])
         postInvalidateOnAnimation()                  // … et on demande l'image suivante
     }
 
-    // ================= 1. AURORE =================
-    // Un rideau de lumière collé à chaque bord. Graves : il gonfle depuis le bas, et la vague remonte.
-    // Mélodie : une avancée de lumière à la hauteur de la note. Aigus : des éclats.
-    private fun aurore(c: Canvas) {
-        for (cote in 0..1) {
-            val bord = if (cote == 0) 0f else w
-            val sens = if (cote == 0) 1f else -1f
-            chemin.rewind(); chemin.moveTo(bord, y0)
-            for (k in 0..80) {
-                val u = k / 80f
-                val plis = 0.5f + 0.5f * sin(u * 17f + t * 0.7f + 2f * sin(u * 5f - t * 0.4f) + cote * 1.7f)
-                val vague = ilYA(memoireG, (1f - u) * 0.30f)                   // la basse part du bas
-                val note = m * cloche(u, 0.78f - 0.55f * h, 0.07f)
-                val longueur = (14f + 70f * plis * (0.25f + 0.75f * vague) + 34f * note) * d * bordsDoux(u)
-                chemin.lineTo(bord + sens * longueur, y0 + (y1 - y0) * u)
-            }
-            chemin.lineTo(bord, y1); chemin.close()
-            plein.shader = voile[cote]
-            plein.maskFilter = flouLarge; plein.alpha = opacite(0.30f + 0.30f * g); c.drawPath(chemin, plein)
-            plein.maskFilter = flouMoyen; plein.alpha = opacite(0.34f + 0.40f * g); c.drawPath(chemin, plein)
-            plein.maskFilter = null; plein.shader = null
-            // le liseré au ras du bord
-            chemin2.rewind(); chemin2.moveTo(bord + sens * 1.5f * d, y0); chemin2.lineTo(bord + sens * 1.5f * d, y1)
-            lumiere(c, chemin2, degrade, Color.WHITE, 1f, 0.35f + 0.45f * g, coeur = false)
-        }
-        scintiller(c, 1f)
-    }
-
-    // ================= 2. CORDES =================
-    // Trois cordes tendues le long de chaque bord, comme une harpe. La grosse (dorée) vibre large sur
-    // les graves ; la moyenne (turquoise) sur la mélodie, avec plus de « ventres » quand la note monte ;
-    // la fine (glacée) frémit sur les aigus. Un son sec fait filer un éclat rose.
-    private fun cordes(c: Canvas) {
-        val ya = y0 + 10f * d
-        val yb = y1 - 10f * d
-        for (cote in 0..1) {
-            for (n in 0..2) {
-                val distance = floatArrayOf(10f, 20f, 28f)[n]
-                val epaisseur = floatArrayOf(1.7f, 1.2f, 0.8f)[n]
-                val couleur = intArrayOf(OR, TURQ, GLACE)[n]
-                val force = min(1f, floatArrayOf(ressort, m, a)[n])
-                val ventres = floatArrayOf(1f, 2f + h * 5f, 13f)[n]
-                val vitesse = floatArrayOf(2.6f, 4.3f, 8f)[n]
-                val amplitude = floatArrayOf(11f, 6.5f, 2.6f)[n] * d * force
-                val phase = cos(t * vitesse * 2f * PI.toFloat() + cote * 1.1f)
-                // le « fuseau » : toute la zone balayée par la corde (le flou d'une vraie corde qui vibre)
-                chemin.rewind(); chemin2.rewind()
-                for (k in 0..60) {
-                    val u = k / 60f
-                    val ecart = amplitude * sin(PI.toFloat() * u * ventres + n) * max(0f, sin(PI.toFloat() * u)).pow(0.6f)
-                    val y = ya + (yb - ya) * u
-                    val xGauche = distance * d + ecart
-                    val xCorde = distance * d + ecart * phase
-                    if (k == 0) { chemin.moveTo(if (cote == 0) xGauche else w - xGauche, y); chemin2.moveTo(if (cote == 0) xCorde else w - xCorde, y) }
-                    else { chemin.lineTo(if (cote == 0) xGauche else w - xGauche, y); chemin2.lineTo(if (cote == 0) xCorde else w - xCorde, y) }
-                }
-                for (k in 60 downTo 0) {
-                    val u = k / 60f
-                    val ecart = amplitude * sin(PI.toFloat() * u * ventres + n) * max(0f, sin(PI.toFloat() * u)).pow(0.6f)
-                    val x = distance * d - ecart
-                    chemin.lineTo(if (cote == 0) x else w - x, ya + (yb - ya) * u)
-                }
-                chemin.close()
-                plein.shader = null; plein.color = couleur; plein.maskFilter = null
-                plein.alpha = opacite(0.13f * force); c.drawPath(chemin, plein)
-                lumiere(c, chemin2, null, couleur, epaisseur, 0.30f + 0.75f * force)
-                // les deux attaches de la corde
-                val x = if (cote == 0) distance * d else w - distance * d
-                plein.color = melange(couleur, Color.WHITE, 0.4f); plein.alpha = opacite(0.8f)
-                c.drawCircle(x, ya, 2.2f * d, plein); c.drawCircle(x, yb, 2.2f * d, plein)
-            }
-            val age = t - tClaque
-            if (age < 0.55f) {
-                val u = age / 0.55f
-                val x = if (cote == 0) 20f * d else w - 20f * d
-                eclat(c, x, yb - (yb - ya) * u * u * (3f - 2f * u), 5f, max(0f, sin(PI.toFloat() * u)).pow(0.7f) * 0.9f, ROSE)
-            }
-        }
-    }
-
-    // ================= 3. VERRE LIQUIDE =================
-    // Le bord devient une matière souple. Graves : de grosses bosses qui gonflent comme un ressort.
-    // Mélodie : une bosse à la hauteur de la note. Aigus : de fines rides qui courent dessus.
-    private val centresBosses = floatArrayOf(0.24f, 0.52f, 0.80f)
-    private val forcesBosses = floatArrayOf(0.85f, 1f, 0.8f)
-    private fun tracerVerre(p: Path, cote: Int, echelle: Float, retard: Float, fermer: Boolean) {
-        val bord = if (cote == 0) 0f else w
-        p.rewind()
-        if (fermer) p.moveTo(bord, y0)
-        for (k in 0..120) {
-            val u = k / 120f
-            var x = 0f
-            for (i in 0..2) {
-                val centre = centresBosses[i] + 0.05f * sin(t * 0.5f + i * 2f + cote * 1.3f)
-                x += 26f * forcesBosses[i] * ilYA(memoireR, i * 0.07f + cote * 0.035f + retard) * cloche(u, centre, 0.115f)
-            }
-            x += 14f * m * cloche(u, 0.85f - 0.7f * h, 0.05f)
-            x += 1.8f * a * sin(u * 150f - t * 24f) * (0.3f + 0.7f * (1f - u))
-            x += 6f * claque * cloche(u, 0.12f, 0.07f)
-            x = (3f + x * echelle) * bordsDoux(u) * d
-            val y = y0 + (y1 - y0) * u
-            if (k == 0 && !fermer) p.moveTo(if (cote == 0) x else w - x, y) else p.lineTo(if (cote == 0) x else w - x, y)
-        }
-        if (fermer) { p.lineTo(bord, y1); p.close() }
-    }
-    private fun verreLiquide(c: Canvas) {
-        for (cote in 0..1) {
-            tracerVerre(chemin, cote, 1f, 0f, fermer = true)                  // l'intérieur : du verre teinté
-            plein.shader = verre[cote]; plein.maskFilter = null; plein.alpha = opacite(1f); c.drawPath(chemin, plein)
-            plein.shader = null
-            tracerVerre(chemin2, cote, 0.55f, 0.05f, fermer = false)          // un second fil, en retard : l'épaisseur du verre
-            trait.shader = degrade; trait.color = Color.WHITE; trait.maskFilter = null
-            trait.strokeWidth = 0.8f * d; trait.alpha = opacite(0.30f); c.drawPath(chemin2, trait)
-            tracerVerre(chemin2, cote, 1f, 0f, fermer = false)                // le liseré lumineux
-            lumiere(c, chemin2, degrade, Color.WHITE, 1.2f, 0.55f + 0.45f * min(1f, ressort))
-        }
-        scintiller(c, 0.7f)
-    }
-
-    // ================= 4. PRISME =================
-    // Un fin néon fait le tour par les côtés et le haut, rangé comme un piano : graves en bas des côtés
-    // (doré), mélodie au milieu (rose, turquoise), aigus tout en haut (glacé). Chaque son allume SA zone,
-    // et la basse remonte les côtés comme une vague.
-    private val intensites = FloatArray(160)
-    private fun prisme(c: Canvas) {
+    // ================= LE PRISME, TOUR COMPLET =================
+    private fun prisme(c: Canvas, coul: IntArray, eclatCouleur: Int) {
+        // 1) LA FORCE de chaque segment, selon sa place sur le « piano »
         for (k in 0 until N) {
-            val f = frequenceSegment(k)
-            var i = ilYA(memoireG, f * 0.38f) * max(0f, 1f - f / 0.6f).pow(1.4f)
-            i += m * cloche(f, 0.40f + 0.30f * h, 0.065f)
-            i += 0.8f * claque * cloche(f, 0.80f, 0.06f)
-            i += a * (0.3f + 0.7f * hasard[k]) * max(0f, (f - 0.87f) / 0.13f)
+            val f = freq[k]
+            var i = ilYA(f * 0.42f) * max(0f, 1f - f / 0.62f).pow(1.3f)      // basses : partent du bas et montent des deux côtés
+            i += m * cloche(f, 0.42f + 0.30f * h, 0.065f)                    // mélodie : une zone qui suit la note
+            i += 0.8f * claque * cloche(f, 0.80f, 0.06f)                     // son sec (caisse claire)
+            i += a * (0.3f + 0.7f * hasard[k]) * max(0f, (f - 0.87f) / 0.13f)   // aigus : scintillement tout en haut
             intensites[k] = min(1f, i)
         }
-        trait.shader = null
-        // les halos : par groupes de 4 segments (moins de travail pour le téléphone)
+
+        // 2) LA BANDE entre la ligne et le bord : chaque morceau prend la couleur de sa place,
+        //    plus ou moins forte (et plus claire, vers le blanc) selon le son à cet endroit
+        bande.strokeWidth = marge + 1f
+        for (k in 0 until N) {
+            val i = intensites[k]
+            bande.color = melange(coul[k], Color.WHITE, 0.35f * i * i)
+            bande.alpha = opacite(0.10f + 0.80f * i)
+            c.drawLine(bx[k], by[k], bx[k + 1], by[k + 1], bande)
+        }
+
+        // 3) LE DÉBORDEMENT vers l'intérieur : deux halos flous (par groupes de 4 segments, moins de travail)
         var k = 0
         while (k < N) {
             val i = (intensites[k] + intensites[k + 1] + intensites[k + 2] + intensites[k + 3]) / 4f
-            if (i > 0.06f) {
-                val fondu = min(1f, min((k + 2f) / N / 0.07f, (1f - (k + 2f) / N) / 0.07f))
-                trait.color = couleurSegment[k + 1]
-                trait.maskFilter = flouLarge; trait.strokeWidth = (1f + 2.2f * i) * 5f * d; trait.alpha = opacite(0.5f * i * fondu)
-                c.drawLine(nx[k], ny[k], nx[k + 4], ny[k + 4], trait)
-                trait.maskFilter = flouMoyen; trait.strokeWidth = (1f + 2.2f * i) * 2.2f * d; trait.alpha = opacite(0.6f * i * fondu)
-                c.drawLine(nx[k], ny[k], nx[k + 4], ny[k + 4], trait)
+            if (i > 0.04f) {
+                trait.color = coul[k + 1]
+                trait.maskFilter = flouLarge; trait.strokeWidth = (1f + 2.2f * i) * 5f * d; trait.alpha = opacite(0.55f * (0.14f + 0.86f * i))
+                c.drawLine(lx[k], ly[k], lx[k + 4], ly[k + 4], trait)
+                trait.maskFilter = flouMoyen; trait.strokeWidth = (1f + 2.2f * i) * 2.2f * d; trait.alpha = opacite(0.70f * (0.14f + 0.86f * i))
+                c.drawLine(lx[k], ly[k], lx[k + 4], ly[k + 4], trait)
             }
             k += 4
         }
-        // le néon lui-même, puis son cœur blanc là où il est fort
+
+        // 4) LA LIGNE elle-même, puis son cœur blanc là où elle est forte
         trait.maskFilter = null
         for (s in 0 until N) {
             val i = intensites[s]
-            val fondu = min(1f, min((s + 0.5f) / N / 0.07f, (1f - (s + 0.5f) / N) / 0.07f))
-            trait.color = couleurSegment[s]
-            trait.strokeWidth = (1f + 2.2f * i) * d; trait.alpha = opacite((0.10f + 0.90f * i) * fondu)
-            c.drawLine(nx[s], ny[s], nx[s + 1], ny[s + 1], trait)
+            trait.color = coul[s]
+            trait.strokeWidth = (1f + 2.2f * i) * d; trait.alpha = opacite(0.14f + 0.86f * i)
+            c.drawLine(lx[s], ly[s], lx[s + 1], ly[s + 1], trait)
             if (i > 0.45f) {
-                trait.color = Color.WHITE; trait.strokeWidth = 0.5f * d; trait.alpha = opacite((i - 0.45f) * 0.8f * fondu)
-                c.drawLine(nx[s], ny[s], nx[s + 1], ny[s + 1], trait)
+                trait.color = Color.WHITE; trait.strokeWidth = 0.5f * d; trait.alpha = opacite((i - 0.45f) * 0.8f)
+                c.drawLine(lx[s], ly[s], lx[s + 1], ly[s + 1], trait)
             }
         }
-        // aigus : quelques éclats posés sur le haut du néon
+
+        // 5) les aigus : quelques éclats posés sur le haut de la ligne
         if (a > 0.03f) for (j in 0..8) {
             val s = (N * (0.40f + 0.20f * ((j * 0.37f + 0.11f) % 1f))).toInt()
             val onde = max(0f, sin(t * 2.3f + j * 5f))
-            eclat(c, nx[s], ny[s], 4.5f, a * onde * onde, GLACE)
+            eclat(c, lx[s], ly[s], 4.5f, a * onde * onde, eclatCouleur)
         }
     }
 }

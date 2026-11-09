@@ -27,7 +27,7 @@ import kotlin.math.min
 import kotlin.math.sin
 
 // LE BOUTON ROND de la réaction sonore (en bas à droite de l'accueil) et SA FENÊTRE d'explication.
-// (Le moteur — la fenêtre posée par-dessus le téléphone et les 4 styles — est dans ReactionSonore.kt.)
+// (Le moteur — la fenêtre posée par-dessus le téléphone et le tour lumineux — est dans ReactionSonore.kt.)
 
 // Le rond : un logo minimaliste (4 barres, comme une onde sonore) et un halo qui « respire » doucement.
 // Quand le mode est allumé et que de la musique joue, les barres dansent avec elle.
@@ -81,8 +81,9 @@ object FenetreSon {
     const val DEMANDE = 4107            // le numéro de notre question « micro » (pour reconnaître la réponse)
     private var ouverte: Dialog? = null
 
-    private val NOMS = intArrayOf(R.string.son_style_1, R.string.son_style_2, R.string.son_style_3, R.string.son_style_4)
-    private val DESCRIPTIONS = intArrayOf(R.string.son_desc_1, R.string.son_desc_2, R.string.son_desc_3, R.string.son_desc_4)
+    // les 2 palettes du Prisme (dans le même ordre que ReactionSonore : 0 = chaude, 1 = froide)
+    private val NOMS = intArrayOf(R.string.son_style_chaud, R.string.son_style_froid)
+    private val DESCRIPTIONS = intArrayOf(R.string.son_desc_chaud, R.string.son_desc_froid)
 
     // Ouvre la fenêtre : elle monte du bas de l'écran.
     fun ouvrir(a: Activity) {
@@ -129,7 +130,7 @@ object FenetreSon {
         if (BuildConfig.STORE) ligne(a.getString(R.string.son_expl_internet), Style.MUET)     // vrai seulement en version Store
         ligne(a.getString(R.string.son_expl_video), Style.MUET, haut = 10f)
 
-        // le choix du style : 4 lignes, un point blanc devant celle qui est choisie
+        // le choix de la palette : 2 lignes, un point blanc devant celle qui est choisie
         colonne.addView(Style.titreCarte(a, a.getString(R.string.son_style)).apply { setPadding(0, px(16f), 0, px(6f)) },
             LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT))
         val points = ArrayList<View>()
