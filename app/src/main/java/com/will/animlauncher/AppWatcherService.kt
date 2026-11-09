@@ -248,6 +248,10 @@ class AppWatcherService : AccessibilityService() {
         // ignore les autres fenêtres (le lanceur bouge encore pendant le clic).
         val estVraieApp = app == ecranAccueil ||
             packageManager.getLaunchIntentForPackage(app) != null
+
+        // MESURE DU DÉMARRAGE (juste une mesure, elle ne change rien au comportement).
+        if (estVraieApp) mesurerDemarrage(app, classe, event.eventTime)
+
         seanceEnCours?.let { vue ->
             // RELAIS : certaines icônes ouvrent en fait une autre app (ex. Gemini s'ouvre
             // dans l'app Google). Si une autre vraie app arrive avant celle attendue, on la suit.
@@ -527,6 +531,39 @@ class AppWatcherService : AccessibilityService() {
         val taille = Point()
         @Suppress("DEPRECATION") ecran.getRealSize(taille)
         return taille
+    }
+
+    // ---------------- LA MESURE DU DÉMARRAGE ----------------
+    // Certaines apps (Instagram, Gmail, YouTube…) affichent leur écran de lancement à chaque
+    // ouverture, même en simple reprise : impossible alors de savoir si elles étaient fermées.
+    // Hypothèse à tester : un vrai démarrage met plus de temps, entre l'écran de lancement et le
+    // vrai écran de l'app, qu'une reprise. On chronomètre donc ce délai à chaque ouverture et on
+    // l'écrit dans le journal, avec ce qu'on croyait de l'app à ce moment-là.
+    private var mesureApp: String? = null    // l'app dont on chronomètre le démarrage
+    private var mesureA = 0L                 // l'heure où son écran de lancement est arrivé
+    private var mesureEtat = ""              // ce qu'on croyait d'elle à ce moment-là
+
+    // « heure » = l'heure à laquelle Android a émis le signal (plus précis que l'heure où
+    // on le traite, car le traitement peut avoir quelques millisecondes de retard).
+    private fun mesurerDemarrage(app: String, classe: String, heure: Long) {
+        // seulement les apps qui ont une animation : ça garde le journal court
+        if (app == ecranAccueil || Catalogue.pour(app) == null) return
+        if (classe == "FrameLayout") {
+            // l'écran de lancement arrive : on lance le chronomètre (une seule fois par ouverture)
+            if (mesureApp == app && heure - mesureA < 10_000) return
+            mesureApp = app
+            mesureA = heure
+            // à ce stade, la liste des apps ouvertes n'est pas encore mise à jour pour cette ouverture
+            mesureEtat = if (enArrierePlan(app)) "supposée ouverte" else "supposée fermée"
+        } else if (mesureApp == app) {
+            // le vrai écran de l'app arrive : on arrête le chronomètre
+            val delai = heure - mesureA
+            mesureApp = null
+            // au-delà de 5 s, ce n'est plus le même démarrage : on n'écrit rien
+            if (delai >= 0 && delai <= 5000) {
+                noter("  .. mesure : $app | lancement -> écran $classe en $delai ms ($mesureEtat)")
+            }
+        }
     }
 
     // ---------------- LE RATTRAPAGE ----------------
