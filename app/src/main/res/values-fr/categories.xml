@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Les noms des catégories de l'écran « Animations d'apps », et le choix de la langue (français). -->
+<resources>
+    <string name="cat_ia">IA</string>
+    <string name="cat_social">Réseaux sociaux</string>
+    <string name="cat_musique">Musique et vidéo</string>
+    <string name="cat_photo">Photos</string>
+    <string name="cat_jeux">Jeux</string>
+    <string name="cat_finance">Finance</string>
+    <string name="cat_trajets">Cartes et trajets</string>
+    <string name="cat_travail">Productivité</string>
+    <string name="cat_infos">Actualités</string>
+    <string name="cat_autres">Non répertorié</string>
+    <string name="resume_categories">%1$d actives · choisis une catégorie</string>
+    <string name="langue">Langue</string>
+    <string name="langue_systeme">Langue du téléphone</string>
+</resources>

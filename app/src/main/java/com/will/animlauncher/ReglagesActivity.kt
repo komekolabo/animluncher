@@ -96,6 +96,12 @@ class ReglagesActivity : Activity() {
             }
         }
 
+        // Le choix de la langue de l'app (voir Langue.kt). Par défaut : la langue du téléphone.
+        val boutonLangue = Button(this).apply {
+            text = getString(R.string.langue)
+            setOnClickListener { Langue.choisir(this@ReglagesActivity) }
+        }
+
         statut = TextView(this).apply {
             textSize = 16f
             setTextColor(Color.parseColor("#DFE4F7"))
@@ -151,6 +157,8 @@ class ReglagesActivity : Activity() {
         colonne.addView(boutonDossiers)
         colonne.addView(boutonVolet)
         colonne.addView(boutonWidget)
+        // (changer la langue d'une seule app n'existe que depuis Android 13)
+        if (Langue.possible) colonne.addView(boutonLangue)
         colonne.addView(statut)
         colonne.addView(boutonAccessibilite)
         // Le journal : dans les deux versions. En Store, il reste sur le téléphone (pas d'Internet) :

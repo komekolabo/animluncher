@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Les noms des catégories de l'écran « Animations d'apps », et le choix de la langue (espagnol). -->
+<resources>
+    <string name="cat_ia">IA</string>
+    <string name="cat_social">Redes sociales</string>
+    <string name="cat_musique">Música y vídeo</string>
+    <string name="cat_photo">Fotos</string>
+    <string name="cat_jeux">Juegos</string>
+    <string name="cat_finance">Finanzas</string>
+    <string name="cat_trajets">Mapas y viajes</string>
+    <string name="cat_travail">Productividad</string>
+    <string name="cat_infos">Noticias</string>
+    <string name="cat_autres">Sin clasificar</string>
+    <string name="resume_categories">%1$d activas · elige una categoría</string>
+    <string name="langue">Idioma</string>
+    <string name="langue_systeme">Idioma del teléfono</string>
+</resources>
