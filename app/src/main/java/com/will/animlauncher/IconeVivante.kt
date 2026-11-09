@@ -52,6 +52,11 @@ object IconeAccueil {
     // Int.MIN_VALUE = « inconnu ».
     @Volatile var dernierScrollX = Int.MIN_VALUE
     @Volatile var dernierIndex = Int.MIN_VALUE
+    // Est-on sur la page de l'icône ? true juste après avoir ouvert l'app depuis son icône (on était
+    // forcément sur sa page), puis mis à jour à chaque changement de page. null = on ne sait pas.
+    @Volatile var surPageIcone: Boolean? = null
+    // true = la page de l'icône reste à confirmer au prochain changement de page (voir finDefilement).
+    @Volatile var pageAConfirmer = false
 
     fun actif(c: Context) = carnet(c).getBoolean("actif", true)
     fun definirActif(c: Context, v: Boolean) { carnet(c).edit().putBoolean("actif", v).apply() }
@@ -62,10 +67,18 @@ object IconeAccueil {
         carnet(c).edit()
             .putString("rect", r.flattenToString())
             .putInt("largeur", largeurEcran)
-            .putInt("page_scroll", dernierScrollX)
+            // On NE note PAS la page tout de suite : la dernière page connue peut être périmée (le
+            // bouton Accueil saute sur la page principale sans prévenir). Vu le 09/11 : le logo de
+            // l'icône de la page d'accueil s'affichait sur la page 3. La page sera confirmée au
+            // prochain changement de page (début du geste = la page de l'icône).
+            .putInt("page_scroll", Int.MIN_VALUE)
             .putInt("page_index", dernierIndex)
             .apply()
+        surPageIcone = true
+        pageAConfirmer = true
     }
+    // La page de l'icône, découverte plus tard (au 1er changement de page après l'avoir touchée).
+    fun definirPageScroll(c: Context, x: Int) { carnet(c).edit().putInt("page_scroll", x).apply() }
     fun rect(c: Context): Rect? = carnet(c).getString("rect", null)?.let { Rect.unflattenFromString(it) }
     fun largeur(c: Context) = carnet(c).getInt("largeur", 0)
     fun pageScroll(c: Context) = carnet(c).getInt("page_scroll", Int.MIN_VALUE)
@@ -83,6 +96,8 @@ class IconeVivante(private val service: AccessibilityService) {
     private var defileA = 0L                // dernier signal de défilement (pour attendre la fin)
     private var dernierDefilement: AccessibilityEvent? = null
     private var notesDefilement = 0         // pour ne pas inonder le journal
+    private var debutGeste = Int.MIN_VALUE  // scrollX au début du geste (= la page qu'on quitte)
+    private var signauxGeste = 0            // nombre de signaux reçus pendant le geste (diagnostic)
     // DIAGNOSTIC : la dernière raison pour laquelle le logo n'est PAS affiché (on ne l'écrit dans
     // le journal que quand elle change), et les noms d'écrans de l'accueil déjà vus.
     private var derniereRaison: String? = null
@@ -116,6 +131,14 @@ class IconeVivante(private val service: AccessibilityService) {
     fun surDefilement(event: AccessibilityEvent, accueil: String?) {
         if (event.packageName?.toString() != accueil) return
         cacher("défilement")
+        // Le 1er signal d'un geste (rien reçu depuis 0,45 s) : sa position est presque celle de la
+        // page qu'on quitte. On la garde pour retrouver la page de l'icône (voir finDefilement).
+        val classeDuSignal = event.className?.toString()?.substringAfterLast('.') ?: "?"
+        if (SystemClock.uptimeMillis() - defileA > 440) {
+            signauxGeste = 0
+            if (classeDuSignal != "RecyclerView" && surAccueil) debutGeste = event.scrollX
+        }
+        signauxGeste++
         // On garde une copie des chiffres (Android réutilise l'objet « event » après nous).
         dernierDefilement = AccessibilityEvent.obtain(event)
         defileA = SystemClock.uptimeMillis()
@@ -135,11 +158,27 @@ class IconeVivante(private val service: AccessibilityService) {
         if (surAccueil && classe != "RecyclerView") {
             if (e.scrollX >= 0) IconeAccueil.dernierScrollX = e.scrollX
             if (e.toIndex >= 0) IconeAccueil.dernierIndex = e.toIndex
+            // 1er changement de page depuis qu'on a touché l'icône : on vient de QUITTER sa page (on y
+            // était depuis l'ouverture de l'app par son icône) : sa position est celle du début du geste.
+            // (Si le geste n'a envoyé qu'un seul signal, le début vaut la fin : on ne peut rien en tirer.)
+            if (IconeAccueil.pageAConfirmer) {
+                IconeAccueil.pageAConfirmer = false
+                if (IconeAccueil.surPageIcone == true && debutGeste >= 0 && debutGeste != e.scrollX) {
+                    IconeAccueil.definirPageScroll(service, debutGeste)
+                    noter("  (icône vivante : page de l'icône trouvée, scrollX $debutGeste)")
+                } else {
+                    noter("  (icône vivante : page de l'icône pas trouvée, début $debutGeste, fin ${e.scrollX})")
+                }
+            }
+            // On sait maintenant si la nouvelle page est celle de l'icône (ou on ne sait plus).
+            val refApres = IconeAccueil.pageScroll(service)
+            IconeAccueil.surPageIcone = if (refApres != Int.MIN_VALUE && e.scrollX >= 0)
+                abs(e.scrollX - refApres) < service.resources.displayMetrics.widthPixels / 2 else null
         }
         if (notesDefilement < 40) {
             notesDefilement++
-            noter("  [défilement] $classe : scrollX ${e.scrollX}, scrollY ${e.scrollY}, " +
-                "index ${e.fromIndex}->${e.toIndex} sur ${e.itemCount}, max ${e.maxScrollX}")
+            noter("  [défilement] $classe : scrollX $debutGeste -> ${e.scrollX} ($signauxGeste signaux), " +
+                "scrollY ${e.scrollY}, index ${e.fromIndex}->${e.toIndex} sur ${e.itemCount}")
         }
         evaluer("fin du défilement")
     }
@@ -157,7 +196,7 @@ class IconeVivante(private val service: AccessibilityService) {
         }
         when (bonnePage()) {
             false -> { cacher("autre page"); return pas("pas sur la page de l'icône") }
-            null -> { cacher("page inconnue"); return pas("page affichée inconnue : change une fois de page, puis reviens") }
+            null -> { cacher("page inconnue"); return pas("page affichée inconnue : touche l'icône d'AnimLauncher sur sa page") }
             true -> {}
         }
         derniereRaison = null
@@ -172,26 +211,25 @@ class IconeVivante(private val service: AccessibilityService) {
     }
 
     // Est-on sur la page de l'icône ? On compare la page actuelle à celle notée à l'ouverture.
-    // true = oui, false = non, null = on ne sait pas. Dans le doute, on n'affiche RIEN : au 1er essai,
-    // on affichait quand même, et le logo apparaissait au milieu d'une autre page (là où l'icône se
-    // trouve sur SA page). On ne sait pas tant qu'on n'a vu aucun changement de page depuis le
-    // démarrage du service, ou si l'icône a été apprise avant (à la réouverture, elle sera réapprise).
+    // true = oui, false = non, null = on ne sait pas. Dans le doute, on n'affiche RIEN (sinon le logo
+    // apparaissait au milieu d'une autre page, là où l'icône se trouve sur SA page).
+    //  - si on connaît la position de la page de l'icône ET celle de la page affichée : on compare ;
+    //  - sinon, on suit « surPageIcone » : vrai juste après avoir touché l'icône (au 2e essai, on
+    //    exigeait d'abord un changement de page, et rien ne s'affichait).
     private fun bonnePage(): Boolean? {
         val refX = IconeAccueil.pageScroll(service)
         val x = IconeAccueil.dernierScrollX
         if (refX != Int.MIN_VALUE && x != Int.MIN_VALUE)
             return abs(x - refX) < service.resources.displayMetrics.widthPixels / 2
-        val refI = IconeAccueil.pageIndex(service)
-        val i = IconeAccueil.dernierIndex
-        if (refI != Int.MIN_VALUE && i != Int.MIN_VALUE) return i == refI
-        return null
+        return IconeAccueil.surPageIcone
     }
 
     private fun montrer(r: Rect, raison: String) {
         // Le rectangle reçu contient l'icône ET son nom écrit dessous. On vise le carré de l'icône :
-        // centré en largeur, et son centre à 40 % de la hauteur. On le fait un peu plus grand que
-        // la vraie icône (78 % de la largeur de la case) pour bien la recouvrir.
-        val cote = (r.width() * 0.78f).toInt()
+        // centré en largeur, et son centre à 40 % de la hauteur. On le fait un tout petit peu plus grand
+        // que la vraie icône (72 % de la largeur de la case) pour bien la recouvrir. (78 % : trop grand,
+        // vu sur la capture du 09/11 : environ 194 pixels pour une icône d'environ 172.)
+        val cote = (r.width() * 0.72f).toInt()
         val cx = r.centerX()
         val cy = r.top + (r.height() * 0.40f).toInt()
         val x = cx - cote / 2
@@ -291,9 +329,9 @@ class VueIconeVivante(context: Context) : View(context) {
         c.drawRoundRect(carre, cote * 0.32f, cote * 0.32f, fond)
 
         // 2) on passe dans la grille 108 x 108 de l'icône. La partie visible d'une icône Android
-        //    fait 72 de large ; notre fenêtre est ~18 % plus grande que l'icône, d'où 72 x 1,18.
+        //    fait 72 de large ; notre fenêtre est ~5 % plus grande que l'icône, d'où 72 x 1,05.
         c.save()
-        val k = cote / (72f * 1.18f)
+        val k = cote / (72f * 1.05f)
         c.translate(cote / 2f, cote / 2f)
         c.scale(k, k)
         c.translate(-54f, -54f)
