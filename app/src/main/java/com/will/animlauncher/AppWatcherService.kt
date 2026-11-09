@@ -275,7 +275,11 @@ class AppWatcherService : AccessibilityService() {
 
         // LES APPS RÉCENTES : quand on les ouvre, on regarde régulièrement quelles apps y sont.
         // Une app qui disparaît de la liste pendant la visite a été fermée (glissée vers le haut).
-        if (app == ecranAccueil && classe == "RecentsActivity") debutRecents()
+        if (app == ecranAccueil && classe == "RecentsActivity") {
+            // si on vient de quitter un dossier animé : pas de retour de l'étoile par-dessus les apps récentes
+            RetourEtoile.annuler()
+            debutRecents()
+        }
         else if (dansRecents && ((app == ecranAccueil && classe == "Launcher") || (app != ecranAccueil && estVraieApp))) {
             finRecents()
             // On a touché une carte des apps récentes : l'app reprend depuis l'arrière-plan.

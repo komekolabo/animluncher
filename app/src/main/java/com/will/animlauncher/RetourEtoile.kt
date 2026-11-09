@@ -37,6 +37,19 @@ object RetourEtoile {
 
     private const val DUREE = 600L
 
+    // La fenêtre en cours (pour pouvoir l'effacer plus tôt, voir annuler).
+    private var enCours: View? = null
+
+    // ON EST PARTI VERS LES APPS RÉCENTES (et pas vers l'accueil) : Android y montre déjà sa propre
+    // animation (les cartes qui se rangent). Nos bandes sombres et l'étoile par-dessus faisaient une
+    // transition moche (vu par Will le 09/11) : on efface tout en douceur, en 0,15 s.
+    // Appelé par le service dès qu'il voit l'écran des apps récentes s'ouvrir.
+    fun annuler() {
+        val vue = enCours ?: return
+        enCours = null
+        vue.animate().alpha(0f).setDuration(150).start()
+    }
+
     fun jouer(service: AccessibilityService, etat: Etat) {
         val gestionnaire = service.getSystemService(Context.WINDOW_SERVICE) as WindowManager
         val ecran = (service.getSystemService(Context.DISPLAY_SERVICE) as DisplayManager).getDisplay(Display.DEFAULT_DISPLAY)
@@ -68,8 +81,12 @@ object RetourEtoile {
             Journal.noter(service, "ERREUR retour de l'étoile : ${e.message}")
             return
         }
+        enCours = vue
         // on enlève la fenêtre une fois l'animation finie (avec une petite marge)
-        vue.postDelayed({ try { gestionnaire.removeView(vue) } catch (_: Exception) {} }, DUREE + 80)
+        vue.postDelayed({
+            if (enCours === vue) enCours = null
+            try { gestionnaire.removeView(vue) } catch (_: Exception) {}
+        }, DUREE + 80)
     }
 
     // Le dessin : les bandes qui repartent vers le haut et le bas, et l'étoile qui rentre en tournant.
