@@ -24,8 +24,12 @@
         android:theme="@android:style/Theme.Material.NoActionBar">
 
         <!-- L'écran principal, avec son icône dans le tiroir d'applications. -->
+        <!-- launchMode="singleTop" : si l'écran principal est déjà ouvert en arrière-plan, toucher
+             l'icône le ramène ET lui transmet la nouvelle demande (avec la position de l'icône,
+             voir MainActivity.onNewIntent), au lieu de le ramener sans rien dire. -->
         <activity
             android:name=".MainActivity"
+            android:launchMode="singleTop"
             android:exported="true">
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />

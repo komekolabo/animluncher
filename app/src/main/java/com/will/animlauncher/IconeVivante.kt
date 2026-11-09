@@ -124,10 +124,14 @@ class IconeVivante(private val service: AccessibilityService) {
     private fun finDefilement() {
         val e = dernierDefilement ?: return
         val classe = e.className?.toString()?.substringAfterLast('.') ?: "?"
-        // Un défilement horizontal (scrollX connu) ou par « index » (numéro de page) : on retient
-        // les deux, faute de savoir encore lequel Samsung remplit pour les pages.
-        if (e.scrollX >= 0) IconeAccueil.dernierScrollX = e.scrollX
-        if (e.toIndex >= 0) IconeAccueil.dernierIndex = e.toIndex
+        // LES PAGES (vu dans le journal le 09/11) : quand on change de page, l'écran d'accueil Samsung
+        // envoie un défilement « ViewGroup » dont scrollX vaut 0, 1039, 2078… (une page = 1039 pixels).
+        // Les listes (apps récentes, tiroir d'apps) envoient des « RecyclerView » avec scrollX 0 : on les
+        // ignore, sinon on croirait être revenu sur la 1re page. On ne retient que si l'accueil est affiché.
+        if (surAccueil && classe != "RecyclerView") {
+            if (e.scrollX >= 0) IconeAccueil.dernierScrollX = e.scrollX
+            if (e.toIndex >= 0) IconeAccueil.dernierIndex = e.toIndex
+        }
         if (notesDefilement < 40) {
             notesDefilement++
             noter("  [défilement] $classe : scrollX ${e.scrollX}, scrollY ${e.scrollY}, " +

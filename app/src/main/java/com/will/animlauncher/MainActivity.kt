@@ -164,8 +164,8 @@ class MainActivity : Activity() {
     // (« sourceBounds », en pixels : gauche, haut, droite, bas). C'est ce qui lui sert à faire
     // grossir l'app depuis l'icône. On l'écrit simplement dans le journal pour vérifier que le
     // lanceur Samsung le donne bien, et que les chiffres tombent au bon endroit.
-    // Attention : ça ne marche qu'au vrai démarrage de l'écran principal. Si AnimLauncher était
-    // encore ouverte en arrière-plan, Android la ramène sans nouvelle demande, donc sans rectangle.
+    // Appelé au démarrage (onCreate) ET quand on retouche l'icône alors que l'app était encore
+    // ouverte (onNewIntent). Dans le tiroir d'apps ou le dock, Samsung ne donne pas de rectangle.
     private fun noterPositionIcone(demande: Intent?) {
         val r = demande?.sourceBounds
         val ecran = resources.displayMetrics
@@ -179,6 +179,14 @@ class MainActivity : Activity() {
                 "sur un écran de ${ecran.widthPixels} x ${ecran.heightPixels}")
         }
         Journal.programmerEnvoi(this)
+    }
+
+    // L'écran principal était déjà ouvert et on retouche l'icône : grâce à launchMode="singleTop"
+    // (voir AndroidManifest.xml), Android nous passe la nouvelle demande ici, avec la position.
+    override fun onNewIntent(nouvelle: Intent) {
+        super.onNewIntent(nouvelle)
+        setIntent(nouvelle)
+        noterPositionIcone(nouvelle)
     }
 
     override fun onResume() {
