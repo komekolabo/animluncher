@@ -1,0 +1,23 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- LA LUEUR qui respire : elle grandit un peu (x1,06) puis revient, toutes les 3 s, sans fin.
+     Jouée par une ProgressBar du widget (même astuce que le reflet du galet). -->
+<animated-vector xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:aapt="http://schemas.android.com/aapt"
+    android:drawable="@drawable/dossier_lueur">
+    <target android:name="lueur_g">
+        <aapt:attr name="android:animation">
+            <objectAnimator android:duration="3000" android:repeatCount="infinite" android:interpolator="@android:interpolator/linear">
+                <propertyValuesHolder android:propertyName="scaleX" android:valueType="floatType">
+                    <keyframe android:fraction="0" android:value="1" />
+                    <keyframe android:fraction="0.5" android:value="1.06" android:interpolator="@interpolator/doux" />
+                    <keyframe android:fraction="1" android:value="1" android:interpolator="@interpolator/doux" />
+                </propertyValuesHolder>
+                <propertyValuesHolder android:propertyName="scaleY" android:valueType="floatType">
+                    <keyframe android:fraction="0" android:value="1" />
+                    <keyframe android:fraction="0.5" android:value="1.06" android:interpolator="@interpolator/doux" />
+                    <keyframe android:fraction="1" android:value="1" android:interpolator="@interpolator/doux" />
+                </propertyValuesHolder>
+            </objectAnimator>
+        </aapt:attr>
+    </target>
+</animated-vector>

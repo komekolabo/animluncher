@@ -2,9 +2,9 @@
 <!-- LE WIDGET « DOSSIER ANIMÉ » AVEC LES VRAIES ICÔNES (10/11, voir WidgetDossier.kt). Même gabarit que
      widget_groupe.xml : un galet de 62 dp, puis le nom du dossier dessous. Trois couches empilées :
        1) le galet de verre brun chaud (teinté par la roue des couleurs, comme avant) ;
-       2) le FOLIOSCOPE (dossier_film) : les 150 images de la boucle de 12 s (étoile, points, icônes des apps),
-          dessinées par AnimLauncher. La visionneuse les fait défiler toute seule, une toutes les 80 ms,
-          et recommence au début quand elle arrive au bout ;
+       2) la lueur rose qui respire, puis le FOLIOSCOPE (dossier_film) : les 300 images de la boucle de 12 s
+          (étoile, points, icônes des apps), dessinées par AnimLauncher. La visionneuse les fait défiler
+          toute seule, une toutes les 40 ms (25 par seconde), et recommence au début quand elle arrive au bout ;
        3) la bande de lumière qui traverse le verre toutes les 6 s (inchangée). -->
 <LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
     android:id="@+id/dossier_racine"
@@ -24,12 +24,31 @@
             android:scaleType="fitXY"
             android:src="@drawable/widget_galet_chaud" />
 
-        <ViewFlipper
-            android:id="@+id/dossier_film"
+        <!-- la lueur rose qui respire, derrière l'étoile -->
+        <ProgressBar
+            style="@android:style/Widget.ProgressBar"
             android:layout_width="match_parent"
             android:layout_height="match_parent"
+            android:minWidth="62dp"
+            android:maxWidth="62dp"
+            android:minHeight="62dp"
+            android:maxHeight="62dp"
+            android:indeterminate="true"
+            android:indeterminateOnly="true"
+            android:indeterminateDrawable="@drawable/dossier_lueur_anime" />
+
+        <!-- le folioscope ne couvre que le MILIEU du galet (38 dp sur 62, centré sur l'étoile) : tout ce qui
+             bouge y tient, et chaque image pèse 3 fois moins -> 25 images par seconde (une toutes les 40 ms) -->
+        <ViewFlipper
+            android:id="@+id/dossier_film"
+            android:layout_width="38dp"
+            android:layout_height="38dp"
+            android:layout_gravity="top|start"
+            android:layout_marginStart="12dp"
+            android:layout_marginLeft="12dp"
+            android:layout_marginTop="10.76dp"
             android:autoStart="true"
-            android:flipInterval="80" />
+            android:flipInterval="40" />
 
         <ProgressBar
             style="@android:style/Widget.ProgressBar"

@@ -12,7 +12,6 @@ import android.graphics.Paint
 import android.graphics.Path
 import android.graphics.PathMeasure
 import android.graphics.Point
-import android.graphics.RadialGradient
 import android.graphics.RectF
 import android.graphics.Shader
 import android.hardware.display.DisplayManager
@@ -39,17 +38,26 @@ import kotlin.math.sqrt
 //  - plus de 9 apps : on les montre par PAGES de 9 (apps 1 à 9, puis 10 à 18…), une page par boucle.
 //
 // COMMENT C'EST FAIT (même astuce que le widget Games, voir WidgetTop.kt). Un widget ne peut pas lancer notre
-// code de dessin : il ne sait afficher que des images qu'on lui donne. AnimLauncher dessine donc les 150 images
-// de la boucle (une toutes les 80 ms) et les range dans une « visionneuse » (ViewFlipper) qui les fait défiler
-// toute seule, en boucle, même quand AnimLauncher est fermé.
+// code de dessin : il ne sait afficher que des images qu'on lui donne. AnimLauncher dessine donc les 300 images
+// de la boucle (une toutes les 40 ms = 25 par seconde) et les range dans une « visionneuse » (ViewFlipper) qui
+// les fait défiler toute seule, en boucle, même quand AnimLauncher est fermé.
+// FLUIDITÉ (10/11, demande de Will : la 1re version à 12,5 images/s saccadait) : Android limite la mémoire
+// d'images d'un widget. Les images ne couvrent donc plus tout le galet mais seulement son MILIEU (la « boîte »,
+// 38 dp sur 62, voir widget_dossier.xml) : tout ce qui bouge y tient, et chaque image pèse 3 fois moins.
+// La lueur rose, plus grande que la boîte, est devenue une couche à part (dossier_lueur_anime.xml).
 // Pour les dossiers de plus de 9 apps, une seule page tient dans la mémoire d'un widget : le SERVICE
 // d'AnimLauncher sert de chef d'orchestre. Tant qu'on est sur l'écran d'accueil, il envoie la page suivante
 // toutes les 12 s (la visionneuse repart alors de la 1re image : le changement tombe pile sur l'étoile).
 // Sans le service (accessibilité éteinte), le widget montre la 1re page en boucle.
 object WidgetDossier {
-    private const val PAS = 80L                  // une image toutes les 80 ms (12,5 images par seconde)
+    private const val PAS = 40L                  // une image toutes les 40 ms (25 images par seconde)
     private const val DUREE = 12.0               // la boucle dure 12 s
-    private const val N = 150                    // 12 s / 80 ms = 150 images
+    private const val N = 300                    // 12 s / 40 ms = 300 images
+    // LA BOÎTE : le carré du milieu du galet couvert par les images (38 dp sur 62), dans le repère 100 x 100
+    // du dessin. Elle est centrée sur l'étoile (50, 48) : de 19,35 à 80,65 en largeur, de 17,35 à 78,65 en hauteur.
+    private const val BOITE = 38f / 62f * 100f   // = 61,29 unités de côté
+    private const val BOITE_X = 50f - BOITE / 2
+    private const val BOITE_Y = 48f - BOITE / 2
     const val PAR_PAGE = 9                       // 9 apps au plus par boucle
 
     private val fil = Executors.newSingleThreadExecutor()   // les dessins se font à part, sans bloquer l'app
@@ -112,13 +120,13 @@ object WidgetDossier {
         // les apps par paquets de 9 (un dossier vide = une page vide : on ne voit que l'étoile)
         val pages = if (apps.isEmpty()) listOf(emptyList()) else apps.chunked(PAR_PAGE)
 
-        // LA TAILLE DES IMAGES : celle du galet (62 dp), réduite si elle dépasse la mémoire permise par Android
+        // LA TAILLE DES IMAGES : celle de la boîte (38 dp), réduite si elle dépasse la mémoire permise par Android
         // pour un widget (environ 1,5 écran ; on garde 20 % de marge, comme pour le widget Games).
         val ecran = (c.getSystemService(Context.DISPLAY_SERVICE) as DisplayManager).getDisplay(Display.DEFAULT_DISPLAY)
         val taille = Point()
         @Suppress("DEPRECATION") ecran.getRealSize(taille)
         val permis = 6.0 * taille.x * taille.y * 0.8
-        var px = min((62 * c.resources.displayMetrics.density).toInt(), sqrt(permis / (N * 4.0)).toInt()).coerceAtLeast(48)
+        var px = min((38 * c.resources.displayMetrics.density).toInt(), sqrt(permis / (N * 4.0)).toInt()).coerceAtLeast(32)
 
         for (essai in 0 until 3) {
             try {
@@ -134,7 +142,7 @@ object WidgetDossier {
             } catch (e: IllegalArgumentException) {
                 // trop d'images pour la mémoire d'un widget : on recommence en plus petit
                 Journal.noter(c, "widget dossier $groupe : images de $px px refusées (${e.message}), on réduit")
-                px = (px * 0.8).toInt().coerceAtLeast(40)
+                px = (px * 0.8).toInt().coerceAtLeast(24)
             }
         }
     }
@@ -144,7 +152,7 @@ object WidgetDossier {
         for (id in ids) gestionnaire.updateAppWidget(id, vues(c, id, groupe, images))
     }
 
-    // LES 150 IMAGES d'une page. Les images où l'on ne voit que l'étoile (avant 3,2 s et après 11 s) sont les
+    // LES 300 IMAGES d'une page. Les images où l'on ne voit que l'étoile (avant 3,2 s et après 11 s) sont les
     // mêmes pour toutes les pages : on les garde de côté (« communes ») pour ne pas les redessiner.
     private val communes = HashMap<String, Bitmap>()
     private fun dessinerPage(c: Context, px: Int, apps: List<String>, hsv: FloatArray?): List<Bitmap> {
@@ -167,7 +175,7 @@ object WidgetDossier {
 
     // L'icône d'une app, dessinée en grand une seule fois (on la réduit ensuite à chaque image).
     private fun icone(c: Context, pkg: String, px: Int): Bitmap {
-        val s = (px * 0.36).toInt().coerceAtLeast(8)          // la plus grande taille possible (1 app, avec la vague)
+        val s = (px * 0.6).toInt().coerceAtLeast(8)           // la plus grande taille possible (1 app, avec la vague)
         val b = Bitmap.createBitmap(s, s, Bitmap.Config.ARGB_8888)
         try {
             val d = c.packageManager.getApplicationIcon(pkg)
@@ -281,23 +289,14 @@ object WidgetDossier {
 
         fun dessiner(cv: Canvas, px: Int, t: Double) {
             cv.save()
-            cv.scale(px / 100f, px / 100f)
-            lueur(cv, t)
+            // on ne dessine que la boîte du milieu : on agrandit, puis on décale pour que son coin soit en (0, 0)
+            cv.scale(px / BOITE, px / BOITE)
+            cv.translate(-BOITE_X, -BOITE_Y)
             etoile(cv, t)
             anneau(cv, t)
             points(cv, t)
             tuiles(cv, t)
             cv.restore()
-        }
-
-        // la lueur rose très douce derrière (elle respire toutes les 3 s, et faiblit pendant le jeu des points)
-        fun lueur(cv: Canvas, t: Double) {
-            val a = cle(t, 0.0 to 1.0 by LIN, 3.0 to 1.0 by LIN, 3.6 to 0.35 by DOUX, 10.4 to 0.35 by LIN, 11.2 to 1.0 by DOUX)
-            val r = (38 * (1 + 0.06 * (0.5 - 0.5 * cos(2 * Math.PI * t / 3)))).toFloat()
-            p.reset(); p.isAntiAlias = true
-            p.shader = RadialGradient(CX, CY, r, intArrayOf(0x40FF6B7A, 0x1AFF4B3A, 0x00FF4B3A), floatArrayOf(0f, 0.45f, 1f), Shader.TileMode.CLAMP)
-            p.alpha = (a * 255).toInt()
-            cv.drawCircle(CX, CY, r, p)
         }
 
         // l'étoile : elle respire, rétrécit en tournant vite (3 s), renaît avec un ressort (10,4 s)
