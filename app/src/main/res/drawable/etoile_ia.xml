@@ -1,0 +1,54 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- L'ÉTOILE DES DOSSIERS ANIMÉS (09/11) : une étoile à 4 branches courbées, en dégradé bleu -> violet ->
+     turquoise (dessin à nous, inventé : pas le logo d'une marque), avec une lueur violette très douce
+     derrière. Dessin en 100 x 100 = tout le galet. Elle est animée par etoile_ia_anime.xml :
+     le groupe « souffle » respire, le groupe « tour » tourne lentement. -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:aapt="http://schemas.android.com/aapt"
+    android:width="62dp"
+    android:height="62dp"
+    android:viewportWidth="100"
+    android:viewportHeight="100">
+
+    <group
+        android:name="souffle"
+        android:pivotX="50"
+        android:pivotY="48">
+
+        <!-- la lueur : un disque qui s'efface vers l'extérieur (jamais de flash) -->
+        <path android:pathData="M50,10 A38,38 0 1,1 49.99,10 Z">
+            <aapt:attr name="android:fillColor">
+                <gradient
+                    android:type="radial"
+                    android:centerX="50"
+                    android:centerY="48"
+                    android:gradientRadius="38">
+                    <item android:offset="0" android:color="#407A6BFF" />
+                    <item android:offset="0.45" android:color="#1A3A4BFF" />
+                    <item android:offset="1" android:color="#003A4BFF" />
+                </gradient>
+            </aapt:attr>
+        </path>
+
+        <group
+            android:name="tour"
+            android:pivotX="50"
+            android:pivotY="48">
+            <!-- 4 pointes (haut, droite, bas, gauche) reliées par des courbes qui passent près du centre -->
+            <path android:pathData="M50,22 Q52.2,45.8 76,48 Q52.2,50.2 50,74 Q47.8,50.2 24,48 Q47.8,45.8 50,22 Z">
+                <aapt:attr name="android:fillColor">
+                    <gradient
+                        android:type="linear"
+                        android:startX="24"
+                        android:startY="22"
+                        android:endX="76"
+                        android:endY="74">
+                        <item android:offset="0" android:color="#5B8CFF" />
+                        <item android:offset="0.5" android:color="#9B6BFF" />
+                        <item android:offset="1" android:color="#3FD1C4" />
+                    </gradient>
+                </aapt:attr>
+            </path>
+        </group>
+    </group>
+</vector>

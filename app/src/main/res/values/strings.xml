@@ -7,4 +7,7 @@
     <!-- Le widget « une app dans un galet » (essai) : son nom et sa phrase dans la liste des widgets. -->
     <string name="widget_app_titre">Galet animé (essai)</string>
     <string name="widget_app_description">Le logo d’une app qui flotte dans un galet de verre sombre.</string>
+    <!-- Le widget « dossier animé » : son nom et sa phrase dans la liste des widgets. -->
+    <string name="widget_groupe_titre">Dossier animé</string>
+    <string name="widget_groupe_description">Un groupe d’apps (IA, jeux…) derrière une étoile animée.</string>
 </resources>

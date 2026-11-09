@@ -47,6 +47,21 @@
             android:name=".ReglageAppActivity"
             android:exported="false" />
 
+        <!-- Les DOSSIERS ANIMÉS : l'écran qui range les apps par groupe (GroupesActivity), et le dossier
+             lui-même (DossierActivity), transparent par-dessus l'accueil. Le dossier vit dans sa propre
+             tâche (taskAffinity vide) et n'apparaît pas dans les apps récentes : il ne s'ouvre jamais
+             par-dessus l'écran principal d'AnimLauncher. -->
+        <activity
+            android:name=".GroupesActivity"
+            android:exported="false" />
+        <activity
+            android:name=".DossierActivity"
+            android:exported="false"
+            android:excludeFromRecents="true"
+            android:noHistory="true"
+            android:taskAffinity=""
+            android:theme="@style/Theme.Dossier" />
+
         <!-- Le guide plein écran pour débloquer l'accessibilité grisée (apps installées hors Play Store). -->
         <activity
             android:name=".GuideDeblocage"
@@ -91,6 +106,19 @@
             <meta-data
                 android:name="android.appwidget.provider"
                 android:resource="@xml/widget_app_info" />
+        </receiver>
+
+        <!-- LE WIDGET « DOSSIER ANIMÉ » (voir WidgetGroupe.kt). -->
+        <receiver
+            android:name=".WidgetGroupe"
+            android:exported="false"
+            android:label="@string/widget_groupe_titre">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+            </intent-filter>
+            <meta-data
+                android:name="android.appwidget.provider"
+                android:resource="@xml/widget_groupe_info" />
         </receiver>
 
         <!-- Le KILL SWITCH : un bouton dans le volet des réglages rapides. -->

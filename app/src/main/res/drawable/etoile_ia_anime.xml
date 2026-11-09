@@ -1,0 +1,45 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- L'ÉTOILE DES DOSSIERS, ANIMÉE (même astuce que le logo du widget : une ProgressBar la joue en boucle).
+     Elle fait un tour complet en 20 s (très lent), et respire (grossit de 6 %) toutes les 3 s. -->
+<animated-vector xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:aapt="http://schemas.android.com/aapt"
+    android:drawable="@drawable/etoile_ia">
+
+    <target android:name="tour">
+        <aapt:attr name="android:animation">
+            <objectAnimator
+                android:propertyName="rotation"
+                android:valueFrom="0"
+                android:valueTo="360"
+                android:valueType="floatType"
+                android:duration="20000"
+                android:repeatCount="infinite"
+                android:interpolator="@android:interpolator/linear" />
+        </aapt:attr>
+    </target>
+
+    <target android:name="souffle">
+        <aapt:attr name="android:animation">
+            <set>
+                <objectAnimator
+                    android:propertyName="scaleX"
+                    android:valueFrom="1"
+                    android:valueTo="1.06"
+                    android:valueType="floatType"
+                    android:duration="1500"
+                    android:repeatCount="infinite"
+                    android:repeatMode="reverse"
+                    android:interpolator="@android:interpolator/accelerate_decelerate" />
+                <objectAnimator
+                    android:propertyName="scaleY"
+                    android:valueFrom="1"
+                    android:valueTo="1.06"
+                    android:valueType="floatType"
+                    android:duration="1500"
+                    android:repeatCount="infinite"
+                    android:repeatMode="reverse"
+                    android:interpolator="@android:interpolator/accelerate_decelerate" />
+            </set>
+        </aapt:attr>
+    </target>
+</animated-vector>
