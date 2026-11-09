@@ -62,8 +62,15 @@ Objectif : la publier sur le Google Play Store, avec une pub non invasive.
   (les réglages retiennent les variantes décochées par leur numéro).
   Chaque scène hérite de `Scene` et dessine **toute l'image à chaque instant** (pas d'état caché).
   Elles sont calibrées sur un écran « modèle » de 540 de large (k = largeur / 540).
-- `IconeVivante.kt` : essai d'« icône vivante » (logo animé posé sur l'icône d'AnimLauncher), fait par une
-  autre instance le 09/11 (branché dans le service et sur l'écran principal).
+- `LogoWidget.kt` + `res/layout/widget_logo.xml` + `res/drawable/logo_widget(_anime).xml` : le WIDGET
+  « logo animé » 1 x 1 (09/11), à poser à la place de l'icône (bouton sur l'écran principal). Astuce :
+  un widget ne peut pas lancer notre code de dessin, mais une ProgressBar joue en boucle son
+  `indeterminateDrawable` -> on lui donne un AnimatedVectorDrawable (lévitation, tiers de tour du
+  triangle toutes les 4,5 s, étoile qui scintille ; tout en `repeatCount="infinite"`).
+  REMPLACE l'ancien essai « icône vivante » (fenêtre posée par-dessus l'icône, supprimé le 09/11) :
+  sans lire l'écran, impossible de savoir la page affichée / si le tiroir d'apps est ouvert
+  (Samsung n'envoie qu'un « contenu changé » sans direction quand on ouvre/ferme le tiroir).
+  Ne pas refaire. Pistes écartées : Shizuku (dépendance + relance à chaque redémarrage), captures d'écran.
 - `Reglages.kt` : kill switch, « seulement au démarrage », réglages par app (durée, variantes).
 - `MainActivity.kt` : écran principal (logo animé, interrupteurs, écran d'explication Store).
 - `GuideDeblocage.kt` : guide plein écran pour l'accessibilité **grisée** (APK installé hors Play Store).
