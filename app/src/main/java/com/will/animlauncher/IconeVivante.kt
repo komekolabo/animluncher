@@ -90,6 +90,10 @@ class IconeVivante(private val service: AccessibilityService) {
 
     // Une fenêtre passe au premier plan.
     fun surFenetre(app: String?, classe: String, accueil: String?) {
+        // NOS PROPRES PETITES FENÊTRES (cette icône vivante, le rideau des animations) envoient elles
+        // aussi un signal « fenêtre » en apparaissant (classe « View » ou « FrameLayout »). Avant, on le
+        // prenait pour une autre app : le logo se retirait 20 ms après être apparu (vu dans le journal).
+        if (app == service.packageName && (classe == "View" || classe == "FrameLayout")) return
         // on note une fois chaque nom d'écran de l'accueil (pour comprendre ce que Samsung envoie)
         if (app == accueil && ecransVus.size < 20 && ecransVus.add(classe))
             noter("  (icône vivante : écran de l'accueil « $classe »)")
@@ -151,7 +155,11 @@ class IconeVivante(private val service: AccessibilityService) {
         if (ecran.widthPixels != IconeAccueil.largeur(service)) {                          // autre écran
             cacher("autre écran"); return pas("écran de ${ecran.widthPixels} de large au lieu de ${IconeAccueil.largeur(service)}")
         }
-        if (!bonnePage()) { cacher("autre page"); return pas("pas sur la page de l'icône") }
+        when (bonnePage()) {
+            false -> { cacher("autre page"); return pas("pas sur la page de l'icône") }
+            null -> { cacher("page inconnue"); return pas("page affichée inconnue : change une fois de page, puis reviens") }
+            true -> {}
+        }
         derniereRaison = null
         montrer(r, raison)
     }
@@ -164,8 +172,11 @@ class IconeVivante(private val service: AccessibilityService) {
     }
 
     // Est-on sur la page de l'icône ? On compare la page actuelle à celle notée à l'ouverture.
-    // Si on ne sait pas (aucun signal de défilement reçu), on affiche quand même (essai).
-    private fun bonnePage(): Boolean {
+    // true = oui, false = non, null = on ne sait pas. Dans le doute, on n'affiche RIEN : au 1er essai,
+    // on affichait quand même, et le logo apparaissait au milieu d'une autre page (là où l'icône se
+    // trouve sur SA page). On ne sait pas tant qu'on n'a vu aucun changement de page depuis le
+    // démarrage du service, ou si l'icône a été apprise avant (à la réouverture, elle sera réapprise).
+    private fun bonnePage(): Boolean? {
         val refX = IconeAccueil.pageScroll(service)
         val x = IconeAccueil.dernierScrollX
         if (refX != Int.MIN_VALUE && x != Int.MIN_VALUE)
@@ -173,7 +184,7 @@ class IconeVivante(private val service: AccessibilityService) {
         val refI = IconeAccueil.pageIndex(service)
         val i = IconeAccueil.dernierIndex
         if (refI != Int.MIN_VALUE && i != Int.MIN_VALUE) return i == refI
-        return true
+        return null
     }
 
     private fun montrer(r: Rect, raison: String) {
