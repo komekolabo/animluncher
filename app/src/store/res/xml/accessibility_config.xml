@@ -7,7 +7,7 @@
      (ni les widgets, ni les apps récentes). Il reçoit seulement le nom écrit sous l'icône touchée.
      (Ta version Perso utilise src/main/res/xml/accessibility_config.xml, plus complet.) -->
 <accessibility-service xmlns:android="http://schemas.android.com/apk/res/android"
-    android:accessibilityEventTypes="typeWindowStateChanged|typeViewClicked"
+    android:accessibilityEventTypes="typeWindowStateChanged|typeViewClicked|typeAnnouncement|typeWindowContentChanged|typeViewScrolled"
     android:accessibilityFeedbackType="feedbackGeneric"
     android:notificationTimeout="0"
     android:canRetrieveWindowContent="false"

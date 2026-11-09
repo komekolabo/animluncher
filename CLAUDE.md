@@ -97,10 +97,11 @@ Objectif : la publier sur le Google Play Store, avec une pub non invasive.
   compte sur le RATTRAPAGE (écran de démarrage < 300 ms après le clic = l'app était fermée).
   La liste « affiche toujours son écran de démarrage » (`splash_toujours_v2`) bloque ce rattrapage :
   elle ne doit retenir une app qu'avec prudence (Claude y avait été mis à tort).
-- « FERMETURE POSSIBLE » (Store) : comme elle ne voit pas quelle carte on glisse dans les apps
-  récentes, un retour apps récentes → accueil (sans toucher de carte) fait jouer l'animation au
-  prochain appui sur une icône. Solution provisoire choisie par Will (09/11) ; raté connu :
-  regarder les apps récentes sans rien fermer. **À remplacer par une vraie détection de fermeture.**
+- « FERMETURE POSSIBLE » (essayée le 09/11, RETIRÉE) : rejouer l'animation après tout passage
+  apps récentes → accueil déclenchait l'animation presque à chaque fois. Ne pas refaire.
+- ESPION DES APPS RÉCENTES (expérience en cours, journal « [récentes] ») : on écoute les annonces
+  (TYPE_ANNOUNCEMENT), changements de contenu et défilements de l'écran d'accueil pendant la visite
+  des apps récentes, pour trouver un signal « telle carte a été fermée » utilisable SANS lire l'écran.
 - Mesure du démarrage (journal « .. mesure : ») : Instagram reprend en ~40 ms même après
   « Tout fermer » (processus encore vivant), ~500 ms quand Android l'avait vraiment tuée.
 - Le journal envoyé sur GitHub est celui de la version **Perso** : si Will teste la version Store,
