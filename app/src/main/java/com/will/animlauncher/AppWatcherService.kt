@@ -273,11 +273,18 @@ class AppWatcherService : AccessibilityService() {
         else if (dansRecents && ((app == ecranAccueil && classe == "Launcher") || (app != ecranAccueil && estVraieApp))) {
             finRecents()
             // On a touché une carte des apps récentes : l'app reprend depuis l'arrière-plan.
-            // Si elle affiche quand même son écran de démarrage, c'est qu'elle le fait à chaque fois
-            // (comme Gmail ou YouTube) : on le retient.
-            if (app != ecranAccueil && classe == "FrameLayout" && app !in splashToujours()) {
-                retenirSplash(app)
-                noter("  (appris : $app affiche son écran de démarrage même en reprise)")
+            // Si elle affiche quand même son écran de démarrage, c'est PEUT-ÊTRE qu'elle le fait à
+            // chaque fois (comme Gmail ou YouTube)… ou simplement qu'Android l'avait fermée en
+            // douce pour libérer de la mémoire (elle redémarre alors vraiment).
+            // Pour ne pas confondre les deux, on ne compte que les reprises d'une app quittée il y a
+            // moins de 3 minutes (Android ne ferme presque jamais une app aussi vite), et il faut
+            // l'avoir vu 2 fois avant de le retenir. (Avant, une seule fois suffisait : Claude avait
+            // été retenu à tort, et son animation ne se lançait plus.)
+            val quitteeIlYa = dejaOuvertes[app]?.let { SystemClock.uptimeMillis() - it }
+            if (app != ecranAccueil && classe == "FrameLayout" && app !in splashToujours() &&
+                quitteeIlYa != null && quitteeIlYa < 3 * 60_000L) {
+                if (retenirSplash(app)) noter("  (appris : $app affiche son écran de démarrage même en reprise)")
+                else noter("  ($app affiche son écran de démarrage en reprise : 1re fois, on attend de le revoir)")
             }
         }
 
@@ -529,13 +536,22 @@ class AppWatcherService : AccessibilityService() {
     private val splashDeBase = setOf(
         "com.google.android.gm", "com.google.android.youtube", "app.revanced.android.youtube"
     )
+    // (La liste apprise s'appelle maintenant « splash_toujours_v2 » : l'ancienne, qui contenait des
+    // erreurs, est ainsi oubliée et tout est réappris proprement.)
     private fun splashToujours(): Set<String> =
         splashDeBase + (getSharedPreferences("apprentissage", Context.MODE_PRIVATE)
-            .getStringSet("splash_toujours", emptySet()) ?: emptySet())
-    private fun retenirSplash(app: String) {
+            .getStringSet("splash_toujours_v2", emptySet()) ?: emptySet())
+    // Compte une observation ; renvoie true quand l'app vient d'être retenue (2e observation).
+    private fun retenirSplash(app: String): Boolean {
         val carnet = getSharedPreferences("apprentissage", Context.MODE_PRIVATE)
-        val liste = (carnet.getStringSet("splash_toujours", emptySet()) ?: emptySet()) + app
-        carnet.edit().putStringSet("splash_toujours", liste.toSet()).apply()
+        val vu = carnet.getInt("splash_vu_$app", 0) + 1
+        if (vu < 2) {
+            carnet.edit().putInt("splash_vu_$app", vu).apply()
+            return false
+        }
+        val liste = (carnet.getStringSet("splash_toujours_v2", emptySet()) ?: emptySet()) + app
+        carnet.edit().putStringSet("splash_toujours_v2", liste.toSet()).remove("splash_vu_$app").apply()
+        return true
     }
 
     // ---------------- LES APPS RÉCENTES ----------------
