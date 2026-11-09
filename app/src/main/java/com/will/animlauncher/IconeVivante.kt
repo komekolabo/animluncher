@@ -95,7 +95,7 @@ class IconeVivante(private val service: AccessibilityService) {
             noter("  (icône vivante : écran de l'accueil « $classe »)")
         val avant = surAccueil
         surAccueil = app == accueil && classe == "Launcher"
-        if (!surAccueil) { cacher(); return }
+        if (!surAccueil) { cacher("écran « $classe » de $app"); return }
         if (!avant) minuteur.postDelayed({ evaluer("retour sur l'accueil") }, 300)
     }
 
@@ -104,14 +104,14 @@ class IconeVivante(private val service: AccessibilityService) {
     // Si on est toujours sur l'accueil 1,2 s plus tard (ex. un dossier ouvert puis refermé),
     // on la remet.
     fun surClic() {
-        cacher()
+        cacher("appui")
         minuteur.postDelayed({ evaluer("après un appui sur l'accueil") }, 1200)
     }
 
     // L'écran d'accueil défile (changement de page, tiroir d'apps…).
     fun surDefilement(event: AccessibilityEvent, accueil: String?) {
         if (event.packageName?.toString() != accueil) return
-        cacher()
+        cacher("défilement")
         // On garde une copie des chiffres (Android réutilise l'objet « event » après nous).
         dernierDefilement = AccessibilityEvent.obtain(event)
         defileA = SystemClock.uptimeMillis()
@@ -149,9 +149,9 @@ class IconeVivante(private val service: AccessibilityService) {
             ?: return pas("position de l'icône inconnue : ferme AnimLauncher, puis ouvre-la depuis son icône sur une page de l'accueil")
         val ecran = service.resources.displayMetrics
         if (ecran.widthPixels != IconeAccueil.largeur(service)) {                          // autre écran
-            cacher(); return pas("écran de ${ecran.widthPixels} de large au lieu de ${IconeAccueil.largeur(service)}")
+            cacher("autre écran"); return pas("écran de ${ecran.widthPixels} de large au lieu de ${IconeAccueil.largeur(service)}")
         }
-        if (!bonnePage()) { cacher(); return pas("pas sur la page de l'icône") }
+        if (!bonnePage()) { cacher("autre page"); return pas("pas sur la page de l'icône") }
         derniereRaison = null
         montrer(r, raison)
     }
@@ -224,10 +224,13 @@ class IconeVivante(private val service: AccessibilityService) {
     }
 
     // On retire la fenêtre (plutôt que la cacher) : rien ne tourne quand elle n'est pas là.
-    fun cacher() {
+    // « pourquoi » : noté dans le journal (les 15 premières fois), pour comprendre ce qui la retire.
+    private var notesRetrait = 0
+    fun cacher(pourquoi: String = "rotation ou changement d'écran") {
         val v = vue ?: return
         try { gestionnaire.removeView(v) } catch (_: Exception) {}
         vue = null; reglages = null
+        if (notesRetrait < 15) { notesRetrait++; noter("  (icône vivante retirée : $pourquoi)") }
     }
 
     private fun noter(texte: String) {
@@ -285,9 +288,10 @@ class VueIconeVivante(context: Context) : View(context) {
         c.translate(-54f, -54f)
         c.scale(0.8f, 0.8f, 54f, 54f)          // même réduction que l'icône
 
-        // 3) LA LÉVITATION : le logo monte et descend de 2 (sur 108), en 3,2 secondes.
-        val vol = 0.5f + 0.5f * sin(t * 2f * PI.toFloat() / 3.2f)   // 0 = en bas, 1 = en haut
-        val levee = -2f * vol
+        // 3) LA LÉVITATION : le logo monte et descend de 4,5 (sur 108), en 3 secondes.
+        //    (Au 1er essai, 2 était trop discret : à la taille d'une icône, ça ne faisait que 3 pixels.)
+        val vol = 0.5f + 0.5f * sin(t * 2f * PI.toFloat() / 3f)     // 0 = en bas, 1 = en haut
+        val levee = -4.5f * vol
 
         // son ombre au sol : plus petite et plus pâle quand le logo est haut
         val largeurOmbre = 20f - 3f * vol
@@ -303,12 +307,15 @@ class VueIconeVivante(context: Context) : View(context) {
             Color.argb((50 + 35 * vol).toInt(), 247, 201, 72), Color.TRANSPARENT, Shader.TileMode.CLAMP)
         c.drawCircle(54f, 61f, 16f, halo)
 
-        // 5) LE TOUR : toutes les 7 secondes, le triangle fait un tiers de tour en 1,4 s, en
+        // 5) LE TOUR : toutes les 4,5 secondes, le triangle fait un tiers de tour en 1,2 s, en
         //    démarrant et en freinant en douceur. Entre deux tours, il reste immobile.
-        val cycle = 7f
-        val numero = floor(t / cycle)
-        val dansCycle = t - numero * cycle
-        val progres = min(1f, dansCycle / 1.4f)
+        //    Le 1er tour attend 1,5 s : sinon il se jouait pendant l'animation de retour sur l'accueil
+        //    de Samsung, et on ne le voyait pas.
+        val cycle = 4.5f
+        val tt = t + cycle - 1.5f
+        val numero = floor(tt / cycle)
+        val dansCycle = tt - numero * cycle
+        val progres = min(1f, dansCycle / 1.2f)
         val doux = progres * progres * (3f - 2f * progres)          // départ et arrêt en douceur
         val angle = (numero * 120f + 120f * doux) % 360f
         c.save()
