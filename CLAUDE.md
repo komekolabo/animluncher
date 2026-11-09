@@ -17,6 +17,7 @@ Objectif : la publier sur le Google Play Store, avec une pub non invasive.
   qui imite `Outils.kt` (halo, tache, révélations…), écran 540 x 1320, vitesse réelle puis ralenti x0,5.
   Il ne vit pas dans le repo : à recréer si besoin (la session précédente l'avait dans /home/claude/apercu).
 - **Les arcs / horizons / anneaux de planète en bas d'écran sont réservés aux animations de Claude.**
+  (Exception voulue par Will le 10/11 : le tour lumineux de la réaction sonore passe aussi en bas.)
 - **Varier les révélations** (pas toujours un cercle) : Outils propose cercle doux, balayage, bandes,
   trame de points, colonnes, tuiles, fente.
 - Textes affichés dans les animations : **en anglais**.
@@ -120,13 +121,21 @@ Objectif : la publier sur le Google Play Store, avec une pub non invasive.
   une fenêtre d'accessibilité transparente et non touchable posée par le service (c'est `Rideau.onAttachedToWindow`
   qui appelle `ReactionSonore.demarrer` : pas besoin de toucher à AppWatcherService). Elle ne dessine que si
   `AudioManager.isMusicActive`, et s'efface en plein écran (barre d'état cachée = vidéo / jeu) et en paysage.
-  4 styles choisis par Will sur aperçu : Aurore, Cordes, Verre liquide, Prisme (graves / mélodie / aigus ont chacun
-  leur effet ; lumière additive, halos BlurMaskFilter ; rien en bas de l'écran = réservé à Claude).
+  UN SEUL DESSIN depuis le 10/11 (Aurore, Cordes, Verre liquide retirés) : le PRISME en TOUR COMPLET de l'écran
+  (bas compris, suit l'arrondi des coins via `RoundedCorner`), ligne à 5 dp du bord ; la BANDE entre la ligne et
+  le bord se colore selon le son à chaque endroit (vers le blanc quand c'est fort), + halo qui déborde vers
+  l'intérieur. « Piano » : graves en bas (vague qui monte des deux côtés), mélodie sur les côtés, aigus en haut.
+  2 palettes (carnet « son », clé « style ») : 0 = CHAUDE (braise -> orange -> or), 1 = FROIDE (violet -> bleu ->
+  turquoise). La fenêtre fait la taille RÉELLE de l'écran (`getRealSize` + `setFitInsetsTypes(0)`, comme le rideau).
+  Aperçu validé : /home/claude/apercu/prisme2.py (prisme_tour_complet.mp4).
+  PLEIN ÉCRAN : notre fenêtre est au-dessus de la barre d'état et n'en reçoit pas les infos -> 1re version
+  croyait toujours être en plein écran et ne dessinait jamais (corrigé : repli sur `currentWindowMetrics`,
+  sinon « pas plein écran »). La fenêtre du rond affiche un DIAGNOSTIC en direct (✓/✗) quand le mode est allumé.
   `ReactionSonoreUi.kt` = `BoutonSon` (rond en bas à droite de l'accueil) + `FenetreSon` (feuille du bas :
-  explication « rien n'est enregistré », choix du style, Activer -> question micro d'Android).
+  explication « rien n'est enregistré », choix de la palette, diagnostic, Activer -> question micro d'Android).
   Textes dans `res/values*/strings_son.xml` (6 langues). Aperçus : /home/claude/apercu/premium.py (avec musique).
-  PAS ENCORE TESTÉ SUR TÉLÉPHONE (écrit sans pouvoir compiler ici) : à vérifier = le Visualizer donne-t-il bien des
-  mesures quand l'app est en arrière-plan (Samsung, Android 16) ? la détection du plein écran marche-t-elle ?
+  Testé par Will le 10/11 : la ligne s'affiche (après la correction du plein écran). Reste à confirmer : la
+  réaction quand l'app est en arrière-plan, et la disparition en vidéo plein écran.
   Play Store : la permission micro devra être justifiée dans la fiche (option éteinte de base, écran d'explication).
   Will aimait aussi le style « Souffle » (les cartes de l'accueil qui respirent sur les basses) : pas encore codé.
 - `Reglages.kt` : kill switch, « seulement au démarrage », réglages par app (durée, variantes).
