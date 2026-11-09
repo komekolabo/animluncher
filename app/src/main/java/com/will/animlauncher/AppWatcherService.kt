@@ -1,8 +1,10 @@
 package com.will.animlauncher
 
 import android.accessibilityservice.AccessibilityService
+import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
+import android.content.IntentFilter
 import android.content.res.Configuration
 import android.graphics.PixelFormat
 import android.graphics.Point
@@ -69,6 +71,33 @@ class AppWatcherService : AccessibilityService() {
         noter("=== Service démarré (allumage ou réactivation) ===")
         noms = calculerNoms()      // préparé à l'avance : le clic doit être traité instantanément
         installerRideau()          // la fenêtre des animations, prête d'avance (voir Rideau.kt)
+        // on veut savoir quand l'écran s'éteint et se rallume (temps passé dans les apps, widget « top 3 »)
+        try {
+            val filtre = IntentFilter().apply { addAction(Intent.ACTION_SCREEN_OFF); addAction(Intent.ACTION_SCREEN_ON); addAction(Intent.ACTION_USER_PRESENT) }
+            if (Build.VERSION.SDK_INT >= 33) registerReceiver(ecouteEcran, filtre, Context.RECEIVER_NOT_EXPORTED)
+            else registerReceiver(ecouteEcran, filtre)
+        } catch (e: Exception) {
+            noter("ERREUR écoute de l'écran : ${e.message}")
+        }
+    }
+
+    // L'ÉCRAN S'ÉTEINT OU SE RALLUME. Éteint : on arrête de compter le temps de l'app en cours (voir Usage.kt)
+    // et l'animation du widget « top 3 » (voir WidgetTop.kt). Rallumé et déverrouillé : on reprend.
+    private val ecouteEcran = object : BroadcastReceiver() {
+        override fun onReceive(c: Context, intention: Intent) {
+            try {
+                if (intention.action == Intent.ACTION_SCREEN_OFF) {
+                    Usage.auPremierPlan(this@AppWatcherService, null)
+                    WidgetTop.pause()
+                } else {
+                    val app = derniereApp
+                    Usage.auPremierPlan(this@AppWatcherService, if (app == ecranAccueil) null else app)
+                    if (app == ecranAccueil) WidgetTop.surAccueil(this@AppWatcherService)
+                }
+            } catch (e: Exception) {
+                noter("ERREUR (rattrapée) écran : " + Journal.pile(e))
+            }
+        }
     }
 
     override fun onAccessibilityEvent(event: AccessibilityEvent) {
@@ -303,6 +332,10 @@ class AppWatcherService : AccessibilityService() {
         if (app == derniereApp) return
         val precedente = derniereApp
         derniereApp = app
+        // le temps passé dans chaque app (pour le top 3 des dossiers), et l'animation du widget « top 3 »,
+        // qui ne tourne que lorsqu'on est sur l'écran d'accueil
+        Usage.auPremierPlan(this, if (app == ecranAccueil) null else app)
+        if (app == ecranAccueil) WidgetTop.surAccueil(this) else WidgetTop.pause()
         // l'app qu'on quitte : on note l'heure (elle reste ouverte en arrière-plan)
         if (precedente != null && precedente != ecranAccueil) dejaOuvertes[precedente] = SystemClock.uptimeMillis()
         val etaitOuverte = app != ecranAccueil && enArrierePlan(app)
@@ -707,6 +740,9 @@ class AppWatcherService : AccessibilityService() {
     override fun onInterrupt() {}
 
     override fun onDestroy() {
+        try { unregisterReceiver(ecouteEcran) } catch (_: Exception) {}
+        Usage.auPremierPlan(this, null)
+        WidgetTop.pause()
         if (actif === this) actif = null
         super.onDestroy()
     }
