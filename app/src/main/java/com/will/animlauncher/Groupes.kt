@@ -11,15 +11,20 @@ import android.content.pm.ApplicationInfo
 // COMMENT ON TROUVE LA CATÉGORIE D'UNE APP :
 //  1) d'abord NOTRE liste d'apps connues (plus précise : Android ne connaît pas la catégorie « IA »,
 //     ni « Finance ») ;
-//  2) sinon, la catégorie que l'app déclare elle-même à Android (jeu, musique, photo, plans…).
-//     Beaucoup d'apps n'en déclarent aucune : elles restent alors hors des groupes.
+//  2) sinon, la catégorie que l'app déclare elle-même à Android (jeu, musique, photo, plans…) ;
+//  3) sinon (ajout du 09/11), des MOTS dans le nom de l'app : « Samsung Health » contient « health »
+//     → Santé, « Galaxy Store » contient « store » → Shopping, « Paramètres » → Réglages…
+//     Un mot compte seulement s'il est au DÉBUT d'un mot du nom (« fit » trouve « Fitbit », pas « Profit »).
+//  Les apps qui ne passent aucun de ces tests restent hors des groupes (« Non répertorié »).
 // L'utilisateur peut ensuite décocher une app d'un groupe (elle est retenue dans le carnet « groupes »).
 // Les noms des groupes sont en anglais, comme tous les textes affichés dans les animations.
 object Groupes {
 
     // Une catégorie : son identifiant (pour les réglages), son nom affiché, nos apps connues,
     // et les catégories Android qui vont avec.
-    class Categorie(val id: String, val nom: String, val connues: Set<String>, val android: Set<Int> = emptySet())
+    // « mots » : les débuts de mots qui, dans le nom de l'app, suffisent à la ranger ici (en minuscules, sans accents).
+    class Categorie(val id: String, val nom: String, val connues: Set<String>, val android: Set<Int> = emptySet(),
+                    val mots: Set<String> = emptySet())
 
     val CATEGORIES = listOf(
         Categorie("ia", "AI", setOf(
@@ -31,8 +36,10 @@ object Groupes {
             "com.samsung.android.messaging", "com.google.android.apps.messaging", "com.facebook.katana",
             "com.facebook.orca", "com.snapchat.android", "org.telegram.messenger", "com.zhiliaoapp.musically",
             "com.reddit.frontpage", "com.linkedin.android", "org.thoughtcrime.securesms",
-            "com.instagram.barcelona", "xyz.blueskyweb.app", "com.google.android.apps.tachyon"),
-            setOf(ApplicationInfo.CATEGORY_SOCIAL)),
+            "com.instagram.barcelona", "xyz.blueskyweb.app", "com.google.android.apps.tachyon",
+            "com.samsung.android.app.contacts", "com.samsung.android.dialer", "com.google.android.dialer",
+            "com.google.android.contacts"),
+            setOf(ApplicationInfo.CATEGORY_SOCIAL), setOf("messag", "chat")),
         Categorie("musique", "Music & Video", setOf(
             "com.spotify.music", "app.revanced.android.youtube", "com.google.android.youtube",
             "com.netflix.mediaclient", "deezer.android.app", "tv.twitch.android.app",
@@ -47,8 +54,8 @@ object Groupes {
             "com.playstack.balatro.android", "com.supercell.clashofclans", "com.chess",
             "com.robtopx.geometryjumplite", "com.robtopx.geometrydashmeltdown", "com.BlackSaltGames.DREDGE",
             "com.dsemu.drastic", "com.chessbar", "com.strayfawnstudio.gambonanza", "com.venezianoapp.frusta",
-            "com.google.android.play.games", "tv.parsec.client"),
-            setOf(ApplicationInfo.CATEGORY_GAME)),
+            "com.google.android.play.games", "tv.parsec.client", "com.duolingo"),
+            setOf(ApplicationInfo.CATEGORY_GAME), setOf("game", "jeu", "chess", "puzzle")),
         Categorie("finance", "Finance", setOf(
             "com.revolut.revolut", "com.fullsix.android.labanquepostale.accountaccess", "nl.degiro.trader",
             "de.traderepublic.app", "com.kraken.invest.app", "com.ledger.live", "com.kraken.pay.app",
@@ -56,7 +63,8 @@ object Groupes {
             "network.bisq.mobile.node", "com.btcframe", "com.microstrategy.stream",
             "com.google.android.apps.walletnfcrel", "com.paypal.android.p2pmobile", "com.lydia",
             "com.boursorama.android.clients", "fr.creditagricole.androidapp", "net.bnpparibas.mescomptes",
-            "com.binance.dev", "com.coinbase.android")),
+            "com.binance.dev", "com.coinbase.android", "com.samsung.android.spay"),
+            emptySet(), setOf("bank", "banque", "wallet", "crypto", "bourse")),
         Categorie("trajets", "Maps & Travel", setOf(
             "com.google.android.apps.maps", "ee.mtakso.client", "com.fabernovel.ratp", "com.airbnb.android",
             "com.ubercab", "com.waze", "com.google.earth", "com.vsct.vsc.mobile.horaireetresa.android",
@@ -68,10 +76,36 @@ object Groupes {
             "com.microsoft.skydrive", "com.github.android", "com.google.android.apps.translate",
             "com.sec.android.app.myfiles"),
             setOf(ApplicationInfo.CATEGORY_PRODUCTIVITY)),
-        Categorie("infos", "News", emptySet(), setOf(ApplicationInfo.CATEGORY_NEWS)),
+        // les 3 catégories ajoutées le 09/11 (demande de Will)
+        Categorie("sante", "Health", setOf(
+            "com.sec.android.app.shealth", "com.samsung.android.shealthmonitor", "com.google.android.apps.fitness",
+            "com.fitbit.FitbitMobile", "com.strava", "com.doctolib.android", "fr.cnamts.it.activity"),
+            emptySet(), setOf("health", "sante", "fit", "medic", "pharma", "sleep", "sommeil", "doctolib", "ameli")),
+        Categorie("shopping", "Shopping", setOf(
+            "com.sec.android.app.samsungapps", "com.android.vending", "com.amazon.mShop.android.shopping",
+            "fr.vinted", "fr.leboncoin", "com.einnovation.temu", "com.alibaba.aliexpresshd", "com.zzkko",
+            "com.ebay.mobile", "com.cdiscount.android", "com.samsung.ecomm.global", "com.samsung.android.shop"),
+            emptySet(), setOf("shop", "store", "amazon", "vinted", "leboncoin", "temu", "aliexpress", "shein", "ebay")),
+        Categorie("reglages", "Settings", setOf(
+            "com.android.settings", "com.google.android.gms", "com.samsung.android.app.tips",
+            "com.samsung.android.oneconnect", "com.google.android.apps.authenticator2", "com.samsung.android.lool",
+            "com.sec.android.app.popupcalculator", "com.sec.android.app.clockpackage", "com.samsung.android.app.galaxyfinder",
+            "app.revanced.manager.flutter", "app.revanced.manager"),
+            emptySet(), setOf("settings", "parametre", "reglage", "manager", "authenticator", "vpn", "launcher", "clavier", "keyboard")),
+        Categorie("infos", "News", setOf("com.samsung.android.app.spage"), setOf(ApplicationInfo.CATEGORY_NEWS), setOf("news", "actu")),
     )
 
     fun categorie(id: String): Categorie? = CATEGORIES.firstOrNull { it.id == id }
+
+    // LA CATÉGORIE D'UNE APP (les 3 tests expliqués en haut du fichier), ou null si aucun ne marche.
+    // « code » = la catégorie qu'Android connaît pour l'app ; « nom » = son nom affiché (« Samsung Health »).
+    fun trouver(pkg: String, code: Int, nom: String): Categorie? {
+        CATEGORIES.firstOrNull { pkg in it.connues }?.let { return it }
+        CATEGORIES.firstOrNull { code in it.android }?.let { return it }
+        // le nom découpé en mots : « Samsung Health » → [« samsung », « health »]
+        val mots = AppsActivity.sansAccents(nom).split(Regex("[^\\p{L}\\p{N}]+")).filter { it.isNotEmpty() }
+        return CATEGORIES.firstOrNull { cat -> cat.mots.any { debut -> mots.any { it.startsWith(debut) } } }
+    }
 
     // Le nom affiché d'une app (« Claude »), ou son nom technique si on ne le trouve pas.
     fun nomApp(c: Context, pkg: String): String = try {
@@ -89,9 +123,7 @@ object Groupes {
         val rangees = LinkedHashMap<String, MutableList<String>>()
         for (pkg in paquets) {
             val code = try { pm.getApplicationInfo(pkg, 0).category } catch (_: Exception) { ApplicationInfo.CATEGORY_UNDEFINED }
-            val cat = CATEGORIES.firstOrNull { pkg in it.connues }
-                ?: CATEGORIES.firstOrNull { code in it.android }
-                ?: continue
+            val cat = trouver(pkg, code, nomApp(c, pkg)) ?: continue
             rangees.getOrPut(cat.id) { mutableListOf() }.add(pkg)
         }
         // Les apps de chaque groupe, par ordre alphabétique de leur nom affiché.

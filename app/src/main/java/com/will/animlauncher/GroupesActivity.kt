@@ -15,12 +15,15 @@ import android.graphics.drawable.Drawable
 import android.os.Bundle
 import android.os.Handler
 import android.os.Looper
+import android.text.Editable
+import android.text.TextWatcher
 import android.view.Gravity
 import android.view.MotionEvent
 import android.view.View
 import android.view.ViewGroup
 import android.view.ViewOutlineProvider
 import android.widget.CheckBox
+import android.widget.EditText
 import android.widget.FrameLayout
 import android.widget.ImageView
 import android.widget.LinearLayout
@@ -38,8 +41,9 @@ import kotlin.math.sin
 //   ACCUEIL : l'écran coupé en deux, DE BIAIS (voir la classe DeuxZones, en bas du fichier).
 //      ├─ en haut : DOSSIERS  → une barre par dossier animé (IA, Jeux…)
 //      │               └─ DOSSIER : le dossier choisi (le voir, le poser sur l'accueil, choisir ses apps)
-//      └─ en bas : ICONES    → une barre par catégorie d'apps (et le logo d'AnimLauncher en premier)
+//      └─ en bas : ICONES    → une recherche, puis une barre par catégorie d'apps (et le logo d'AnimLauncher)
 //                      └─ APPS : les apps de la catégorie ; un appui pose l'icône animée de l'app
+//   Dans ICONES, dès qu'on tape une lettre, les barres laissent la place aux apps trouvées.
 //
 // Les dossiers viennent de Groupes.kt (widget : WidgetGroupe). Les icônes animées d'une seule app
 // sont le widget « galet » (WidgetApp.kt) ; le rangement de toutes les apps vient de Rayons.kt.
@@ -63,6 +67,10 @@ class GroupesActivity : Activity() {
 
     // Le défilement des icônes à droite des barres : chaque icône, et la liste des apps qu'elle fait défiler.
     private val defilants = ArrayList<Pair<ImageView, List<String>>>()
+    // Les mini dossiers à droite des barres de dossiers : 4 icônes à la fois (une page de 4, puis la suivante).
+    private val defilants4 = ArrayList<Pair<MiniDossier, List<String>>>()
+    private var cherche = ""         // ce qui est tapé dans la recherche des icônes d'apps (en minuscules, sans accents)
+    private var chercheTape = ""     // le même texte, tel qu'il a été tapé (pour le remettre dans la case)
     private val icones = HashMap<String, Drawable?>()
     private val principal = Handler(Looper.getMainLooper())
     private var tour = 0
@@ -93,6 +101,7 @@ class GroupesActivity : Activity() {
     // ================= LA NAVIGATION ENTRE LES 5 ÉTATS =================
 
     private fun aller(nouvelEtat: Int, id: String = "") {
+        if (nouvelEtat == ACCUEIL) { cherche = ""; chercheTape = "" }      // en revenant à l'écran coupé en deux, on oublie la recherche
         etat = nouvelEtat
         choisi = id
         construire()
@@ -116,6 +125,7 @@ class GroupesActivity : Activity() {
     // Fabrique l'écran de l'état en cours : l'en-tête (flèche + titre), puis le contenu.
     private fun construire() {
         defilants.clear()
+        defilants4.clear()
         val corps: View
         val titre: String
         when (etat) {
@@ -181,7 +191,7 @@ class GroupesActivity : Activity() {
         colonne.addView(note(getString(R.string.dossiers_choix)))
         for ((cat, _) in dossiers) {
             val dedans = Groupes.apps(this, cat.id)        // les apps du dossier, sans celles qu'on a décochées
-            colonne.addView(barre(Rayons.nom(this, cat.id), getString(R.string.n_apps, dedans.size), iconeDefilante(dedans)) {
+            colonne.addView(barre(Rayons.nom(this, cat.id), getString(R.string.n_apps, dedans.size), miniDossier(dedans)) {
                 aller(DOSSIER, cat.id)
             })
         }
@@ -250,9 +260,52 @@ class GroupesActivity : Activity() {
 
     // ================= ÉTAT 3 : LES ICÔNES ANIMÉES, PAR CATÉGORIE =================
 
+    // En haut, une recherche (elle reste en place) ; dessous, la liste, refaite à chaque lettre tapée.
     private fun ecranIcones(): View {
         val colonne = colonne()
+        val recherche = EditText(this).apply {
+            hint = getString(R.string.rechercher)
+            setHintTextColor(Color.rgb(142, 142, 150))
+            setTextColor(Style.TEXTE)
+            textSize = 16f
+            isSingleLine = true
+            background = Style.arrondi(this@GroupesActivity, Style.CARTE, 16f, Style.BORD)
+            setPadding(px(18f), px(13f), px(18f), px(13f))
+            setText(chercheTape)                 // en revenant ici, on retrouve ce qu'on avait tapé
+            addTextChangedListener(object : TextWatcher {
+                override fun beforeTextChanged(s: CharSequence?, a: Int, b: Int, c: Int) {}
+                override fun onTextChanged(s: CharSequence?, a: Int, b: Int, c: Int) {}
+                override fun afterTextChanged(s: Editable?) {
+                    chercheTape = s?.toString() ?: ""
+                    cherche = AppsActivity.sansAccents(chercheTape.trim())
+                    remplirIcones(colonne)
+                }
+            })
+        }
+        remplirIcones(colonne)
+        return LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            addView(recherche, LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT)
+                .apply { leftMargin = px(16f); rightMargin = px(16f); bottomMargin = px(12f) })
+            addView(defilement(colonne), LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, 0, 1f))
+        }
+    }
+
+    // Remplit la liste sous la recherche : les barres de catégories, ou les apps trouvées si on cherche.
+    private fun remplirIcones(colonne: LinearLayout) {
+        colonne.removeAllViews()
+        defilants.clear()
         colonne.addView(note(getString(R.string.icones_note)))
+        if (cherche.isNotEmpty()) {
+            // toutes les apps, avec leur nom ; on garde celles qui correspondent, les meilleures d'abord
+            val trouvees = rayons.values.flatten().distinct()
+                .map { it to AppsActivity.sansAccents(Groupes.nomApp(this, it)) }
+                .map { Triple(it.first, it.second, Rayons.rang(it.second, cherche)) }
+                .filter { it.third >= 0 }
+                .sortedWith(compareBy({ it.third }, { it.second }))
+            for (t in trouvees) colonne.addView(ligneApp(t.first))
+            return
+        }
         // en premier : le logo animé d'AnimLauncher lui-même (voir LogoWidget.kt)
         colonne.addView(barre(getString(R.string.app_name), getString(R.string.logo_anime_note), LogoAnime(this)) {
             if (!LogoWidget.proposer(this)) aideWidget()
@@ -262,7 +315,6 @@ class GroupesActivity : Activity() {
                 aller(APPS, id)
             })
         }
-        return defilement(colonne)
     }
 
     // ================= ÉTAT 4 : LES APPS D'UNE CATÉGORIE =================
@@ -270,33 +322,34 @@ class GroupesActivity : Activity() {
     private fun ecranApps(): View {
         val colonne = colonne()
         colonne.addView(note(getString(R.string.icones_note)))
-        for (pkg in rayons[choisi] ?: emptyList()) {
-            colonne.addView(LinearLayout(this).apply {
-                orientation = LinearLayout.HORIZONTAL
-                gravity = Gravity.CENTER_VERTICAL
-                background = Style.arrondi(this@GroupesActivity, Style.CARTE, 18f, Style.BORD)
-                minimumHeight = px(64f)
-                setPadding(px(14f), px(10f), px(12f), px(10f))
-                appuyable(this)
-                addView(ImageView(this@GroupesActivity).apply { setImageDrawable(charger(pkg)) },
-                    LinearLayout.LayoutParams(px(40f), px(40f)))
-                addView(Style.texte(this@GroupesActivity, Groupes.nomApp(this@GroupesActivity, pkg), 16f, Style.TEXTE)
-                    .apply { setPadding(px(14f), 0, px(8f), 0) },
-                    LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f))
-                // le petit « + » rond : il rappelle qu'un appui pose l'icône sur l'accueil
-                addView(Style.texte(this@GroupesActivity, "+", 20f, Style.TEXTE).apply {
-                    gravity = Gravity.CENTER
-                    background = Style.arrondi(this@GroupesActivity, Color.argb(20, 255, 255, 255), 18f, Color.rgb(63, 63, 70))
-                }, LinearLayout.LayoutParams(px(36f), px(36f)))
-                setOnClickListener { if (!WidgetApp.proposer(this@GroupesActivity, pkg)) aideWidget() }
-                layoutParams = LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT)
-                    .apply { bottomMargin = px(8f) }
-            })
-        }
+        for (pkg in rayons[choisi] ?: emptyList()) colonne.addView(ligneApp(pkg))
         return defilement(colonne)
     }
 
     // ================= LES PETITES PIÈCES COMMUNES =================
+
+    // UNE LIGNE D'APP : son icône, son nom, et un « + ». Un appui propose de poser son icône animée.
+    private fun ligneApp(pkg: String): View = LinearLayout(this).apply {
+        orientation = LinearLayout.HORIZONTAL
+        gravity = Gravity.CENTER_VERTICAL
+        background = Style.arrondi(this@GroupesActivity, Style.CARTE, 18f, Style.BORD)
+        minimumHeight = px(64f)
+        setPadding(px(14f), px(10f), px(12f), px(10f))
+        appuyable(this)
+        addView(ImageView(this@GroupesActivity).apply { setImageDrawable(charger(pkg)) },
+            LinearLayout.LayoutParams(px(40f), px(40f)))
+        addView(Style.texte(this@GroupesActivity, Groupes.nomApp(this@GroupesActivity, pkg), 16f, Style.TEXTE)
+            .apply { setPadding(px(14f), 0, px(8f), 0) },
+            LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f))
+        // le petit « + » rond : il rappelle qu'un appui pose l'icône sur l'accueil
+        addView(Style.texte(this@GroupesActivity, "+", 20f, Style.TEXTE).apply {
+            gravity = Gravity.CENTER
+            background = Style.arrondi(this@GroupesActivity, Color.argb(20, 255, 255, 255), 18f, Color.rgb(63, 63, 70))
+        }, LinearLayout.LayoutParams(px(36f), px(36f)))
+        setOnClickListener { if (!WidgetApp.proposer(this@GroupesActivity, pkg)) aideWidget() }
+        layoutParams = LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT)
+            .apply { bottomMargin = px(8f) }
+    }
 
     private fun colonne() = LinearLayout(this).apply {
         orientation = LinearLayout.VERTICAL
@@ -335,7 +388,8 @@ class GroupesActivity : Activity() {
             addView(Style.texte(this@GroupesActivity, nom, 19f, Style.TEXTE, gras = true))
             addView(Style.texte(this@GroupesActivity, detail, 13f, Style.MUET).apply { setPadding(0, px(2f), 0, 0) })
         }, LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f))
-        addView(droite, LinearLayout.LayoutParams(px(48f), px(48f)))
+        val cote = if (droite is MiniDossier) 56f else 48f       // le mini dossier est un peu plus grand
+        addView(droite, LinearLayout.LayoutParams(px(cote), px(cote)))
         addView(Style.texte(this@GroupesActivity, "›", 24f, Style.MUET).apply { setPadding(px(12f), 0, px(4f), px(3f)) })
         setOnClickListener { action() }
         layoutParams = LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT)
@@ -347,6 +401,20 @@ class GroupesActivity : Activity() {
     private fun iconeDefilante(apps: List<String>): ImageView = ImageView(this).apply {
         if (apps.isNotEmpty()) setImageDrawable(icone(apps[tour % apps.size]))
         defilants.add(this to apps)
+    }
+
+    // Le mini dossier à droite d'une barre de dossier : les 4 premières apps, puis les 4 suivantes…
+    private fun miniDossier(apps: List<String>): MiniDossier = MiniDossier(this).apply {
+        montrer(page(apps, tour))
+        defilants4.add(this to apps)
+    }
+
+    // Les 4 apps de la « page » n° tour (on recommence au début quand on a tout vu).
+    private fun page(apps: List<String>, tour: Int): List<Drawable?> {
+        if (apps.isEmpty()) return emptyList()
+        val pages = (apps.size + 3) / 4                    // le nombre de pages de 4, arrondi au-dessus
+        val p = tour % pages
+        return apps.drop(p * 4).take(4).map { icone(it) }
     }
 
     // LE DÉFILEMENT : toutes les 2,4 s, l'ancienne icône glisse vers la gauche en s'effaçant,
@@ -364,6 +432,17 @@ class GroupesActivity : Activity() {
                     vue.setImageDrawable(suivante)
                     vue.translationX = glisse
                     vue.animate().alpha(1f).translationX(0f).setStartDelay(0L).setDuration(320).start()
+                }.start()
+            }
+            // les mini dossiers : tout le carré s'efface, prend les 4 apps suivantes, et revient
+            for ((i, d) in defilants4.withIndex()) {
+                val mini = d.first
+                val apps = d.second
+                if (apps.size <= 4) continue                   // une seule page : rien à faire défiler
+                val suivantes = page(apps, tour)
+                mini.animate().alpha(0f).scaleX(0.9f).scaleY(0.9f).setStartDelay(i * 90L).setDuration(260).withEndAction {
+                    mini.montrer(suivantes)
+                    mini.animate().alpha(1f).scaleX(1f).scaleY(1f).setStartDelay(0L).setDuration(320).start()
                 }.start()
             }
             principal.postDelayed(this, 2400)
@@ -477,5 +556,32 @@ class DeuxZones(context: Context, private val dossiers: List<List<Drawable>>, pr
             }
         }
         return true
+    }
+}
+
+// UN MINI DOSSIER : un carré arrondi gris foncé avec 4 petites icônes rangées 2 par 2,
+// comme un dossier sur l'écran d'accueil. « montrer » change les 4 icônes.
+class MiniDossier(context: Context) : LinearLayout(context) {
+    private val cases = List(4) { ImageView(context) }
+
+    init {
+        orientation = VERTICAL
+        gravity = Gravity.CENTER
+        val p = Style.px(context, 5f)
+        setPadding(p, p, p, p)
+        background = Style.arrondi(context, Color.rgb(26, 26, 30), 14f, Style.BORD)
+        for (rangee in 0..1) {
+            addView(LinearLayout(context).apply {
+                orientation = HORIZONTAL
+                for (k in 0..1) {
+                    addView(cases[rangee * 2 + k], LayoutParams(0, ViewGroup.LayoutParams.MATCH_PARENT, 1f)
+                        .apply { val m = Style.px(context, 2f); setMargins(m, m, m, m) })
+                }
+            }, LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, 0, 1f))
+        }
+    }
+
+    fun montrer(icones: List<Drawable?>) {
+        for ((i, case) in cases.withIndex()) case.setImageDrawable(icones.getOrNull(i))
     }
 }

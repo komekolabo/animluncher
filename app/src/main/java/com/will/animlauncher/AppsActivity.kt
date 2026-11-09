@@ -2,7 +2,6 @@ package com.will.animlauncher
 
 import android.app.Activity
 import android.content.Intent
-import android.content.pm.ApplicationInfo
 import android.graphics.Color
 import android.graphics.drawable.ColorDrawable
 import android.graphics.drawable.Drawable
@@ -32,10 +31,9 @@ import java.text.Normalizer
 //      l'animation ; un appui sur la ligne ouvre les réglages de l'app. « Retour » revient aux catégories.
 //   3. LA RECHERCHE : dès qu'on tape une lettre, on cherche dans TOUTES les apps, sans catégories.
 //
-// D'OÙ VIENT LA CATÉGORIE D'UNE APP ? Du même classement que les dossiers animés (voir Groupes.kt) :
-// d'abord notre liste d'apps connues, sinon la catégorie qu'Android connaît pour l'app (le Play Store
-// la donne pour les apps qu'il installe : jeu, musique, photo, social, actualités, cartes…).
-// Tout le reste va dans « Non répertorié ».
+// D'OÙ VIENT LA CATÉGORIE D'UNE APP ? Du même classement que les dossiers animés (voir Groupes.kt et
+// Rayons.kt) : notre liste d'apps connues, sinon la catégorie qu'Android connaît pour l'app, sinon des
+// mots de son nom (« Health » → Santé). Tout le reste va dans « Non répertorié ».
 class AppsActivity : Activity() {
 
     // Une app : son nom affiché, son nom technique, et l'identifiant de sa catégorie.
@@ -172,7 +170,10 @@ class AppsActivity : Activity() {
     private fun afficher() {
         val r = ouvert
         lignes = when {
-            cherche.isNotEmpty() -> toutes.filter { it.cle.contains(cherche) || it.pkg.contains(cherche) }
+            // la recherche : seulement dans le nom, les meilleures correspondances d'abord (voir Rayons.rang),
+            // puis, à égalité, celles qui ont une animation, puis l'ordre alphabétique
+            cherche.isNotEmpty() -> toutes.map { it to Rayons.rang(it.cle, cherche) }.filter { it.second >= 0 }
+                .sortedWith(compareBy({ it.second }, { !it.first.aUneAnimation }, { it.first.cle })).map { it.first }
             r != null -> r.apps
             else -> rayons
         }
@@ -204,47 +205,22 @@ class AppsActivity : Activity() {
     // puis les autres, par ordre alphabétique.
     private fun chargerApps(): List<AppDetectee> {
         // les apps que l'utilisateur a ajoutées lui-même à un dossier animé : on respecte son choix
-        val ajouts = Groupes.CATEGORIES.associate { it.id to Groupes.ajoutees(this, it.id) }
+        val ajouts = Rayons.ajouts(this)
         val intention = Intent(Intent.ACTION_MAIN).addCategory(Intent.CATEGORY_LAUNCHER)
         return packageManager.queryIntentActivities(intention, 0)
             .map { it.loadLabel(packageManager).toString().trim() to it.activityInfo.packageName }
             .filter { it.second != packageName }
             .distinctBy { it.second }
-            .map { AppDetectee(it.first, it.second, categorieDe(it.second, ajouts)) }
+            .map { AppDetectee(it.first, it.second, Rayons.categorieDe(this, it.second, it.first, ajouts)) }
             .sortedWith(compareBy<AppDetectee>({ !it.aUneAnimation }, { it.cle }))
-    }
-
-    // La catégorie d'une app : 1) le choix de l'utilisateur, 2) notre liste d'apps connues,
-    // 3) la catégorie qu'Android connaît pour cette app, 4) sinon « autres » (non répertorié).
-    private fun categorieDe(pkg: String, ajouts: Map<String, Set<String>>): String {
-        val code = try { packageManager.getApplicationInfo(pkg, 0).category }
-                   catch (_: Exception) { ApplicationInfo.CATEGORY_UNDEFINED }
-        val trouvee = Groupes.CATEGORIES.firstOrNull { pkg in (ajouts[it.id] ?: emptySet()) }
-            ?: Groupes.CATEGORIES.firstOrNull { pkg in it.connues }
-            ?: Groupes.CATEGORIES.firstOrNull { code in it.android }
-        return trouvee?.id ?: "autres"
     }
 
     // Les catégories, dans l'ordre de Groupes.kt, puis « Non répertorié ». Une catégorie vide n'est pas montrée.
     private fun ranger(): List<Rayon> {
         val parCategorie = toutes.groupBy { it.categorie }
-        val ids = Groupes.CATEGORIES.map { it.id } + "autres"
-        return ids.mapNotNull { id -> parCategorie[id]?.let { Rayon(id, nomCategorie(id), it) } }
+        val ids = Groupes.CATEGORIES.map { it.id } + Rayons.AUTRES
+        return ids.mapNotNull { id -> parCategorie[id]?.let { Rayon(id, Rayons.nom(this, id), it) } }
     }
-
-    // Le nom d'une catégorie, dans la langue de l'app (fichiers res/values*/categories.xml).
-    private fun nomCategorie(id: String): String = getString(when (id) {
-        "ia" -> R.string.cat_ia
-        "social" -> R.string.cat_social
-        "musique" -> R.string.cat_musique
-        "photo" -> R.string.cat_photo
-        "jeux" -> R.string.cat_jeux
-        "finance" -> R.string.cat_finance
-        "trajets" -> R.string.cat_trajets
-        "travail" -> R.string.cat_travail
-        "infos" -> R.string.cat_infos
-        else -> R.string.cat_autres
-    })
 
     private fun icone(pkg: String): Drawable? = icones.getOrPut(pkg) {
         try { packageManager.getApplicationIcon(pkg) } catch (_: Exception) { null }
