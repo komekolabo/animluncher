@@ -57,9 +57,12 @@ class JournalActivity : Activity() {
         }
 
         // --- les actions sur le journal ---
-        val barre = rangee(
-            bouton("Copier") { copier() },
-            bouton("Effacer") { Journal.effacer(this); contenu.text = Journal.texte(this) },
+        // (Version Store : pas d'Internet, donc pas de bouton « Envoyer » ni de clé GitHub.
+        // On copie le journal et on le colle dans Claude.)
+        val copierB = bouton("Copier") { copier() }
+        val effacerB = bouton("Effacer") { Journal.effacer(this); contenu.text = Journal.texte(this) }
+        val barre = if (BuildConfig.STORE) rangee(copierB, effacerB) else rangee(
+            copierB, effacerB,
             bouton("Envoyer") {
                 etat.text = "Envoi…"
                 Journal.envoyer(this) { message -> majEtat(); Toast.makeText(this, message, Toast.LENGTH_SHORT).show() }
@@ -78,8 +81,10 @@ class JournalActivity : Activity() {
             orientation = LinearLayout.VERTICAL
             setBackgroundColor(Color.parseColor("#1B2340"))
             setPadding(32, 120, 32, 32)
-            addView(rangee(caseJeton, enregistrer))
-            addView(etat)
+            if (!BuildConfig.STORE) {
+                addView(rangee(caseJeton, enregistrer))
+                addView(etat)
+            }
             addView(barre)
             // Le texte défile et prend toute la place restante (hauteur 0 + poids 1).
             addView(
@@ -99,6 +104,7 @@ class JournalActivity : Activity() {
 
     // La petite ligne d'état : envoi automatique actif ou non, dernier envoi, lien du ticket.
     private fun majEtat() {
+        if (BuildConfig.STORE) return
         val actif = Journal.jeton(this).isNotEmpty()
         val dernier = Journal.etat(this).ifBlank { "aucun envoi pour l'instant" }
         val lien = Journal.lienTicket(this)?.let { "\n$it" } ?: ""

@@ -91,7 +91,7 @@ class MainActivity : Activity() {
         }
 
         val boutonJournal = Button(this).apply {
-            text = "Ouvrir le journal (logs)"
+            text = if (BuildConfig.STORE) "Journal (diagnostic)" else "Ouvrir le journal (logs)"
             setOnClickListener {
                 startActivity(Intent(this@MainActivity, JournalActivity::class.java))
             }
@@ -129,9 +129,11 @@ class MainActivity : Activity() {
         colonne.addView(boutonVolet)
         colonne.addView(statut)
         colonne.addView(boutonAccessibilite)
-        // Les outils de développement (journal, liste des apps, mode standard) : version Perso seulement.
+        // Le journal : dans les deux versions. En Store, il reste sur le téléphone (pas d'Internet) :
+        // on le copie et on le colle dans Claude pour comprendre un souci.
+        colonne.addView(boutonJournal)
+        // Les autres outils de développement (liste des apps, mode standard) : version Perso seulement.
         if (!BuildConfig.STORE) {
-            colonne.addView(boutonJournal)
             colonne.addView(boutonListe)
             colonne.addView(statutStandard)
             colonne.addView(boutonStandard)
