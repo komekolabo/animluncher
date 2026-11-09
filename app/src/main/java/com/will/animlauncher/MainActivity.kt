@@ -26,6 +26,7 @@ class MainActivity : Activity() {
     private lateinit var statut: TextView
     private lateinit var interrupteur: Switch
     private lateinit var interrupteurDemarrage: Switch
+    private lateinit var interrupteurIcone: Switch
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -61,6 +62,16 @@ class MainActivity : Activity() {
             setOnCheckedChangeListener { _, coche ->
                 Reglages.definirSeulementDemarrage(this@MainActivity, coche)
             }
+        }
+
+        // 2 bis. L'icône vivante (essai) : un logo animé posé sur l'icône d'AnimLauncher, sur
+        // l'écran d'accueil. Elle apprend où est l'icône quand on ouvre l'app depuis une page.
+        interrupteurIcone = Switch(this).apply {
+            text = "Icône vivante sur l'accueil (essai)"
+            textSize = 18f
+            setTextColor(Color.parseColor("#DFE4F7"))
+            setPadding(0, 0, 0, 40)
+            setOnCheckedChangeListener { _, coche -> IconeAccueil.definirActif(this@MainActivity, coche) }
         }
 
         // Le grand bouton vers la liste des apps : couper, accélérer ou ralentir chaque animation.
@@ -126,6 +137,7 @@ class MainActivity : Activity() {
 
         colonne.addView(interrupteur)
         colonne.addView(interrupteurDemarrage)
+        colonne.addView(interrupteurIcone)
         colonne.addView(boutonApps)
         colonne.addView(boutonVolet)
         colonne.addView(statut)
@@ -160,6 +172,8 @@ class MainActivity : Activity() {
         if (r == null) {
             Journal.noter(this, "position de l'icône : non transmise par l'écran d'accueil")
         } else {
+            // on la garde pour l'icône vivante (voir IconeVivante.kt)
+            IconeAccueil.retenir(this, r, ecran.widthPixels)
             Journal.noter(this, "position de l'icône : gauche ${r.left}, haut ${r.top}, " +
                 "droite ${r.right}, bas ${r.bottom} (taille ${r.width()} x ${r.height()}) " +
                 "sur un écran de ${ecran.widthPixels} x ${ecran.heightPixels}")
@@ -171,6 +185,7 @@ class MainActivity : Activity() {
         super.onResume()
         interrupteur.isChecked = Reglages.actif(this)
         interrupteurDemarrage.isChecked = Reglages.seulementDemarrage(this)
+        interrupteurIcone.isChecked = IconeAccueil.actif(this)
         statut.text = if (serviceActif()) {
             "✅ Détection activée"
         } else if (peutEtreRestreinte()) {

@@ -58,6 +58,9 @@ class AppWatcherService : AccessibilityService() {
         "com.samsung.android.app.spage"
     )
 
+    // Le petit logo animé posé sur l'icône d'AnimLauncher, sur l'écran d'accueil (essai).
+    private val iconeVivante by lazy { IconeVivante(this) }
+
     private val ecranAccueil: String? by lazy {
         val intention = Intent(Intent.ACTION_MAIN).addCategory(Intent.CATEGORY_HOME)
         packageManager.resolveActivity(intention, 0)?.activityInfo?.packageName
@@ -74,6 +77,15 @@ class AppWatcherService : AccessibilityService() {
         // Si quelque chose se passe mal pendant le traitement d'un signal, on l'écrit dans le
         // journal au lieu de laisser planter le service (un service planté = plus aucune animation).
         try {
+            // L'ICÔNE VIVANTE (essai, voir IconeVivante.kt) est prévenue en premier : elle se cache
+            // dès qu'on touche quelque chose ou qu'une autre fenêtre arrive, et suit les pages.
+            when (event.eventType) {
+                AccessibilityEvent.TYPE_VIEW_CLICKED -> iconeVivante.surClic()
+                AccessibilityEvent.TYPE_WINDOW_STATE_CHANGED -> iconeVivante.surFenetre(
+                    event.packageName?.toString(),
+                    event.className?.toString()?.substringAfterLast('.') ?: "?", ecranAccueil)
+                AccessibilityEvent.TYPE_VIEW_SCROLLED -> { iconeVivante.surDefilement(event, ecranAccueil); return }
+            }
             when (event.eventType) {
                 AccessibilityEvent.TYPE_VIEW_CLICKED -> { diagnostic(event); clic(event) }
                 AccessibilityEvent.TYPE_WINDOW_STATE_CHANGED -> fenetre(event)
@@ -508,6 +520,7 @@ class AppWatcherService : AccessibilityService() {
     override fun onConfigurationChanged(nouvelle: Configuration) {
         super.onConfigurationChanged(nouvelle)
         ajusterTaille()
+        iconeVivante.cacher()      // l'icône n'est plus au même endroit : elle reviendra au retour sur l'accueil
     }
 
     private fun ajusterTaille() {
