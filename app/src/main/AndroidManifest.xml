@@ -33,6 +33,15 @@
             </intent-filter>
         </activity>
 
+        <!-- Les réglages (la roue de l'accueil : c'est l'ancien écran principal) et l'écran
+             « Fonds d'écran » (carte 3 de l'accueil). Refonte du 09/11. -->
+        <activity
+            android:name=".ReglagesActivity"
+            android:exported="false" />
+        <activity
+            android:name=".FondsActivity"
+            android:exported="false" />
+
         <!-- L'écran Journal (pas d'icône : on y accède depuis l'écran principal). -->
         <activity
             android:name=".JournalActivity"
