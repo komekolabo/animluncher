@@ -51,18 +51,18 @@ class GroupesActivity : Activity() {
             addView(LogoAnime(this@GroupesActivity), LinearLayout.LayoutParams(px(64f), px(64f)).apply { rightMargin = px(14f) })
             addView(LinearLayout(this@GroupesActivity).apply {
                 orientation = LinearLayout.VERTICAL
-                addView(Style.texte(this@GroupesActivity, "Le logo animé", 17f, Style.TEXTE, gras = true))
-                addView(Style.texte(this@GroupesActivity, "À poser sur l'accueil, à la place de l'icône.", 13f, Style.MUET))
+                addView(Style.texte(this@GroupesActivity, getString(R.string.logo_anime), 17f, Style.TEXTE, gras = true))
+                addView(Style.texte(this@GroupesActivity, getString(R.string.logo_anime_note), 13f, Style.MUET))
             }, LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f))
         })
-        carteLogo.addView(Style.boutonDiscret(this, "Mettre sur l'accueil") {
+        carteLogo.addView(Style.boutonDiscret(this, getString(R.string.mettre_accueil)) {
             if (!LogoWidget.proposer(this)) aideWidget()
         }, LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, px(46f)).apply { topMargin = px(12f) })
         colonne.addView(carteLogo)
 
         // ---------- les dossiers animés ----------
-        colonne.addView(Style.texte(this, "Dossiers animés", 20f, Style.TEXTE, gras = true).apply { setPadding(px(6f), 0, 0, px(4f)) })
-        colonne.addView(Style.texte(this, "Tes apps rangées par thème, derrière une étoile animée.", 13f, Style.MUET)
+        colonne.addView(Style.texte(this, getString(R.string.dossiers_animes), 20f, Style.TEXTE, gras = true).apply { setPadding(px(6f), 0, 0, px(4f)) })
+        colonne.addView(Style.texte(this, getString(R.string.dossiers_note), 13f, Style.MUET)
             .apply { setPadding(px(6f), 0, 0, px(14f)) })
 
         var aucun = true
@@ -72,13 +72,13 @@ class GroupesActivity : Activity() {
             aucun = false
             colonne.addView(carteGroupe(cat, liste))
         }
-        if (aucun) colonne.addView(Style.texte(this, "Aucun groupe d'au moins 2 apps n'a été trouvé.", 15f, Style.DOUX)
+        if (aucun) colonne.addView(Style.texte(this, getString(R.string.aucun_groupe), 15f, Style.DOUX)
             .apply { setPadding(px(6f), 0, 0, 0) })
 
         setContentView(LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
             setBackgroundColor(Style.NOIR)
-            addView(Style.entete(this@GroupesActivity, "Logos animés"))
+            addView(Style.entete(this@GroupesActivity, getString(R.string.carte_logos)))
             addView(ScrollView(this@GroupesActivity).apply {
                 isVerticalScrollBarEnabled = false
                 addView(colonne)
@@ -96,7 +96,7 @@ class GroupesActivity : Activity() {
         val compte = Style.texte(this, "", 13f, Style.MUET)
         fun majCompte() {
             val n = liste.size - Groupes.retirees(this, cat.id).count { it in liste }
-            compte.text = "$n apps"
+            compte.text = getString(R.string.n_apps, n)
         }
         majCompte()
         carte.addView(LinearLayout(this).apply {
@@ -121,10 +121,10 @@ class GroupesActivity : Activity() {
         // les deux actions : voir le dossier tel qu'il s'ouvrira, et le poser sur l'accueil
         carte.addView(LinearLayout(this).apply {
             orientation = LinearLayout.HORIZONTAL
-            addView(Style.boutonDiscret(this@GroupesActivity, "Voir") {
+            addView(Style.boutonDiscret(this@GroupesActivity, getString(R.string.voir)) {
                 startActivity(Intent(this@GroupesActivity, DossierActivity::class.java).putExtra("groupe", cat.id))
             }, LinearLayout.LayoutParams(0, px(46f), 1f))
-            addView(Style.boutonBlanc(this@GroupesActivity, "Mettre sur l'accueil") {
+            addView(Style.boutonBlanc(this@GroupesActivity, getString(R.string.mettre_accueil)) {
                 if (!WidgetGroupe.proposer(this@GroupesActivity, cat.id)) aideWidget()
             }, LinearLayout.LayoutParams(0, px(46f), 2f).apply { leftMargin = px(8f) })
         })
@@ -157,7 +157,7 @@ class GroupesActivity : Activity() {
                 }, LinearLayout.LayoutParams(0, px(46f), 1f))
             })
         }
-        detail.addView(Style.boutonDiscret(this, "＋  Ajouter une app") {
+        detail.addView(Style.boutonDiscret(this, getString(R.string.ajouter_app)) {
             startActivity(Intent(this, ChoixAppActivity::class.java).putExtra("groupe", cat.id))
         }, LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, px(46f)).apply { topMargin = px(6f) })
 
@@ -166,7 +166,7 @@ class GroupesActivity : Activity() {
             setPadding(0, px(14f), 0, px(2f))
             isClickable = true
         }
-        fun majLien() { lien.text = if (cat.id in ouverts) "Masquer les apps  ▴" else "Choisir les apps  ▾" }
+        fun majLien() { lien.text = getString(if (cat.id in ouverts) R.string.masquer_apps else R.string.choisir_apps) }
         majLien()
         lien.setOnClickListener {
             if (!ouverts.remove(cat.id)) ouverts.add(cat.id)
@@ -180,6 +180,6 @@ class GroupesActivity : Activity() {
 
     // Si le téléphone ne sait pas proposer le widget tout seul : on explique où le trouver.
     private fun aideWidget() {
-        Toast.makeText(this, "Appui long sur l'accueil → Widgets → " + getString(R.string.app_name), Toast.LENGTH_LONG).show()
+        Toast.makeText(this, getString(R.string.aide_widget, getString(R.string.app_name)), Toast.LENGTH_LONG).show()
     }
 }

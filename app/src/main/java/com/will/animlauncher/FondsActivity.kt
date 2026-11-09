@@ -25,10 +25,10 @@ class FondsActivity : Activity() {
             gravity = Gravity.CENTER_VERTICAL
             setPadding(px(4f), 0, px(16f), 0)
             addView(Icone(this@FondsActivity, Icone.RETOUR).apply {
-                contentDescription = "Retour"
+                contentDescription = getString(R.string.retour)
                 setOnClickListener { finish() }
             }, LinearLayout.LayoutParams(px(48f), px(48f)))
-            addView(Style.texte(this@FondsActivity, "Fonds d'écran", 20f, Style.TEXTE, gras = true).apply {
+            addView(Style.texte(this@FondsActivity, getString(R.string.carte_fonds), 20f, Style.TEXTE, gras = true).apply {
                 setPadding(px(6f), 0, 0, 0)
             })
         }
@@ -44,10 +44,9 @@ class FondsActivity : Activity() {
         val textes = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
             setPadding(px(24f), px(20f), px(24f), px(28f))
-            addView(Style.texte(this@FondsActivity, "Bientôt", 22f, Style.TEXTE, gras = true))
+            addView(Style.texte(this@FondsActivity, getString(R.string.bientot), 22f, Style.TEXTE, gras = true))
             addView(Style.texte(this@FondsActivity,
-                "Des fonds d'écran animés, sombres et légers pour la batterie, à poser en un appui. " +
-                "Ensuite, la communauté : publie les tiens et découvre ceux des autres.",
+                getString(R.string.fonds_note),
                 14f, Style.MUET).apply { setLineSpacing(0f, 1.2f); setPadding(0, px(8f), 0, 0) })
         }
 
