@@ -17,6 +17,9 @@ Objectif : la publier sur le Google Play Store, avec une pub non invasive.
   trame de points, colonnes, tuiles, fente.
 - Textes affichés dans les animations : **en anglais**.
 - Il n'a **pas Android Studio** : tout se compile sur GitHub (voir plus bas). Il teste sur son téléphone.
+- Aperçus Python : une image skia est en **BGRA** : avant d'envoyer à ffmpeg en `rgba`, faire
+  `img.convert(colorType=skia.kRGBA_8888_ColorType, alphaType=skia.kUnpremul_AlphaType)` (oublié le 09/11 :
+  rouge et bleu inversés dans les vidéos ; c'est d'ailleurs comme ça que la palette chaude a été choisie).
 - Aperçus Python : dans skia-python, `Image.makeShader()` est très lent → créer les shaders d'image UNE fois
   (petites textures 128 x 128 répétées). Rendre une vidéo prend ~20 s à 1,5 min.
 
@@ -90,6 +93,13 @@ Objectif : la publier sur le Google Play Store, avec une pub non invasive.
   widget (`intent.sourceBounds`), monte au centre en faisant un tour, se pose près du titre, traînées de poussière
   vers chaque app, apps qui apparaissent l'une après l'autre. Appui sur une app -> `AppWatcherService.actif
   ?.depuisDossier(app)` (le lanceur n'envoie pas de clic pour NOTRE écran) puis on ouvre l'app.
+  V2 (09/11, validée sur aperçu) : PALETTE CHAUDE (étoile orange -> rose -> vert-jaune, galet brun
+  `widget_galet_chaud.xml`, panneau brun) ; le widget joue une « mini-vidéo » de 12 s (étoile -> 4 points qui
+  tournent en traçant un anneau -> 4 tuiles qui ondulent -> l'étoile renaît), dans `etoile_ia(_anime).xml`
+  FABRIQUÉS par `outils/generer_avd.py` (raccourcis d'interpolateurs dans `res/interpolator/`) ; le voile
+  arrive en 2 BANDES (haut et bas) ; les apps ÉCLOSENT (ressort + petite rotation + onde fine, nom qui glisse) ;
+  case « + » en dernier -> `ChoixAppActivity.kt` (ajout retenu dans « avec_<groupe> », `Groupes.tous()`).
+  Will a choisi la palette chaude, a écarté 6 pistes de logo (Facette, Constellation, Orbite, Pétales…).
 - `Reglages.kt` : kill switch, « seulement au démarrage », réglages par app (durée, variantes).
 - `MainActivity.kt` : écran principal (logo animé, interrupteurs, écran d'explication Store).
 - `GuideDeblocage.kt` : guide plein écran pour l'accessibilité **grisée** (APK installé hors Play Store).
