@@ -26,7 +26,6 @@ class MainActivity : Activity() {
     private lateinit var statut: TextView
     private lateinit var interrupteur: Switch
     private lateinit var interrupteurDemarrage: Switch
-    private lateinit var interrupteurIcone: Switch
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -64,16 +63,6 @@ class MainActivity : Activity() {
             }
         }
 
-        // 2 bis. L'icône vivante (essai) : un logo animé posé sur l'icône d'AnimLauncher, sur
-        // l'écran d'accueil. Elle apprend où est l'icône quand on ouvre l'app depuis une page.
-        interrupteurIcone = Switch(this).apply {
-            text = "Icône vivante sur l'accueil (essai)"
-            textSize = 18f
-            setTextColor(Color.parseColor("#DFE4F7"))
-            setPadding(0, 0, 0, 40)
-            setOnCheckedChangeListener { _, coche -> IconeAccueil.definirActif(this@MainActivity, coche) }
-        }
-
         // Le grand bouton vers la liste des apps : couper, accélérer ou ralentir chaque animation.
         val boutonApps = Button(this).apply {
             text = "🎬  Animations par app"
@@ -84,6 +73,18 @@ class MainActivity : Activity() {
         val boutonVolet = Button(this).apply {
             text = "Ajouter le bouton au volet rapide"
             setOnClickListener { proposerTuile() }
+        }
+
+        // Le widget « logo animé » (voir LogoWidget.kt) : Samsung affiche sa fenêtre pour le poser
+        // sur l'accueil. Ensuite, on peut retirer l'icône normale et garder le widget à sa place.
+        val boutonWidget = Button(this).apply {
+            text = "✨  Mettre le logo animé sur l'accueil"
+            setOnClickListener {
+                if (!LogoWidget.proposer(this@MainActivity)) {
+                    statut.text = "Appuie longuement sur un endroit vide de l'accueil, puis « Widgets » " +
+                        "et cherche « ${getString(R.string.app_name)} »."
+                }
+            }
         }
 
         statut = TextView(this).apply {
@@ -137,9 +138,9 @@ class MainActivity : Activity() {
 
         colonne.addView(interrupteur)
         colonne.addView(interrupteurDemarrage)
-        colonne.addView(interrupteurIcone)
         colonne.addView(boutonApps)
         colonne.addView(boutonVolet)
+        colonne.addView(boutonWidget)
         colonne.addView(statut)
         colonne.addView(boutonAccessibilite)
         // Le journal : dans les deux versions. En Store, il reste sur le téléphone (pas d'Internet) :
@@ -164,16 +165,14 @@ class MainActivity : Activity() {
     // (« sourceBounds », en pixels : gauche, haut, droite, bas). C'est ce qui lui sert à faire
     // grossir l'app depuis l'icône. On l'écrit simplement dans le journal pour vérifier que le
     // lanceur Samsung le donne bien, et que les chiffres tombent au bon endroit.
-    // Appelé au démarrage (onCreate) ET quand on retouche l'icône alors que l'app était encore
-    // ouverte (onNewIntent). Dans le tiroir d'apps ou le dock, Samsung ne donne pas de rectangle.
+    // Attention : ça ne marche qu'au vrai démarrage de l'écran principal. Si AnimLauncher était
+    // encore ouverte en arrière-plan, Android la ramène sans nouvelle demande, donc sans rectangle.
     private fun noterPositionIcone(demande: Intent?) {
         val r = demande?.sourceBounds
         val ecran = resources.displayMetrics
         if (r == null) {
             Journal.noter(this, "position de l'icône : non transmise par l'écran d'accueil")
         } else {
-            // on la garde pour l'icône vivante (voir IconeVivante.kt)
-            IconeAccueil.retenir(this, r, ecran.widthPixels)
             Journal.noter(this, "position de l'icône : gauche ${r.left}, haut ${r.top}, " +
                 "droite ${r.right}, bas ${r.bottom} (taille ${r.width()} x ${r.height()}) " +
                 "sur un écran de ${ecran.widthPixels} x ${ecran.heightPixels}")
@@ -181,19 +180,10 @@ class MainActivity : Activity() {
         Journal.programmerEnvoi(this)
     }
 
-    // L'écran principal était déjà ouvert et on retouche l'icône : grâce à launchMode="singleTop"
-    // (voir AndroidManifest.xml), Android nous passe la nouvelle demande ici, avec la position.
-    override fun onNewIntent(nouvelle: Intent) {
-        super.onNewIntent(nouvelle)
-        setIntent(nouvelle)
-        noterPositionIcone(nouvelle)
-    }
-
     override fun onResume() {
         super.onResume()
         interrupteur.isChecked = Reglages.actif(this)
         interrupteurDemarrage.isChecked = Reglages.seulementDemarrage(this)
-        interrupteurIcone.isChecked = IconeAccueil.actif(this)
         statut.text = if (serviceActif()) {
             "✅ Détection activée"
         } else if (peutEtreRestreinte()) {
