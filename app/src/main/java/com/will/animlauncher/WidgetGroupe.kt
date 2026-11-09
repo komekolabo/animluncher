@@ -11,6 +11,7 @@ import android.content.res.ColorStateList
 import android.graphics.BlendMode
 import android.graphics.Color
 import android.os.Build
+import android.os.Bundle
 import android.widget.RemoteViews
 
 // LE WIDGET « DOSSIER ANIMÉ » (09/11) : un galet de verre avec une étoile qui tourne doucement, et le
@@ -125,7 +126,18 @@ class WidgetGroupe : AppWidgetProvider() {
             val pose = Intent(a, WidgetGroupe::class.java).setAction(ACTION_POSE).putExtra("groupe", groupe)
             val rappel = PendingIntent.getBroadcast(a, groupe.hashCode(), pose,
                 PendingIntent.FLAG_MUTABLE or PendingIntent.FLAG_UPDATE_CURRENT)
-            return gestionnaire.requestPinAppWidget(ComponentName(a, WidgetGroupe::class.java), null, rappel)
+            // L'APERÇU de la fenêtre « Ajouter à l'écran d'accueil » : sans rien préciser, Android montre l'aperçu
+            // écrit dans res/xml/widget_groupe_info.xml, c'est-à-dire l'étoile de l'IA, même pour le dossier Games
+            // (vu par Will le 09/11). Pour Games, on lui donne donc notre propre aperçu : une image du jeu.
+            var options: Bundle? = null
+            if (groupe == WidgetTop.GROUPE) {
+                try {
+                    options = Bundle().apply { putParcelable(AppWidgetManager.EXTRA_APPWIDGET_PREVIEW, WidgetTop.apercu(a)) }
+                } catch (e: Exception) {
+                    Journal.noter(a, "widget top : aperçu impossible (${e.message})")
+                }
+            }
+            return gestionnaire.requestPinAppWidget(ComponentName(a, WidgetGroupe::class.java), options, rappel)
         }
     }
 }

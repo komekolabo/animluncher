@@ -71,6 +71,20 @@ object WidgetTop {
         return v
     }
 
+    // L'APERÇU montré dans la fenêtre « Ajouter à l'écran d'accueil » (voir WidgetGroupe.proposer) : le galet
+    // avec UNE image fixe, la fin de l'intro du monde ouvert (l'écran du téléphone remplit le widget).
+    fun apercu(c: Context): RemoteViews {
+        val px = (62 * c.resources.displayMetrics.density).toInt()
+        val type = Appareil.type(c)
+        val t = IntrosJeu.duree(type) - 0.05
+        val b = image(px) { IntrosJeu(it).dessiner(type, 0, px.toDouble(), t, Color.rgb(150, 110, 230)) }
+        val v = RemoteViews(c.packageName, R.layout.widget_top)
+        v.setTextViewText(R.id.top_nom, Groupes.categorie(GROUPE)?.nom ?: "Games")
+        v.removeAllViews(R.id.top_scene)
+        v.addView(R.id.top_scene, vueImage(c, b))
+        return v
+    }
+
     // Les 3 jeux les plus joués des 7 derniers jours : (nom technique, minutes). Les ex æquo gardent l'ordre du dossier.
     private fun top(c: Context): List<Pair<String, Int>> =
         Groupes.apps(c, GROUPE).map { it to Usage.minutes(c, it) }.sortedByDescending { it.second }.take(3)
