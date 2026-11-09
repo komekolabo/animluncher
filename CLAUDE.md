@@ -71,6 +71,15 @@ Objectif : la publier sur le Google Play Store, avec une pub non invasive.
   sans lire l'écran, impossible de savoir la page affichée / si le tiroir d'apps est ouvert
   (Samsung n'envoie qu'un « contenu changé » sans direction quand on ouvre/ferme le tiroir).
   Ne pas refaire. Pistes écartées : Shizuku (dépendance + relance à chaque redémarrage), captures d'écran.
+- `WidgetApp.kt` + `res/layout/widget_app*.xml` + `res/drawable/widget_galet*.xml` : ESSAI (09/11) du widget
+  « une app dans un galet », posé depuis Animations par app → l'app → « Mettre le widget sur l'accueil »
+  (requestPinAppWidget + rappel qui donne le numéro du widget ; app retenue par widget). Galet IMMOBILE,
+  dessiné par l'app avec la COUCHE DE FOND de l'icône (Will veut la vraie couleur : le orange de Claude),
+  reflet + liseré de verre par-dessus ; le LOGO
+  de l'app flotte dedans avec son ombre sur le fond du galet, bande de lumière toutes les 6 s. Le logo est une
+  image du téléphone (couche avant de l'icône adaptative) : on dessine les images de la flottaison au moment
+  de poser le widget et un ViewFlipper les fait défiler (« folioscope », 60 images à 20 images/s ; 12/s saccadait). Will a refusé le halo
+  (« juste l'ombre ») et veut que ce soit le logo qui flotte, pas le galet. Aperçus : /home/claude/apercu/widgets_*.py.
 - `Reglages.kt` : kill switch, « seulement au démarrage », réglages par app (durée, variantes).
 - `MainActivity.kt` : écran principal (logo animé, interrupteurs, écran d'explication Store).
 - `GuideDeblocage.kt` : guide plein écran pour l'accessibilité **grisée** (APK installé hors Play Store).
