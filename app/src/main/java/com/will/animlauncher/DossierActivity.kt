@@ -26,6 +26,7 @@ import kotlin.math.PI
 import kotlin.math.abs
 import kotlin.math.ceil
 import kotlin.math.cos
+import kotlin.math.floor
 import kotlin.math.max
 import kotlin.math.min
 import kotlin.math.roundToInt
@@ -617,6 +618,17 @@ class DossierVue(
         return -1
     }
 
+    // Pendant un déplacement : quelle PLACE est sous le doigt, y compris les places vides du cadre
+    // (vu sur la vidéo de Will le 09/11 : poser une app sur une place vide ne faisait rien, elle revenait).
+    // Une place vide après la dernière app = « tout à la fin ». -1 = le doigt est hors de la grille.
+    private fun placeSous(x: Float, y: Float): Int {
+        val col = floor((x - panneau.left - 20f * k) / celluleL).toInt()
+        val ligne = floor((y - haut) / celluleH).toInt()
+        if (col !in 0 until colonnes || ligne !in 0 until 4) return -1
+        val i = page.roundToInt() * parPage + ligne * colonnes + col
+        return min(i, cases.size - 1)
+    }
+
     // LES APPUIS : toucher une app l'ouvre (dès 0,15 s, même si elle n'est pas encore apparue) ; toucher la
     // bulle « + » ajoute une app ; toucher à côté referme ; glisser à gauche / à droite change de page.
     // APPUI LONG sur une app : mode édition (retirer avec la croix, déplacer en faisant glisser).
@@ -649,8 +661,9 @@ class DossierVue(
                 doigtX = e.x; doigtY = e.y
                 val tire = tiree
                 if (tire != null) {
-                    // on déplace une app : elle prend la place de la case sous le doigt, les autres glissent
-                    val cible = caseSous(e.x, e.y)
+                    // on déplace une app : elle prend la place de la case sous le doigt, les autres glissent.
+                    // Les places VIDES (après la dernière app) comptent aussi : on peut la poser à la fin.
+                    val cible = placeSous(e.x, e.y)
                     val actuelle = cases.indexOf(tire)
                     if (cible >= 0 && cible != actuelle) { cases.removeAt(actuelle); cases.add(cible, tire) }
                     return true
