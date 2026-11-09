@@ -1,0 +1,112 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- LE LOGO DU WIDGET, ANIMÉ. Un « dessin animé vectoriel » (AnimatedVectorDrawable) : on reprend le
+     dessin logo_widget.xml, et on dit à chaque morceau nommé comment bouger. Toutes les animations
+     tournent en boucle sans fin (repeatCount="infinite"). C'est Android qui les joue tout seul,
+     sans notre code : c'est pour ça que ça marche dans un widget.
+     Les mouvements sont ceux choisis par Will le 09/11 : le logo lévite doucement, et le triangle
+     fait de temps en temps un tiers de tour. Mouvements doux, jamais de flash. -->
+<animated-vector xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:aapt="http://schemas.android.com/aapt"
+    android:drawable="@drawable/logo_widget">
+
+    <!-- 1) LA LÉVITATION : le logo monte de 4,5 (sur 108) en 1,5 s, puis redescend (reverse), etc. -->
+    <target android:name="flottant">
+        <aapt:attr name="android:animation">
+            <objectAnimator
+                android:propertyName="translateY"
+                android:valueFrom="0"
+                android:valueTo="-4.5"
+                android:valueType="floatType"
+                android:duration="1500"
+                android:repeatCount="infinite"
+                android:repeatMode="reverse"
+                android:interpolator="@android:interpolator/accelerate_decelerate" />
+        </aapt:attr>
+    </target>
+
+    <!-- 2) L'OMBRE rétrécit quand le logo monte (même rythme) -->
+    <target android:name="ombre">
+        <aapt:attr name="android:animation">
+            <objectAnimator
+                android:propertyName="scaleX"
+                android:valueFrom="1"
+                android:valueTo="0.85"
+                android:valueType="floatType"
+                android:duration="1500"
+                android:repeatCount="infinite"
+                android:repeatMode="reverse"
+                android:interpolator="@android:interpolator/accelerate_decelerate" />
+        </aapt:attr>
+    </target>
+
+    <!-- 3) LE HALO respire au même rythme (plus lumineux quand le logo est en haut, sans flash) -->
+    <target android:name="halo">
+        <aapt:attr name="android:animation">
+            <objectAnimator
+                android:propertyName="fillAlpha"
+                android:valueFrom="0.6"
+                android:valueTo="1"
+                android:valueType="floatType"
+                android:duration="1500"
+                android:repeatCount="infinite"
+                android:repeatMode="reverse"
+                android:interpolator="@android:interpolator/accelerate_decelerate" />
+        </aapt:attr>
+    </target>
+
+    <!-- 4) LE TOUR : une boucle de 9 s. Le triangle attend 1,5 s, fait un tiers de tour (120 degrés)
+         en 1,2 s en démarrant et freinant en douceur, attend, refait un tiers de tour à 6 s, puis
+         attend la fin. 120 degrés retombent pile sur la même forme : quand la boucle repart de 0,
+         on ne voit aucun saut. (« keyframe » = une image clé : à tel moment de la boucle, tel angle.) -->
+    <target android:name="tour">
+        <aapt:attr name="android:animation">
+            <objectAnimator
+                android:duration="9000"
+                android:repeatCount="infinite"
+                android:interpolator="@android:interpolator/linear">
+                <propertyValuesHolder
+                    android:propertyName="rotation"
+                    android:valueType="floatType">
+                    <keyframe android:fraction="0" android:value="0" />
+                    <keyframe android:fraction="0.1667" android:value="0" />
+                    <keyframe
+                        android:fraction="0.3"
+                        android:value="120"
+                        android:interpolator="@android:interpolator/accelerate_decelerate" />
+                    <keyframe android:fraction="0.6667" android:value="120" />
+                    <keyframe
+                        android:fraction="0.8"
+                        android:value="240"
+                        android:interpolator="@android:interpolator/accelerate_decelerate" />
+                    <keyframe android:fraction="1" android:value="240" />
+                </propertyValuesHolder>
+            </objectAnimator>
+        </aapt:attr>
+    </target>
+
+    <!-- 5) L'ÉTOILE scintille un peu (elle grossit et rapetisse très légèrement) -->
+    <target android:name="etoile">
+        <aapt:attr name="android:animation">
+            <set>
+                <objectAnimator
+                    android:propertyName="scaleX"
+                    android:valueFrom="0.92"
+                    android:valueTo="1.04"
+                    android:valueType="floatType"
+                    android:duration="1200"
+                    android:repeatCount="infinite"
+                    android:repeatMode="reverse"
+                    android:interpolator="@android:interpolator/accelerate_decelerate" />
+                <objectAnimator
+                    android:propertyName="scaleY"
+                    android:valueFrom="0.92"
+                    android:valueTo="1.04"
+                    android:valueType="floatType"
+                    android:duration="1200"
+                    android:repeatCount="infinite"
+                    android:repeatMode="reverse"
+                    android:interpolator="@android:interpolator/accelerate_decelerate" />
+            </set>
+        </aapt:attr>
+    </target>
+</animated-vector>

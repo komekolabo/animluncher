@@ -2,4 +2,6 @@
 <!-- Les textes de l'app. Celui-ci s'affiche dans Paramètres > Accessibilité. -->
 <resources>
     <string name="description_service">Détecte l’application que tu ouvres pour jouer une animation personnalisée. AnimLauncher ne lit pas le contenu de tes écrans.</string>
+    <!-- La phrase qui présente le widget dans la liste des widgets de l'écran d'accueil. -->
+    <string name="widget_description">Le logo d’AnimLauncher, animé : à poser à la place de l’icône.</string>
 </resources>

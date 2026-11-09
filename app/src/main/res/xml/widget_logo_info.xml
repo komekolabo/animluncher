@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- La « fiche » du widget pour Android : sa taille (1 x 1 case), son dessin, son aperçu dans la
+     liste des widgets. updatePeriodMillis=0 : il ne se met jamais à jour tout seul (inutile :
+     l'animation tourne en boucle d'elle-même), donc il ne réveille jamais le téléphone. -->
+<appwidget-provider xmlns:android="http://schemas.android.com/apk/res/android"
+    android:minWidth="40dp"
+    android:minHeight="40dp"
+    android:targetCellWidth="1"
+    android:targetCellHeight="1"
+    android:resizeMode="none"
+    android:updatePeriodMillis="0"
+    android:initialLayout="@layout/widget_logo"
+    android:previewLayout="@layout/widget_logo"
+    android:previewImage="@drawable/logo_widget"
+    android:description="@string/widget_description"
+    android:widgetCategory="home_screen" />

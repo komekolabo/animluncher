@@ -1,0 +1,47 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- LE WIDGET « LOGO ANIMÉ » (1 x 1 case) : il ressemble à l'icône d'AnimLauncher, nom compris,
+     mais son logo bouge. Un widget fait PARTIE de l'écran d'accueil : c'est Samsung qui le déplace
+     avec les pages, le cache quand on ouvre l'écran des apps, etc. Rien à deviner.
+
+     L'ASTUCE : un widget ne peut pas faire tourner notre propre code de dessin. Mais il a le droit
+     d'afficher un « indicateur de chargement » (ProgressBar), qui joue en boucle le dessin qu'on lui
+     donne. On lui donne notre logo animé (logo_widget_anime.xml) au lieu du rond qui tourne.
+     style Widget.ProgressBar (le plus simple) : pas de couleur ajoutée par-dessus notre dessin.
+     Les tailles min/max remplacent celles de l'indicateur normal (48 dp). -->
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:id="@+id/widget_racine"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:gravity="center"
+    android:orientation="vertical">
+
+    <ProgressBar
+        android:id="@+id/widget_logo"
+        style="@android:style/Widget.ProgressBar"
+        android:layout_width="62dp"
+        android:layout_height="62dp"
+        android:minWidth="62dp"
+        android:maxWidth="62dp"
+        android:minHeight="62dp"
+        android:maxHeight="62dp"
+        android:indeterminate="true"
+        android:indeterminateOnly="true"
+        android:indeterminateDrawable="@drawable/logo_widget_anime" />
+
+    <!-- le nom sous l'icône, comme les autres icônes de l'accueil (blanc, avec une ombre) -->
+    <TextView
+        android:id="@+id/widget_nom"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="4dp"
+        android:ellipsize="end"
+        android:fontFamily="sans-serif"
+        android:maxLines="1"
+        android:shadowColor="#99000000"
+        android:shadowDx="0"
+        android:shadowDy="1"
+        android:shadowRadius="3"
+        android:text="@string/app_name"
+        android:textColor="#FFFFFF"
+        android:textSize="13sp" />
+</LinearLayout>
