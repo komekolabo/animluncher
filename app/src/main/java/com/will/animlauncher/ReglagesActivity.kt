@@ -48,7 +48,7 @@ class ReglagesActivity : Activity() {
 
         // 1. L'interrupteur général (kill switch).
         interrupteur = Switch(this).apply {
-            text = "Animations activées"
+            text = getString(R.string.anim_activees)
             textSize = 22f
             setTextColor(Color.WHITE)
             setPadding(0, 0, 0, 32)
@@ -57,7 +57,7 @@ class ReglagesActivity : Activity() {
 
         // 2. Le mode : à chaque ouverture, ou seulement quand l'app démarre.
         interrupteurDemarrage = Switch(this).apply {
-            text = "Seulement au démarrage de l'app"
+            text = getString(R.string.seulement_demarrage_app)
             textSize = 18f
             setTextColor(Color.parseColor("#DFE4F7"))
             setPadding(0, 0, 0, 40)
@@ -68,31 +68,30 @@ class ReglagesActivity : Activity() {
 
         // Le grand bouton vers la liste des apps : couper, accélérer ou ralentir chaque animation.
         val boutonApps = Button(this).apply {
-            text = "🎬  Animations par app"
+            text = getString(R.string.carte_apps)
             textSize = 18f
             setOnClickListener { startActivity(Intent(this@ReglagesActivity, AppsActivity::class.java)) }
         }
 
         // Les dossiers animés (voir GroupesActivity.kt) : les apps rangées par catégorie, en widgets.
         val boutonDossiers = Button(this).apply {
-            text = "✦  Dossiers animés"
+            text = getString(R.string.dossiers_animes)
             textSize = 18f
             setOnClickListener { startActivity(Intent(this@ReglagesActivity, GroupesActivity::class.java)) }
         }
 
         val boutonVolet = Button(this).apply {
-            text = "Ajouter le bouton au volet rapide"
+            text = getString(R.string.bouton_volet)
             setOnClickListener { proposerTuile() }
         }
 
         // Le widget « logo animé » (voir LogoWidget.kt) : Samsung affiche sa fenêtre pour le poser
         // sur l'accueil. Ensuite, on peut retirer l'icône normale et garder le widget à sa place.
         val boutonWidget = Button(this).apply {
-            text = "✨  Mettre le logo animé sur l'accueil"
+            text = getString(R.string.bouton_logo)
             setOnClickListener {
                 if (!LogoWidget.proposer(this@ReglagesActivity)) {
-                    statut.text = "Appuie longuement sur un endroit vide de l'accueil, puis « Widgets » " +
-                        "et cherche « ${getString(R.string.app_name)} »."
+                    statut.text = getString(R.string.aide_widget, getString(R.string.app_name))
                 }
             }
         }
@@ -105,7 +104,7 @@ class ReglagesActivity : Activity() {
         }
 
         val boutonAccessibilite = Button(this).apply {
-            text = if (BuildConfig.STORE) "Activer la détection" else "Ouvrir les réglages d'accessibilité"
+            text = getString(if (BuildConfig.STORE) R.string.activer_detection else R.string.ouvrir_accessibilite)
             // Version Store : Google exige un écran d'explication AVANT d'envoyer vers les réglages.
             setOnClickListener {
                 if (BuildConfig.STORE) expliquerAccessibilite()
@@ -114,7 +113,7 @@ class ReglagesActivity : Activity() {
         }
 
         val boutonJournal = Button(this).apply {
-            text = if (BuildConfig.STORE) "Journal (diagnostic)" else "Ouvrir le journal (logs)"
+            text = getString(R.string.menu_journal)
             setOnClickListener {
                 startActivity(Intent(this@ReglagesActivity, JournalActivity::class.java))
             }
@@ -139,7 +138,7 @@ class ReglagesActivity : Activity() {
         }
 
         val version = TextView(this).apply {
-            text = "Version " + packageManager.getPackageInfo(packageName, 0).versionName
+            text = getString(R.string.version, packageManager.getPackageInfo(packageName, 0).versionName)
             textSize = 14f
             setTextColor(Color.parseColor("#94A0C4"))
             gravity = Gravity.CENTER
@@ -175,13 +174,13 @@ class ReglagesActivity : Activity() {
         super.onResume()
         interrupteur.isChecked = Reglages.actif(this)
         interrupteurDemarrage.isChecked = Reglages.seulementDemarrage(this)
+        val nomApp = getString(R.string.app_name)
         statut.text = if (serviceActif()) {
-            "✅ Détection activée"
+            getString(R.string.detection_ok)
         } else if (peutEtreRestreinte()) {
-            "⚠️ Détection désactivée : active AnimLauncher dans l'accessibilité.\n" +
-                "(Grisé ? Le bouton ci-dessous t'explique comment le débloquer.)"
+            getString(R.string.detection_ko, nomApp) + "\n" + getString(R.string.detection_grise)
         } else {
-            "⚠️ Détection désactivée : active AnimLauncher dans l'accessibilité."
+            getString(R.string.detection_ko, nomApp)
         }
         if (!BuildConfig.STORE) afficherEtatStandard()
     }
@@ -192,34 +191,19 @@ class ReglagesActivity : Activity() {
     // CE QU'ELLE FAIT avec, POURQUOI, et laisser ACCEPTER ou REFUSER. Ce texte doit rester séparé
     // de toute autre information sur les données. Refuser ne bloque rien : on peut revenir plus tard.
     private fun expliquerAccessibilite() {
-        val texte = """
-            AnimLauncher utilise le service d'accessibilité d'Android (API AccessibilityService).
-
-            Pourquoi ?
-            Pour savoir sur quelle icône de ton écran d'accueil tu appuies, et quelle application s'ouvre. C'est ce qui permet de lancer l'animation AVANT que l'application apparaisse. Aucune autre fonction d'Android ne prévient assez tôt.
-
-            Ce que l'app reçoit :
-            • le nom écrit sous l'icône que tu touches sur l'écran d'accueil ;
-            • le nom de l'application qui passe au premier plan ;
-            • les annonces de l'écran d'accueil quand tu fermes une application (« application … fermée »), pour rejouer l'animation à sa prochaine ouverture.
-
-            Ce que l'app ne fait PAS :
-            • elle ne lit pas le contenu de tes écrans, ni ce que tu tapes (messages, mots de passe…) ;
-            • elle n'agit jamais à ta place ;
-            • rien n'est collecté, enregistré sur un serveur ou partagé : tout reste sur ton téléphone.
-
-            Tu peux désactiver ce service à tout moment dans Paramètres > Accessibilité.
-        """.trimIndent()
+        // Le texte est dans les fichiers de textes (clé « expl_texte »), traduit dans chaque langue :
+        // Google demande que l'explication soit claire pour l'utilisateur, donc dans SA langue.
+        val nom = getString(R.string.app_name)
+        val texte = getString(R.string.expl_texte, nom)
         AlertDialog.Builder(this)
-            .setTitle("Pourquoi AnimLauncher a besoin de l'accessibilité")
+            .setTitle(getString(R.string.expl_titre, nom))
             .setMessage(texte)
             .setCancelable(false)                       // il faut choisir : accepter ou refuser
-            .setPositiveButton("Accepter et activer") { _, _ ->
+            .setPositiveButton(getString(R.string.expl_accepter)) { _, _ ->
                 ouvrirAccessibilite()
             }
-            .setNegativeButton("Refuser") { _, _ ->
-                statut.text = "Sans l'accessibilité, AnimLauncher ne peut pas jouer d'animation. " +
-                    "Tu peux changer d'avis quand tu veux avec le bouton ci-dessous."
+            .setNegativeButton(getString(R.string.expl_refuser)) { _, _ ->
+                statut.text = getString(R.string.expl_refus, nom)
             }
             .show()
     }
@@ -236,15 +220,15 @@ class ReglagesActivity : Activity() {
     private val cheminAccessibilite: String get() {
         val nom = getString(R.string.app_name)
         return if (Build.MANUFACTURER.equals("samsung", ignoreCase = true))
-            "touche « Applications installées » (en bas), puis « $nom »"
-        else "cherche « $nom » (souvent dans « Applications téléchargées » ou « installées »)"
+            getString(R.string.chemin_samsung, nom)
+        else getString(R.string.chemin_autre, nom)
     }
 
     private fun ouvrirAccessibilite() {
         if (serviceActif() || !peutEtreRestreinte()) {
             GuideDeblocage.ouvrirAccessibilite(this)
             // le rappel s'affiche par-dessus les Paramètres
-            Toast.makeText(this, "Dans l'accessibilité : $cheminAccessibilite", Toast.LENGTH_LONG).show()
+            Toast.makeText(this, getString(R.string.dans_accessibilite, cheminAccessibilite), Toast.LENGTH_LONG).show()
         } else {
             startActivity(Intent(this, GuideDeblocage::class.java))
         }
@@ -313,7 +297,7 @@ class ReglagesActivity : Activity() {
                 mainExecutor
             ) { }
         } else {
-            statut.text = "Ouvre le volet rapide, appuie sur le crayon ✏️ et glisse le bouton AnimLauncher."
+            statut.text = getString(R.string.volet_aide, getString(R.string.app_name))
         }
     }
 

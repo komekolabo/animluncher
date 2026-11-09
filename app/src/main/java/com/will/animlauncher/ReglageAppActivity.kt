@@ -36,7 +36,9 @@ class ReglageAppActivity : Activity() {
 
     // Les 3 vitesses : leur nom, et par combien on multiplie la durée normale de l'animation.
     // (Normale = la durée prévue pour cette app, rangée comme « -1 » dans les réglages.)
-    private val NOMS = listOf("Rapide", "Normale", "Lente")
+    // (« by lazy » : la liste est fabriquée à la première utilisation, quand l'écran existe et
+    // peut donc lire ses textes dans la langue du téléphone.)
+    private val NOMS by lazy { listOf(getString(R.string.rapide), getString(R.string.normale), getString(R.string.lente)) }
     private val FACTEURS = floatArrayOf(0.6f, 1f, 1.6f)
 
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -54,7 +56,7 @@ class ReglageAppActivity : Activity() {
         // ---------- 1. allumer / couper, et voir ----------
         val carteVoir = Style.carte(this)
         val interActif = Style.interrupteur(this).apply {
-            text = "Animation"
+            text = getString(R.string.animation)
             textSize = 17f
             setTextColor(Style.TEXTE)
             isChecked = Reglages.appActive(this@ReglageAppActivity, pkg)
@@ -71,7 +73,7 @@ class ReglageAppActivity : Activity() {
             }, LinearLayout.LayoutParams(px(44f), px(44f)).apply { rightMargin = px(14f) })
             addView(interActif, LinearLayout.LayoutParams(0, px(48f), 1f))
         })
-        carteVoir.addView(Style.boutonBlanc(this, "▶   Voir l'animation") { apercu(-1) },
+        carteVoir.addView(Style.boutonBlanc(this, getString(R.string.voir_animation)) { apercu(-1) },
             LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, px(50f)).apply { topMargin = px(12f) })
         colonne.addView(carteVoir)
 
@@ -81,7 +83,7 @@ class ReglageAppActivity : Activity() {
 
         // ---------- 2. la vitesse ----------
         val carteVitesse = Style.carte(this)
-        carteVitesse.addView(Style.titreCarte(this, "Vitesse"))
+        carteVitesse.addView(Style.titreCarte(this, getString(R.string.vitesse)))
         val rangee = LinearLayout(this).apply { orientation = LinearLayout.HORIZONTAL }
         for (i in NOMS.indices) {
             val bouton = Style.texte(this, NOMS[i], 14.5f, Style.TEXTE).apply {
@@ -103,8 +105,8 @@ class ReglageAppActivity : Activity() {
         // ---------- 3. les variantes (seulement pour les apps qui en ont plusieurs) ----------
         if (entree.variantes.isNotEmpty()) {
             val carteVariantes = Style.carte(this)
-            carteVariantes.addView(Style.titreCarte(this, "Variantes"))
-            carteVariantes.addView(Style.texte(this, "Une est tirée au hasard à chaque ouverture, parmi celles cochées.", 13f, Style.MUET)
+            carteVariantes.addView(Style.titreCarte(this, getString(R.string.variantes)))
+            carteVariantes.addView(Style.texte(this, getString(R.string.variantes_note), 13f, Style.MUET)
                 .apply { setPadding(0, 0, 0, px(6f)) })
             val eteintes = Reglages.variantesDesactivees(this, pkg)
             // les cases à cocher aux couleurs de la refonte : blanche quand elle est cochée, grise sinon
@@ -129,7 +131,7 @@ class ReglageAppActivity : Activity() {
                 // le petit bouton rond ▶ : voir CETTE variante
                 ligne.addView(Style.texte(this, "▶", 13f, Style.TEXTE).apply {
                     gravity = Gravity.CENTER
-                    contentDescription = "Voir $nomVariante"
+                    contentDescription = getString(R.string.voir_variante, nomVariante)
                     background = Style.arrondi(this@ReglageAppActivity, Color.argb(20, 255, 255, 255), 20f, Color.rgb(63, 63, 70))
                     isClickable = true
                     setOnClickListener { apercu(numero) }
@@ -143,13 +145,13 @@ class ReglageAppActivity : Activity() {
         // (tant qu'on n'y touche pas, l'app suit l'interrupteur général des réglages)
         val carteDemarrage = Style.carte(this)
         val noteDemarrage = Style.texte(this, "", 13f, Style.MUET)
-        val suivre = Style.texte(this, "Revenir au réglage général ›", 13f, Style.DOUX).apply {
+        val suivre = Style.texte(this, getString(R.string.revenir_general), 13f, Style.DOUX).apply {
             setPadding(0, px(10f), 0, 0)
             isClickable = true
         }
         var majAuto = false      // vrai quand c'est le programme (pas le doigt) qui bouge l'interrupteur
         val interDemarrage = Style.interrupteur(this).apply {
-            text = "Seulement au démarrage"
+            text = getString(R.string.seulement_demarrage)
             textSize = 16f
             setTextColor(Style.TEXTE)
             isChecked = Reglages.seulementDemarrage(this@ReglageAppActivity, pkg)
@@ -174,12 +176,11 @@ class ReglageAppActivity : Activity() {
 
         // ---------- 5. l'icône animée de cette app (voir WidgetApp.kt) ----------
         val carteWidget = Style.carte(this)
-        carteWidget.addView(Style.titreCarte(this, "Icône animée"))
-        carteWidget.addView(Style.texte(this, "Le logo de $nom qui flotte doucement dans son icône, à poser sur " +
-            "l'accueil à la place de l'icône normale.", 13.5f, Style.MUET).apply { setLineSpacing(0f, 1.15f); setPadding(0, 0, 0, px(12f)) })
-        carteWidget.addView(Style.boutonDiscret(this, "Mettre sur l'accueil") {
+        carteWidget.addView(Style.titreCarte(this, getString(R.string.icone_animee)))
+        carteWidget.addView(Style.texte(this, getString(R.string.icone_animee_note, nom), 13.5f, Style.MUET).apply { setLineSpacing(0f, 1.15f); setPadding(0, 0, 0, px(12f)) })
+        carteWidget.addView(Style.boutonDiscret(this, getString(R.string.mettre_accueil)) {
             if (!WidgetApp.proposer(this, pkg)) {
-                Toast.makeText(this, "Appui long sur l'accueil → Widgets → " + getString(R.string.app_name), Toast.LENGTH_LONG).show()
+                Toast.makeText(this, getString(R.string.aide_widget, getString(R.string.app_name)), Toast.LENGTH_LONG).show()
             }
         })
         colonne.addView(carteWidget)
@@ -227,20 +228,19 @@ class ReglageAppActivity : Activity() {
     // La petite explication sous l'interrupteur « Seulement au démarrage », et le lien pour
     // revenir au réglage général (il n'apparaît que si on a fait un choix pour cette app).
     private fun majNoteDemarrage(note: TextView, suivre: View) {
-        note.text = if (Reglages.seulementDemarrage(this, pkg))
-            "Pas d'animation si l'app était encore ouverte en arrière-plan."
-            else "L'animation se joue à chaque appui sur l'icône."
+        note.text = getString(if (Reglages.seulementDemarrage(this, pkg)) R.string.note_demarrage_oui
+                              else R.string.note_demarrage_non)
         suivre.visibility = if (Reglages.seulementDemarrageChoisi(this, pkg)) View.VISIBLE else View.GONE
     }
 
     // Prévient si, avec ces réglages, l'animation ne se lancera jamais.
     private fun majAvertissement() {
         val texte = when {
-            !Reglages.appActive(this, pkg) -> "L'animation de cette app est coupée."
-            Reglages.duree(this, pkg) == 0 -> "Choisis une vitesse : avec une durée de 0, l'animation ne se lance pas."
+            !Reglages.appActive(this, pkg) -> getString(R.string.avert_coupee)
+            Reglages.duree(this, pkg) == 0 -> getString(R.string.avert_duree0)
             entree.variantes.isNotEmpty() &&
                 Reglages.variantesDesactivees(this, pkg).size >= entree.variantes.size ->
-                "Aucune variante cochée : l'animation ne se lance pas."
+                getString(R.string.avert_variantes)
             else -> ""
         }
         avertissement.text = texte
@@ -253,7 +253,7 @@ class ReglageAppActivity : Activity() {
         if (apercuEnCours != null) return
         val ms = dureeMs()
         if (ms == 0) {
-            Toast.makeText(this, "Choisis d'abord une vitesse", Toast.LENGTH_SHORT).show()
+            Toast.makeText(this, getString(R.string.choisir_vitesse), Toast.LENGTH_SHORT).show()
             return
         }
         var n = numero

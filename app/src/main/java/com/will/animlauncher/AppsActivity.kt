@@ -49,7 +49,7 @@ class AppsActivity : Activity() {
 
         // La barre de recherche : à chaque lettre tapée, la liste est filtrée.
         val recherche = EditText(this).apply {
-            hint = "Rechercher une app"
+            hint = getString(R.string.rechercher)
             setHintTextColor(Color.rgb(142, 142, 150))
             setTextColor(Style.TEXTE)
             textSize = 16f
@@ -92,7 +92,7 @@ class AppsActivity : Activity() {
         setContentView(LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
             setBackgroundColor(Style.NOIR)
-            addView(Style.entete(this@AppsActivity, "Animations d'apps"))
+            addView(Style.entete(this@AppsActivity, getString(R.string.carte_apps)))
             addView(corps, LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, 0, 1f))
         })
     }
@@ -108,8 +108,8 @@ class AppsActivity : Activity() {
     private fun majResume() {
         val avec = toutes.count { it.aUneAnimation }
         val coupees = toutes.count { it.aUneAnimation && Catalogue.lancement(this, it.pkg) == null }
-        resume.text = "${avec - coupees} actives" + (if (coupees > 0) " · $coupees coupées" else "") +
-            " · touche une app pour la régler"
+        resume.text = if (coupees > 0) getString(R.string.resume_apps_coupees, avec - coupees, coupees)
+                      else getString(R.string.resume_apps, avec)
     }
 
     // Toutes les apps qui ont une icône : celles avec une animation d'abord, puis les autres.
@@ -130,12 +130,12 @@ class AppsActivity : Activity() {
 
     // Le texte gris d'une ligne : en quelques mots, où en est l'animation de cette app.
     private fun description(app: AppDetectee): String {
-        val e = Catalogue.pour(app.pkg) ?: return "Pas encore d'animation"
-        if (!Reglages.appActive(this, app.pkg)) return "Coupée"
-        if (Reglages.duree(this, app.pkg) == 0) return "Coupée (durée réglée à 0)"
-        if (e.variantes.isEmpty()) return "Activée"
+        val e = Catalogue.pour(app.pkg) ?: return getString(R.string.desc_pas_anim)
+        if (!Reglages.appActive(this, app.pkg)) return getString(R.string.desc_coupee)
+        if (Reglages.duree(this, app.pkg) == 0) return getString(R.string.desc_duree0)
+        if (e.variantes.isEmpty()) return getString(R.string.desc_activee)
         val actives = e.variantes.size - Reglages.variantesDesactivees(this, app.pkg).size
-        return if (actives <= 0) "Aucune variante cochée" else "Activée · $actives variantes au hasard"
+        return if (actives <= 0) getString(R.string.desc_aucune_variante) else getString(R.string.desc_variantes, actives)
     }
 
     // L'ADAPTATEUR fabrique (et recycle) les lignes de la liste au fur et à mesure du défilement.
@@ -159,7 +159,7 @@ class AppsActivity : Activity() {
             l.inter.setOnCheckedChangeListener(null)          // évite de déclencher l'ancien écouteur
             l.inter.visibility = if (app.aUneAnimation) View.VISIBLE else View.INVISIBLE
             l.inter.isChecked = Reglages.appActive(this@AppsActivity, app.pkg)
-            l.inter.contentDescription = "Animation de ${app.nom}"
+            l.inter.contentDescription = getString(R.string.anim_de, app.nom)
             l.inter.setOnCheckedChangeListener { _, coche ->
                 Reglages.definirAppActive(this@AppsActivity, app.pkg, coche)
                 l.detail.text = description(app)

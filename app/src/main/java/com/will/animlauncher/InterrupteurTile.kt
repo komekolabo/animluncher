@@ -28,7 +28,7 @@ class InterrupteurTile : TileService() {
         tuile.label = "AnimLauncher"
         // Le sous-titre n'existe qu'à partir d'Android 10 (API 29).
         if (Build.VERSION.SDK_INT >= 29) {
-            tuile.subtitle = if (actif) "Animations ON" else "Coupé"
+            tuile.subtitle = getString(if (actif) R.string.etat_on else R.string.tuile_off)
         }
         tuile.updateTile()   // envoie les changements à l'écran
     }

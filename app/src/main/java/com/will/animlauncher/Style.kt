@@ -25,6 +25,7 @@ import kotlin.math.sin
 // Un seul endroit pour les couleurs et les petits éléments (textes, boutons, interrupteurs),
 // partagé par l'accueil (MainActivity), les réglages (ReglagesActivity) et les fonds (FondsActivity).
 // Changer une couleur ici la change partout.
+// (Les textes, eux, sont dans res/values*/strings.xml : un fichier par langue.)
 object Style {
     val NOIR = Color.rgb(0, 0, 0)
     val CARTE = Color.rgb(14, 14, 16)        // le fond des cartes
@@ -114,7 +115,7 @@ object Style {
         gravity = Gravity.CENTER_VERTICAL
         setPadding(px(a, 4f), 0, px(a, 16f), 0)
         addView(Icone(a, Icone.RETOUR).apply {
-            contentDescription = "Retour"
+            contentDescription = a.getString(R.string.retour)
             setOnClickListener { a.finish() }
         }, LinearLayout.LayoutParams(px(a, 48f), px(a, 48f)))
         addView(texte(a, titre, 20f, TEXTE, gras = true).apply { setPadding(px(a, 6f), 0, 0, 0) },

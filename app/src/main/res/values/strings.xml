@@ -1,13 +1,102 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- Les textes de l'app. Celui-ci s'affiche dans Paramètres > Accessibilité. -->
+<!-- Les textes de l'app en anglais (la langue par défaut : tout téléphone réglé sur une autre langue que celles traduites).
+     Chaque texte a une « clé » (name) : le code demande la clé, Android donne le texte dans la langue du téléphone.
+     %1$s et %1$d sont des « jokers » remplacés par un nom ou un nombre ; \n = retour à la ligne.
+     Pour ajouter une langue : copier ce fichier dans un dossier values-xx (xx = le code de la langue) et traduire. -->
 <resources>
-    <string name="description_service">Détecte l’application que tu ouvres pour jouer une animation personnalisée. AnimLauncher ne lit pas le contenu de tes écrans.</string>
-    <!-- La phrase qui présente le widget dans la liste des widgets de l'écran d'accueil. -->
-    <string name="widget_description">Le logo d’AnimLauncher, animé : à poser à la place de l’icône.</string>
-    <!-- Le widget « une app dans un galet » (essai) : son nom et sa phrase dans la liste des widgets. -->
-    <string name="widget_app_titre">Galet animé (essai)</string>
-    <string name="widget_app_description">Le logo d’une app qui flotte dans un galet de verre sombre.</string>
-    <!-- Le widget « dossier animé » : son nom et sa phrase dans la liste des widgets. -->
-    <string name="widget_groupe_titre">Dossier animé</string>
-    <string name="widget_groupe_description">Un groupe d’apps (IA, jeux…) derrière une étoile animée.</string>
+    <string name="retour">Back</string>
+    <string name="aide_widget">Long-press the home screen → Widgets → %1$s</string>
+    <string name="mettre_accueil">Add to home screen</string>
+    <string name="reglages">Settings</string>
+    <string name="carte_apps">App animations</string>
+    <string name="carte_logos">Animated logos</string>
+    <string name="carte_fonds">Wallpapers</string>
+    <string name="menu_ouvrir">Open menu</string>
+    <string name="detection_coupee">Detection is off: tap here to turn it on</string>
+    <string name="titre2_apps">App\nanimations</string>
+    <string name="titre2_logos">Animated\nlogos</string>
+    <string name="titre2_fonds">Wall-\npapers</string>
+    <string name="phrase_apps_aucune">A full-screen animation each time you open an app. Here is an example.</string>
+    <string name="phrase_logos">Living icons on your home screen: logo, app pebbles and folders.</string>
+    <string name="lien_poser_logo">Put the logo on the home screen ›</string>
+    <string name="phrase_fonds">Animated, dark and easy on the battery. This is one of them.</string>
+    <string name="chiffre_fonds">Coming soon to the app, then the community</string>
+    <string name="compte_actives">%1$d on · %2$d off</string>
+    <string name="toutes_animations">All animations</string>
+    <string name="etat_on">Animations ON</string>
+    <string name="etat_pause">Paused</string>
+    <string name="menu_accueil">Home</string>
+    <string name="menu_logos">Logos &amp; animated folders</string>
+    <string name="menu_journal">Log (diagnostics)</string>
+    <string name="rechercher">Search an app</string>
+    <string name="resume_apps">%1$d on · tap an app to adjust it</string>
+    <string name="resume_apps_coupees">%1$d on · %2$d off · tap an app to adjust it</string>
+    <string name="desc_pas_anim">No animation yet</string>
+    <string name="desc_coupee">Off</string>
+    <string name="desc_duree0">Off (duration set to 0)</string>
+    <string name="desc_activee">On</string>
+    <string name="desc_aucune_variante">No variant selected</string>
+    <string name="desc_variantes">On · %1$d variants at random</string>
+    <string name="anim_de">Animation for %1$s</string>
+    <string name="animation">Animation</string>
+    <string name="voir_animation">▶ Play the animation</string>
+    <string name="vitesse">Speed</string>
+    <string name="rapide">Fast</string>
+    <string name="normale">Normal</string>
+    <string name="lente">Slow</string>
+    <string name="variantes">Variants</string>
+    <string name="variantes_note">One is picked at random each time, among the checked ones.</string>
+    <string name="voir_variante">Play %1$s</string>
+    <string name="seulement_demarrage">Only when the app starts</string>
+    <string name="note_demarrage_oui">No animation if the app was still open in the background.</string>
+    <string name="note_demarrage_non">The animation plays each time you tap the icon.</string>
+    <string name="revenir_general">Back to the general setting ›</string>
+    <string name="icone_animee">Animated icon</string>
+    <string name="icone_animee_note">The logo of %1$s gently floating in its icon, to place on the home screen instead of the regular icon.</string>
+    <string name="avert_coupee">The animation for this app is off.</string>
+    <string name="avert_duree0">Pick a speed: with a duration of 0, the animation does not play.</string>
+    <string name="avert_variantes">No variant checked: the animation does not play.</string>
+    <string name="choisir_vitesse">Pick a speed first</string>
+    <string name="logo_anime">The animated logo</string>
+    <string name="logo_anime_note">To place on the home screen, instead of the icon.</string>
+    <string name="dossiers_animes">Animated folders</string>
+    <string name="dossiers_note">Your apps sorted by theme, behind an animated star.</string>
+    <string name="aucun_groupe">No group of at least 2 apps was found.</string>
+    <string name="n_apps">%1$d apps</string>
+    <string name="voir">View</string>
+    <string name="ajouter_app">＋ Add an app</string>
+    <string name="masquer_apps">Hide apps ▴</string>
+    <string name="choisir_apps">Choose apps ▾</string>
+    <string name="bientot">Coming soon</string>
+    <string name="fonds_note">Animated wallpapers, dark and easy on the battery, set with one tap. Then the community: publish yours and discover those of others.</string>
+    <string name="anim_activees">Animations enabled</string>
+    <string name="seulement_demarrage_app">Only when the app starts</string>
+    <string name="bouton_volet">Add the button to Quick Settings</string>
+    <string name="bouton_logo">Put the animated logo on the home screen</string>
+    <string name="volet_aide">Open Quick Settings, tap the pencil and drag the %1$s button.</string>
+    <string name="detection_ok">✅ Detection is on</string>
+    <string name="detection_ko">⚠️ Detection is off: enable %1$s in Accessibility.</string>
+    <string name="detection_grise">(Greyed out? The button below explains how to unlock it.)</string>
+    <string name="activer_detection">Turn on detection</string>
+    <string name="ouvrir_accessibilite">Open accessibility settings</string>
+    <string name="version">Version %1$s</string>
+    <string name="chemin_samsung">tap “Installed apps” (at the bottom), then “%1$s”</string>
+    <string name="chemin_autre">look for “%1$s” (often under “Downloaded apps” or “Installed apps”)</string>
+    <string name="dans_accessibilite">In Accessibility: %1$s</string>
+    <string name="expl_titre">Why %1$s needs Accessibility</string>
+    <string name="expl_texte">%1$s uses Android’s accessibility service (AccessibilityService API).\n\nWhy?\nTo know which icon you tap on your home screen and which app opens. This is what lets the animation start BEFORE the app appears. No other Android feature gives notice early enough.\n\nWhat the app receives:\n• the name written under the icon you tap on the home screen;\n• the name of the app that comes to the foreground;\n• the home screen’s announcements when you close an app (“app … closed”), so the animation plays again next time.\n\nWhat the app does NOT do:\n• it does not read the content of your screens or what you type (messages, passwords…);\n• it never acts on your behalf;\n• nothing is collected, stored on a server or shared: everything stays on your phone.\n\nYou can turn this service off at any time in Settings &gt; Accessibility.</string>
+    <string name="expl_accepter">Accept and turn on</string>
+    <string name="expl_refuser">Decline</string>
+    <string name="expl_refus">Without Accessibility, %1$s cannot play any animation. You can change your mind anytime with the button below.</string>
+    <string name="tuile_off">Off</string>
+    <string name="description_service">Detects the app you open to play a custom animation. AnimLauncher does not read the content of your screens.</string>
+    <string name="widget_description">The AnimLauncher logo, animated: place it instead of the icon.</string>
+    <string name="widget_app_titre">Animated pebble (trial)</string>
+    <string name="widget_app_description">An app’s logo floating in a dark glass pebble.</string>
+    <string name="widget_groupe_titre">Animated folder</string>
+    <string name="widget_groupe_description">A group of apps (AI, games…) behind an animated star.</string>
+    <plurals name="apps_trouvees">
+        <item quantity="one">%1$d compatible app found on your phone. Here is what it looks like.</item>
+        <item quantity="other">%1$d compatible apps found on your phone. Here is what it looks like.</item>
+    </plurals>
 </resources>
