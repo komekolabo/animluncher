@@ -155,7 +155,8 @@ object Catalogue {
             val eteintes = Reglages.variantesDesactivees(c, app)
             val permises = e.variantes.indices.filter { it !in eteintes }
             if (permises.isEmpty()) return null
-            numero = permises.random()          // une variante au hasard parmi celles qui sont cochées
+            // une variante au hasard parmi les cochées, mais celle qui vient de passer a moins de chances
+            numero = Reglages.tirerVariante(c, app, e.variantes.size, permises)
         }
         return Lancement(e.fabrique(numero), e.categorie, ms.toFloat() / e.dureeDefaut)
     }
