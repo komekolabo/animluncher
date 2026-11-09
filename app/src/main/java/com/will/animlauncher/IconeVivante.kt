@@ -159,6 +159,12 @@ class IconeVivante(private val service: AccessibilityService) {
     // simple appui ?) : le logo reste caché jusqu'à une preuve qu'on est sur la bonne page de l'accueil
     // (un vrai changement de page, ou un retour sur l'accueil depuis une app).
     private var enAttenteDePreuve = false
+    // Pour « l'interrupteur » (voir surContenu) : l'heure des derniers signaux de chaque sorte.
+    private var fenetreA = 0L               // dernière fenêtre passée au premier plan
+    private var clicA = 0L                  // dernier appui
+    private var contenuA = 0L               // dernier « contenu changé » de l'accueil
+    private var groupeDebut = 0L            // début de la rafale de « contenu changé » en cours
+    private var notesBascule = 0
 
     // Une fenêtre passe au premier plan.
     fun surFenetre(app: String?, classe: String, accueil: String?) {
@@ -166,6 +172,7 @@ class IconeVivante(private val service: AccessibilityService) {
         // aussi un signal « fenêtre » en apparaissant (classe « View » ou « FrameLayout »). Avant, on le
         // prenait pour une autre app : le logo se retirait 20 ms après être apparu (vu dans le journal).
         if (app == service.packageName && (classe == "View" || classe == "FrameLayout")) return
+        fenetreA = SystemClock.uptimeMillis()
         // on note une fois chaque nom d'écran de l'accueil (pour comprendre ce que Samsung envoie)
         if (app == accueil && ecransVus.size < 20 && ecransVus.add(classe))
             noter("  (icône vivante : écran de l'accueil « $classe »)")
@@ -188,8 +195,55 @@ class IconeVivante(private val service: AccessibilityService) {
     // Si on est toujours sur l'accueil 1,2 s plus tard (ex. un dossier ouvert puis refermé),
     // on la remet.
     fun surClic() {
+        clicA = SystemClock.uptimeMillis()
         cacher("appui")
         minuteur.postDelayed({ evaluer("après un appui sur l'accueil") }, 800)
+    }
+
+    // L'INTERRUPTEUR (enquête du 09/11). Quand on ouvre OU ferme le tiroir d'apps sans changer de page,
+    // Samsung n'envoie qu'un seul signal : « le contenu de l'écran d'accueil a changé » (classe
+    // FrameLayout). Il ne dit pas dans quel sens. Alors on fait comme un interrupteur : un signal SEUL
+    // (sans changement de page, sans appui, sans nouvelle fenêtre juste avant ou juste après) = on a
+    // basculé, accueil -> tiroir ou tiroir -> accueil. Le prochain « Page X sur N » remet les pendules
+    // à l'heure si on s'est trompé. Plusieurs signaux à moins de 0,5 s d'écart comptent pour un seul.
+    fun surContenu(event: AccessibilityEvent, accueil: String?) {
+        if (event.packageName?.toString() != accueil) return
+        if (event.className?.toString()?.substringAfterLast('.') != "FrameLayout") return
+        val maintenant = SystemClock.uptimeMillis()
+        if (maintenant - contenuA > 500) groupeDebut = maintenant
+        contenuA = maintenant
+        minuteur.postDelayed({ if (SystemClock.uptimeMillis() - contenuA >= 490) finContenu() }, 500)
+    }
+
+    private fun finContenu() {
+        if (!surAccueil) return
+        val debut = groupeDebut
+        val fin = contenuA
+        // un autre signal tout près (0,7 s avant le début, 0,5 s après la fin) : ce n'était pas le tiroir
+        fun pres(t: Long) = t > 0 && t > debut - 700 && t < fin + 500
+        val autre = when {
+            pres(defileA) -> "défilement"
+            pres(selectionA) -> "changement de page"
+            pres(fenetreA) -> "nouvelle fenêtre"
+            pres(clicA) -> "appui"
+            else -> null
+        }
+        if (autre != null) {
+            if (notesBascule < 30) { notesBascule++; noter("  (icône vivante : « contenu changé » ignoré, avec un $autre)") }
+            return
+        }
+        dansTiroir = !dansTiroir
+        IconeAccueil.accueilSur = false
+        if (notesBascule < 30) {
+            notesBascule++
+            noter("  (icône vivante : bascule devinée -> ${if (dansTiroir) "tiroir d'apps" else "accueil"})")
+        }
+        if (dansTiroir) {
+            cacher("tiroir d'apps (deviné)")
+        } else {
+            enAttenteDePreuve = false
+            evaluer("tiroir refermé (deviné)")
+        }
     }
 
     // Le signal « Page 2 sur 3 » (envoyé quand une page de l'accueil OU du tiroir s'affiche).
