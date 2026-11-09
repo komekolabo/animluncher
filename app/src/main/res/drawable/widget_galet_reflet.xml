@@ -1,0 +1,39 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- LA BANDE DE LUMIÈRE du galet (immobile au départ). Une bande penchée, très transparente, qui
+     traversera le verre (voir widget_galet_reflet_anime.xml). Le « clip-path » la découpe à la forme
+     du galet : elle ne déborde jamais. Dessin en 100 x 100. -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:aapt="http://schemas.android.com/aapt"
+    android:width="62dp"
+    android:height="62dp"
+    android:viewportWidth="100"
+    android:viewportHeight="100">
+
+    <clip-path android:pathData="M99.30,50.00 L99.22,56.05 98.98,60.29 98.57,64.02 98.00,67.43 97.27,70.59 96.39,73.55 95.34,76.32 94.14,78.93 92.78,81.37 91.26,83.65 89.59,85.79 87.76,87.76 85.79,89.59 83.65,91.26 81.37,92.78 78.93,94.14 76.32,95.34 73.55,96.39 70.59,97.27 67.43,98.00 64.02,98.57 60.29,98.98 56.05,99.22 50.00,99.30 43.95,99.22 39.71,98.98 35.98,98.57 32.57,98.00 29.41,97.27 26.45,96.39 23.68,95.34 21.07,94.14 18.63,92.78 16.35,91.26 14.21,89.59 12.24,87.76 10.41,85.79 8.74,83.65 7.22,81.37 5.86,78.93 4.66,76.32 3.61,73.55 2.73,70.59 2.00,67.43 1.43,64.02 1.02,60.29 0.78,56.05 0.70,50.00 0.78,43.95 1.02,39.71 1.43,35.98 2.00,32.57 2.73,29.41 3.61,26.45 4.66,23.68 5.86,21.07 7.22,18.63 8.74,16.35 10.41,14.21 12.24,12.24 14.21,10.41 16.35,8.74 18.63,7.22 21.07,5.86 23.68,4.66 26.45,3.61 29.41,2.73 32.57,2.00 35.98,1.43 39.71,1.02 43.95,0.78 50.00,0.70 56.05,0.78 60.29,1.02 64.02,1.43 67.43,2.00 70.59,2.73 73.55,3.61 76.32,4.66 78.93,5.86 81.37,7.22 83.65,8.74 85.79,10.41 87.76,12.24 89.59,14.21 91.26,16.35 92.78,18.63 94.14,21.07 95.34,23.68 96.39,26.45 97.27,29.41 98.00,32.57 98.57,35.98 98.98,39.71 99.22,43.95 Z" />
+
+    <!-- « bande » : c'est ce groupe qui glisse de gauche à droite -->
+    <group
+        android:name="bande"
+        android:translateX="-110">
+        <!-- la bande, penchée de 25 degrés -->
+        <group
+            android:pivotX="50"
+            android:pivotY="50"
+            android:rotation="25">
+            <path android:pathData="M35,-40 L65,-40 L65,140 L35,140 Z">
+                <aapt:attr name="android:fillColor">
+                    <gradient
+                        android:type="linear"
+                        android:startX="35"
+                        android:startY="50"
+                        android:endX="65"
+                        android:endY="50">
+                        <item android:offset="0" android:color="#00FFFFFF" />
+                        <item android:offset="0.5" android:color="#1EFFFFFF" />
+                        <item android:offset="1" android:color="#00FFFFFF" />
+                    </gradient>
+                </aapt:attr>
+            </path>
+        </group>
+    </group>
+</vector>

@@ -4,4 +4,7 @@
     <string name="description_service">Détecte l’application que tu ouvres pour jouer une animation personnalisée. AnimLauncher ne lit pas le contenu de tes écrans.</string>
     <!-- La phrase qui présente le widget dans la liste des widgets de l'écran d'accueil. -->
     <string name="widget_description">Le logo d’AnimLauncher, animé : à poser à la place de l’icône.</string>
+    <!-- Le widget « une app dans un galet » (essai) : son nom et sa phrase dans la liste des widgets. -->
+    <string name="widget_app_titre">Galet animé (essai)</string>
+    <string name="widget_app_description">Le logo d’une app qui flotte dans un galet de verre sombre.</string>
 </resources>

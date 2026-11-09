@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- La fiche du widget « une app dans un galet » (essai) : 1 x 1 case, jamais de mise à jour
+     automatique (l'animation tourne toute seule). -->
+<appwidget-provider xmlns:android="http://schemas.android.com/apk/res/android"
+    android:minWidth="40dp"
+    android:minHeight="40dp"
+    android:targetCellWidth="1"
+    android:targetCellHeight="1"
+    android:resizeMode="none"
+    android:updatePeriodMillis="0"
+    android:initialLayout="@layout/widget_app"
+    android:previewImage="@drawable/widget_galet"
+    android:description="@string/widget_app_description"
+    android:widgetCategory="home_screen" />

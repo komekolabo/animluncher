@@ -1,0 +1,29 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- LA BANDE DE LUMIÈRE, ANIMÉE : une boucle de 6 s. La bande traverse le verre de gauche à droite en
+     1,8 s (départ et arrivée en douceur), puis attend hors du galet (invisible) jusqu'à la fin de la
+     boucle. Très transparente : jamais de flash. Jouée en boucle par une ProgressBar (même astuce que
+     le widget du logo). -->
+<animated-vector xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:aapt="http://schemas.android.com/aapt"
+    android:drawable="@drawable/widget_galet_reflet">
+
+    <target android:name="bande">
+        <aapt:attr name="android:animation">
+            <objectAnimator
+                android:duration="6000"
+                android:repeatCount="infinite"
+                android:interpolator="@android:interpolator/linear">
+                <propertyValuesHolder
+                    android:propertyName="translateX"
+                    android:valueType="floatType">
+                    <keyframe android:fraction="0" android:value="-110" />
+                    <keyframe
+                        android:fraction="0.3"
+                        android:value="110"
+                        android:interpolator="@android:interpolator/accelerate_decelerate" />
+                    <keyframe android:fraction="1" android:value="110" />
+                </propertyValuesHolder>
+            </objectAnimator>
+        </aapt:attr>
+    </target>
+</animated-vector>

@@ -80,6 +80,19 @@
                 android:resource="@xml/widget_logo_info" />
         </receiver>
 
+        <!-- LE WIDGET « UNE APP DANS UN GALET » (essai, voir WidgetApp.kt). -->
+        <receiver
+            android:name=".WidgetApp"
+            android:exported="false"
+            android:label="@string/widget_app_titre">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+            </intent-filter>
+            <meta-data
+                android:name="android.appwidget.provider"
+                android:resource="@xml/widget_app_info" />
+        </receiver>
+
         <!-- Le KILL SWITCH : un bouton dans le volet des réglages rapides. -->
         <service
             android:name=".InterrupteurTile"

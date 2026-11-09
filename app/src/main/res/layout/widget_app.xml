@@ -1,0 +1,61 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- LE WIDGET « UNE APP DANS UN GALET » (essai du 09/11, voir WidgetApp.kt). Trois couches, l'une
+     sur l'autre (FrameLayout = on empile) :
+       1) le galet (immobile) ;
+       2) le « folioscope » (ViewFlipper) : une suite d'images du logo de l'app qui flotte, dessinées
+          par l'app au moment où on pose le widget, et qui défilent toutes seules (12 images/s) ;
+       3) la bande de lumière qui traverse le verre (même astuce de ProgressBar que le widget du logo).
+     Puis le nom de l'app dessous. -->
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:id="@+id/widget_app_racine"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:gravity="center"
+    android:orientation="vertical">
+
+    <FrameLayout
+        android:layout_width="62dp"
+        android:layout_height="62dp">
+
+        <ImageView
+            android:layout_width="match_parent"
+            android:layout_height="match_parent"
+            android:scaleType="fitXY"
+            android:src="@drawable/widget_galet" />
+
+        <!-- flipInterval = 83 ms entre deux images (environ 12 images par seconde) -->
+        <ViewFlipper
+            android:id="@+id/widget_app_folioscope"
+            android:layout_width="match_parent"
+            android:layout_height="match_parent"
+            android:autoStart="true"
+            android:flipInterval="83" />
+
+        <ProgressBar
+            style="@android:style/Widget.ProgressBar"
+            android:layout_width="match_parent"
+            android:layout_height="match_parent"
+            android:minWidth="62dp"
+            android:maxWidth="62dp"
+            android:minHeight="62dp"
+            android:maxHeight="62dp"
+            android:indeterminate="true"
+            android:indeterminateOnly="true"
+            android:indeterminateDrawable="@drawable/widget_galet_reflet_anime" />
+    </FrameLayout>
+
+    <TextView
+        android:id="@+id/widget_app_nom"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="4dp"
+        android:ellipsize="end"
+        android:fontFamily="sans-serif"
+        android:maxLines="1"
+        android:shadowColor="#99000000"
+        android:shadowDx="0"
+        android:shadowDy="1"
+        android:shadowRadius="3"
+        android:textColor="#FFFFFF"
+        android:textSize="13sp" />
+</LinearLayout>
