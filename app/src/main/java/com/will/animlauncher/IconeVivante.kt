@@ -160,8 +160,11 @@ class IconeVivante(private val service: AccessibilityService) {
         surAccueil = app == accueil && classe == "Launcher"
         if (!surAccueil) { cacher("écran « $classe » de $app"); return }
         if (!avant) {
-            // on revient d'une app : on est sur l'accueil (pas dans le tiroir)
-            dansTiroir = false; enAttenteDePreuve = false
+            // On revient d'une app. ATTENTION : si l'app avait été ouverte depuis le tiroir d'apps,
+            // Samsung revient DANS le tiroir (vu le 09/11 : le logo s'affichait par-dessus ChessBar).
+            // On ne remet donc PAS « dansTiroir » à faux ici : c'est le prochain « Page X sur N » de
+            // l'accueil (fermeture du tiroir, changement de page) qui le fera.
+            enAttenteDePreuve = false
             minuteur.postDelayed({ evaluer("retour sur l'accueil") }, 300)
         }
     }
