@@ -23,7 +23,7 @@ Objectif : la publier sur le Google Play Store, avec une pub non invasive.
 |---|---|---|
 | Identifiant | `com.will.animlauncher` | `com.will.animlauncher.store` |
 | Nom | AnimLauncher Perso | AnimLauncher |
-| Logo | comète ambre | comète violette |
+| Logo | identique (« Étincelle halo ») | identique (« Étincelle halo ») |
 | Accessibilité | complète (`src/main/res/xml/accessibility_config.xml`) | allégée, sans lecture d'écran (`src/store/res/xml/…`) |
 | Extras | journal envoyé sur GitHub, mode standard, outils de dev | écran d'explication Google, pas d'Internet |
 
@@ -52,7 +52,10 @@ Objectif : la publier sur le Google Play Store, avec une pub non invasive.
 - `Reglages.kt` : kill switch, « seulement au démarrage », réglages par app (durée, variantes).
 - `MainActivity.kt` : écran principal (logo animé, interrupteurs, écran d'explication Store).
 - `GuideDeblocage.kt` : guide plein écran pour l'accessibilité **grisée** (APK installé hors Play Store).
-- `LogoAnime.kt` + `res/drawable/logo_avant.xml` : le logo (icône adaptative + version animée).
+- `LogoAnime.kt` + `res/drawable/logo_avant.xml` (+ `logo_mono.xml` pour les icônes thématisées) : le logo
+  « Étincelle halo » choisi par Will le 09/11 (triangle aux 3 côtés coupés au milieu, étoile à 4 branches en
+  dégradé bleu/vert/jaune/rouge façon Play Store adoucie, halo jaune doux). Pistes sur le canevas Design
+  https://claude.ai/artifact/LBzsAiPhrmc24HJDBLnHei . Réduit à 80 % pour tenir dans la zone sûre de l'icône.
 - `Journal.kt` / `JournalActivity.kt` : journal de bord. **En Perso, il est envoyé dans un ticket
   GitHub du repo** : c'est la meilleure source pour déboguer (lisible via l'API GitHub publique,
   dernier commentaire du ticket le plus récent).

@@ -1,45 +1,62 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- LE LOGO (premier plan). Une icône d'app (le carré arrondi), entourée d'une comète qui file
-     autour d'elle et finit en étincelle : « une animation qui accompagne l'ouverture de tes apps ».
+<!-- LE LOGO (premier plan) : « Étincelle halo », choisi par Will le 09/11.
+     Un triangle dont les trois côtés sont coupés en leur milieu (il ne reste que les trois coins),
+     avec au centre une étoile à 4 branches en dégradé (bleu, vert, jaune, rouge) posée sur un
+     halo doux. Idée : le déclic de l'animation au cœur de l'app.
      Dessin en 108 x 108 : Android découpe ensuite l'icône (rond, carré, goutte…) selon le téléphone,
-     donc tout l'important reste dans le cercle central de 66 de diamètre. -->
+     donc tout l'important doit rester dans le cercle central de 66 de diamètre. Le dessin d'origine
+     (fait sur le canevas) est un peu trop grand : le groupe le réduit à 80 % autour du centre. -->
 <vector xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:aapt="http://schemas.android.com/aapt"
     android:width="108dp"
     android:height="108dp"
     android:viewportWidth="108"
     android:viewportHeight="108">
 
-    <!-- l'icône d'app, au centre : un carré aux coins arrondis, en trait clair -->
-    <path
-        android:pathData="M45.6,36 L62.4,36 Q72,36 72,45.6 L72,62.4 Q72,72 62.4,72 L45.6,72 Q36,72 36,62.4 L36,45.6 Q36,36 45.6,36 Z"
-        android:strokeColor="#E8ECF7"
-        android:strokeWidth="3.6"
-        android:fillColor="#00000000" />
+    <group
+        android:pivotX="54"
+        android:pivotY="54"
+        android:scaleX="0.8"
+        android:scaleY="0.8">
 
-    <!-- un petit point au milieu de l'icône : l'app qui « s'allume » -->
-    <path
-        android:pathData="M54,50.4 A3.6,3.6 0 1,1 54,57.6 A3.6,3.6 0 1,1 54,50.4 Z"
-        android:fillColor="@color/logo_couleur" />
+        <!-- le halo : un disque dont la couleur s'efface du centre vers le bord (jamais de flash) -->
+        <path android:pathData="M54,45 A16,16 0 1,1 54,77 A16,16 0 1,1 54,45 Z">
+            <aapt:attr name="android:fillColor">
+                <gradient
+                    android:type="radial"
+                    android:centerX="54"
+                    android:centerY="61"
+                    android:gradientRadius="16">
+                    <item android:offset="0" android:color="#47F7C948" />
+                    <item android:offset="1" android:color="#00F7C948" />
+                </gradient>
+            </aapt:attr>
+        </path>
 
-    <!-- la traîne de la comète (plus fine et transparente) -->
-    <path
-        android:pathData="M26.16,61.44 A28.8,28.8 0 0,1 29.04,68.4"
-        android:strokeColor="@color/logo_couleur"
-        android:strokeAlpha="0.4"
-        android:strokeWidth="3"
-        android:strokeLineCap="round"
-        android:fillColor="#00000000" />
+        <!-- les trois coins du triangle : traits épais, bouts arrondis -->
+        <path
+            android:pathData="M44.5,45.2 L54,29 L63.5,45.2 M35.5,60.8 L26,77 L45,77 M63,77 L82,77 L72.5,60.8"
+            android:strokeColor="#ECEFF7"
+            android:strokeWidth="8"
+            android:strokeLineCap="round"
+            android:strokeLineJoin="round"
+            android:fillColor="#00000000" />
 
-    <!-- la comète : un arc qui part d'en bas à gauche, passe au-dessus de l'icône et file vers la droite -->
-    <path
-        android:pathData="M29.04,68.4 A28.8,28.8 0 0,1 76.08,35.52"
-        android:strokeColor="@color/logo_couleur"
-        android:strokeWidth="4.8"
-        android:strokeLineCap="round"
-        android:fillColor="#00000000" />
-
-    <!-- l'étincelle au bout de la comète (une étoile à 4 branches) -->
-    <path
-        android:pathData="M76.08,28.32 L77.88,33.72 L83.48,35.52 L77.88,37.32 L76.08,42.72 L74.28,37.32 L68.68,35.52 L74.28,33.72 Z"
-        android:fillColor="#FFFFFF" />
+        <!-- l'étoile à 4 branches, en dégradé d'un coin à l'autre (en diagonale) -->
+        <path android:pathData="M54,50.5 L56.4,58.6 L64.5,61 L56.4,63.4 L54,71.5 L51.6,63.4 L43.5,61 L51.6,58.6 Z">
+            <aapt:attr name="android:fillColor">
+                <gradient
+                    android:type="linear"
+                    android:startX="43.5"
+                    android:startY="50.5"
+                    android:endX="64.5"
+                    android:endY="71.5">
+                    <item android:offset="0" android:color="#4C8DF6" />
+                    <item android:offset="0.38" android:color="#34C77B" />
+                    <item android:offset="0.66" android:color="#F7C948" />
+                    <item android:offset="1" android:color="#F0645A" />
+                </gradient>
+            </aapt:attr>
+        </path>
+    </group>
 </vector>
