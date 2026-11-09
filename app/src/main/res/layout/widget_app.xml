@@ -1,9 +1,9 @@
 <?xml version="1.0" encoding="utf-8"?>
 <!-- LE WIDGET « UNE APP DANS UN GALET » (essai du 09/11, voir WidgetApp.kt). Trois couches, l'une
      sur l'autre (FrameLayout = on empile) :
-       1) le galet (immobile) ;
+       1) le galet (immobile) : dessiné par l'app avec le fond de l'icône (sinon, verre sombre) ;
        2) le « folioscope » (ViewFlipper) : une suite d'images du logo de l'app qui flotte, dessinées
-          par l'app au moment où on pose le widget, et qui défilent toutes seules (12 images/s) ;
+          par l'app au moment où on pose le widget, et qui défilent toutes seules (20 images/s) ;
        3) la bande de lumière qui traverse le verre (même astuce de ProgressBar que le widget du logo).
      Puis le nom de l'app dessous. -->
 <LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
@@ -18,18 +18,19 @@
         android:layout_height="62dp">
 
         <ImageView
+            android:id="@+id/widget_app_galet"
             android:layout_width="match_parent"
             android:layout_height="match_parent"
             android:scaleType="fitXY"
             android:src="@drawable/widget_galet" />
 
-        <!-- flipInterval = 83 ms entre deux images (environ 12 images par seconde) -->
+        <!-- flipInterval = 50 ms entre deux images (20 images par seconde) -->
         <ViewFlipper
             android:id="@+id/widget_app_folioscope"
             android:layout_width="match_parent"
             android:layout_height="match_parent"
             android:autoStart="true"
-            android:flipInterval="83" />
+            android:flipInterval="50" />
 
         <ProgressBar
             style="@android:style/Widget.ProgressBar"

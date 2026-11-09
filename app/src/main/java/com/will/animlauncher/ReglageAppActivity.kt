@@ -143,6 +143,27 @@ class ReglageAppActivity : Activity() {
         })
         colonne.addView(carteDuree)
 
+        // --- 2 bis. le widget « galet » de cette app (voir WidgetApp.kt) ---
+        val carteWidget = carte()
+        carteWidget.addView(titre("Widget animé"))
+        carteWidget.addView(TextView(this).apply {
+            text = "Le logo de $nom qui flotte doucement dans son icône. À poser sur l'accueil, " +
+                "à la place de l'icône normale (elle reste dans l'écran des apps)."
+            textSize = 14f
+            setTextColor(Color.parseColor("#DFE4F7"))
+            setPadding(0, 0, 0, (8 * dp).toInt())
+        })
+        carteWidget.addView(Button(this).apply {
+            text = "✨  Mettre le widget sur l'accueil"
+            setOnClickListener {
+                if (!WidgetApp.proposer(this@ReglageAppActivity, pkg)) {
+                    Toast.makeText(this@ReglageAppActivity, "Appui long sur l'accueil → Widgets → " +
+                        getString(R.string.app_name), Toast.LENGTH_LONG).show()
+                }
+            }
+        })
+        colonne.addView(carteWidget)
+
         // --- 3. les variantes (seulement pour les apps qui en ont plusieurs) ---
         if (entree.variantes.isNotEmpty()) {
             val carteVariantes = carte()
