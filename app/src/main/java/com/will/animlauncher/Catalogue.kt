@@ -32,7 +32,8 @@ fun gemini(numero: Int): Scene = when (numero) {
 // Pour ajouter une app : une ligne de plus dans la liste.
 object Catalogue {
     // Le film de la collision de galaxies est long à calculer : on le prépare en arrière-plan dès le départ.
-    init { FilmCollision.preparer() }
+    // Pareil pour les décors d'Instagram (les fonds des vidéos et le mur dans la nuit) : dessinés une fois.
+    init { FilmCollision.preparer(); FondsReels.preparer(); FondsMur.preparer() }
 
     private val E = Categorie.ESSENTIELLE
     private val C = Categorie.COURANTE
@@ -51,8 +52,8 @@ object Catalogue {
     // « Transition » = juste une belle transition, la plus courte possible (voir ScenesTransition.kt).
     private val entrees: Map<String, Entree> = mapOf(
         // --- Lot 1 : les IA ---
-        // Claude : un des 5 horizons, ou « Autonomy » (la durée de travail autonome des IA), au hasard
-        "com.anthropic.claude" to v(E, MONDES.map { it.nom } + "Autonomie") { if (it in MONDES.indices) Horizons(it) else Autonomie() },
+        // Claude : un des 5 horizons, au hasard (« Autonomy » retirée le 09/11)
+        "com.anthropic.claude" to v(E, MONDES.map { it.nom }) { Horizons(it) },
         "com.anthropic.aibo" to e(E) { Lucioles() },
         // ChatGPT : 4 animations au hasard
         "com.openai.chatgpt" to v(E, CHATGPT_VARIANTES) { chatgpt(it) },
@@ -107,7 +108,8 @@ object Catalogue {
         // --- Lot 4 : réseaux, musique, services ---
         "com.whatsapp" to e(S) { Transition(rgb(37, 211, 102)) },       // minimale
         "com.spotify.music" to e(E) { Vinyle() },
-        "com.instagram.android" to e(C) { Pellicule() },
+        // Instagram : « Défilement sans fin » (Reels) ou « Mur dans la nuit », au hasard
+        "com.instagram.android" to v(C, listOf("Défilement sans fin", "Mur dans la nuit")) { if (it == 1) MurNuit() else Reels() },
         "com.twitter.android" to e(C) { Eclipse() },
         "com.discord" to e(C) { EnseigneNeon() },
         "ee.mtakso.client" to e(C) { Route() },
