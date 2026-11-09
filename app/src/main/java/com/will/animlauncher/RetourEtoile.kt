@@ -112,8 +112,12 @@ object RetourEtoile {
                     pinceau.shader = null
                 }
             }
-            // 2) l'étoile rentre dans le widget en tournant (un demi-tour en arrière)
-            val x = mix(e.x, e.versX, k); val y = mix(e.y, e.versY, k); val r = mix(e.r, e.versR, k)
+            // 2) l'étoile rentre dans le widget en tournant (un demi-tour en arrière). Elle PASSE SOUS LA BOÎTE :
+            //    on ne la dessine pas là où est le galet du widget (« clipOutPath » = tout sauf cette zone), et
+            //    elle vise un peu plus bas que le centre, comme si elle se glissait dessous.
+            val x = mix(e.x, e.versX, k); val y = mix(e.y, e.versY + 0.6f * e.versR, k); val r = mix(e.r, e.versR * 0.8f, k)
+            c.save()
+            if (k > 0.3f) c.clipOutPath(boite(e.versX, e.versY, e.versR))
             pinceau.color = Color.WHITE
             val lueur = 50f * (1 - k)
             if (lueur > 1) {
@@ -133,7 +137,15 @@ object RetourEtoile {
             c.drawPath(etoile, pinceau)
             pinceau.shader = null
             c.restore()
+            c.restore()
             if (f < 1f) postInvalidateOnAnimation()
+        }
+
+        // La forme du galet du widget (62 dp de côté = 3,875 fois le rayon de l'étoile du widget), en carré
+        // très arrondi : c'est la zone où l'étoile est « sous la boîte ».
+        private fun boite(cx: Float, cy: Float, rEtoile: Float): Path {
+            val demi = rEtoile * 3.875f / 2
+            return Path().apply { addRoundRect(cx - demi, cy - demi, cx + demi, cy + demi, demi * 0.72f, demi * 0.72f, Path.Direction.CW) }
         }
     }
 }

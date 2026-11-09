@@ -112,10 +112,23 @@ object Groupes {
     // Un dossier contient au plus 60 apps (5 pages de 12), choix de Will le 09/11.
     const val MAX = 60
 
-    // Les apps du dossier : toutes, sauf celles que l'utilisateur a décochées (60 au plus).
+    // Les apps du dossier : toutes, sauf celles que l'utilisateur a décochées (60 au plus), dans l'ORDRE
+    // choisi par l'utilisateur (mode édition du dossier) ; les apps jamais rangées vont à la fin.
     fun apps(c: Context, id: String): List<String> {
         val sans = retirees(c, id)
-        return tous(c, id).filter { it !in sans }.take(MAX)
+        val ordre = ordre(c, id)
+        return tous(c, id).filter { it !in sans }
+            .sortedBy { val i = ordre.indexOf(it); if (i < 0) Int.MAX_VALUE else i }      // tri « stable » : l'alphabet départage
+            .take(MAX)
+    }
+
+    // L'ordre des apps dans le dossier (retenu quand on les déplace en mode édition).
+    fun ordre(c: Context, id: String): List<String> =
+        c.getSharedPreferences(CARNET, Context.MODE_PRIVATE).getString("ordre_$id", null)
+            ?.split(",")?.filter { it.isNotBlank() } ?: emptyList()
+
+    fun definirOrdre(c: Context, id: String, apps: List<String>) {
+        c.getSharedPreferences(CARNET, Context.MODE_PRIVATE).edit().putString("ordre_$id", apps.joinToString(",")).apply()
     }
 
     // LE CARNET « groupes » : pour chaque groupe, les apps décochées (« sans_… ») et les apps

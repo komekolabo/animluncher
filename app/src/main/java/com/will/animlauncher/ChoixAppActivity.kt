@@ -107,5 +107,25 @@ class ChoixAppActivity : Activity() {
             setBackgroundColor(Color.parseColor("#1B2340"))
             addView(colonne)
         })
+        this.groupe = groupe
+        this.depuisDossier = depuisDossier
+    }
+
+    private var groupe = ""
+    private var depuisDossier = false
+
+    // Le bouton RETOUR : si on vient du dossier animé, on y retourne (au lieu de tout fermer).
+    @Deprecated("Bouton retour")
+    override fun onBackPressed() {
+        if (depuisDossier) {
+            startActivity(Intent(this, DossierActivity::class.java).putExtra("groupe", groupe)
+                .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK))
+            @Suppress("DEPRECATION")
+            overridePendingTransition(0, 0)
+            finish()
+        } else {
+            @Suppress("DEPRECATION")
+            super.onBackPressed()
+        }
     }
 }
