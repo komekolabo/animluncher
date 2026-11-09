@@ -70,6 +70,13 @@ class MainActivity : Activity() {
             setOnClickListener { startActivity(Intent(this@MainActivity, AppsActivity::class.java)) }
         }
 
+        // Les dossiers animés (voir GroupesActivity.kt) : les apps rangées par catégorie, en widgets.
+        val boutonDossiers = Button(this).apply {
+            text = "✦  Dossiers animés"
+            textSize = 18f
+            setOnClickListener { startActivity(Intent(this@MainActivity, GroupesActivity::class.java)) }
+        }
+
         val boutonVolet = Button(this).apply {
             text = "Ajouter le bouton au volet rapide"
             setOnClickListener { proposerTuile() }
@@ -139,6 +146,7 @@ class MainActivity : Activity() {
         colonne.addView(interrupteur)
         colonne.addView(interrupteurDemarrage)
         colonne.addView(boutonApps)
+        colonne.addView(boutonDossiers)
         colonne.addView(boutonVolet)
         colonne.addView(boutonWidget)
         colonne.addView(statut)

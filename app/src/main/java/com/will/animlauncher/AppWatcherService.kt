@@ -64,6 +64,7 @@ class AppWatcherService : AccessibilityService() {
     }
 
     override fun onServiceConnected() {
+        actif = this
         Journal.installerFilet(this)
         noter("=== Service démarré (allumage ou réactivation) ===")
         noms = calculerNoms()      // préparé à l'avance : le clic doit être traité instantanément
@@ -696,7 +697,38 @@ class AppWatcherService : AccessibilityService() {
 
     override fun onInterrupt() {}
 
+    override fun onDestroy() {
+        if (actif === this) actif = null
+        super.onDestroy()
+    }
+
+    // 3) UNE APP OUVERTE DEPUIS UN DOSSIER ANIMÉ (DossierActivity) : c'est notre propre écran, donc
+    // le lanceur ne nous envoie pas de « clic ». Le dossier nous prévient lui-même, juste avant
+    // d'ouvrir l'app, et on fait exactement comme pour un appui sur une icône de l'accueil.
+    fun depuisDossier(app: String) {
+        try {
+            if (!Reglages.actif(this)) return
+            val lancement = Catalogue.lancement(this, app)
+            if (lancement == null) { noter("dossier -> $app : pas d'animation"); return }
+            if (Reglages.seulementDemarrage(this, app) && enArrierePlan(app)) {
+                noter("dossier -> $app : déjà ouverte en arrière-plan, pas d'animation")
+                refuseeApp = app       // (sauf si son écran de démarrage arrive juste après, voir fenetre)
+                refuseeA = SystemClock.uptimeMillis()
+                return
+            }
+            appCliquee = app
+            clicA = SystemClock.uptimeMillis()
+            dernierClicAccueil = clicA
+            afficher(lancement, app, dejaPrete = false)
+            noter("dossier -> $app : animation lancée")
+        } catch (e: Exception) {
+            noter("ERREUR dossier (rattrapée) : " + Journal.pile(e))
+        }
+    }
+
     companion object {
+        // Le service en marche (null s'il est éteint) : le dossier animé l'utilise pour lancer l'animation.
+        var actif: AppWatcherService? = null
         const val CARNET = Journal.CARNET
         const val CLE_LISTE = Journal.CLE_LISTE
     }
