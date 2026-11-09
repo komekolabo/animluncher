@@ -10,6 +10,9 @@
     <string name="cat_trajets">Mapas e viagens</string>
     <string name="cat_travail">Produtividade</string>
     <string name="cat_infos">Notícias</string>
+    <string name="cat_sante">Saúde</string>
+    <string name="cat_shopping">Compras</string>
+    <string name="cat_reglages">Definições e ferramentas</string>
     <string name="cat_autres">Não classificadas</string>
     <string name="resume_categories">%1$d ativas · escolhe uma categoria</string>
     <string name="langue">Idioma</string>

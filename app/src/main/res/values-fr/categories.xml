@@ -10,6 +10,9 @@
     <string name="cat_trajets">Cartes et trajets</string>
     <string name="cat_travail">Productivité</string>
     <string name="cat_infos">Actualités</string>
+    <string name="cat_sante">Santé</string>
+    <string name="cat_shopping">Shopping</string>
+    <string name="cat_reglages">Réglages et outils</string>
     <string name="cat_autres">Non répertorié</string>
     <string name="resume_categories">%1$d actives · choisis une catégorie</string>
     <string name="langue">Langue</string>

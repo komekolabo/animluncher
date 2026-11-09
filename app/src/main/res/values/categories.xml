@@ -10,6 +10,9 @@
     <string name="cat_trajets">Maps &amp; travel</string>
     <string name="cat_travail">Productivity</string>
     <string name="cat_infos">News</string>
+    <string name="cat_sante">Health</string>
+    <string name="cat_shopping">Shopping</string>
+    <string name="cat_reglages">Settings &amp; tools</string>
     <string name="cat_autres">Unlisted</string>
     <string name="resume_categories">%1$d on · choose a category</string>
     <string name="langue">Language</string>
