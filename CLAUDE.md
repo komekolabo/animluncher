@@ -44,7 +44,13 @@ Objectif : la publier sur le Google Play Store, avec une pub non invasive.
 - `Scenes*.kt` : les animations, par lots (IA, Google, système, social, finance, jeux…).
   Lot 2 des IA : `ScenesEspace.kt` (ChatGPT : Collision de galaxies — film précalculé en arrière-plan —
   et Lancement), `ScenesPuces.kt` (Gemini : TPU, Quantique), `ScenesCourseIA.kt` (la course à l'IA en
-  chiffres : Benchmarks/ChatGPT, Autonomy/Claude, Power/Gemini, Intelligence/Grok).
+  chiffres : Benchmarks/ChatGPT, Power/Gemini, Intelligence/Grok ; « Autonomy » de Claude retirée du catalogue le 09/11 ;
+  ses classes `Autonomie` et l'ancienne `Pellicule` d'Instagram restent dans le code, inutilisées : à supprimer un jour).
+  Instagram (09/11, remplace « Pellicule ») : `ScenesInstagram.kt` = « Défilement sans fin » (Reels : swipes
+  nets qui accélèrent, l'app arrive comme le swipe suivant ; 8 décors détaillés précalculés dans `FondsReels`,
+  flou de mouvement via RenderNode sur Android 12+) et `ScenesMurNuit.kt` = « Mur dans la nuit » (20 polaroïds
+  qui s'allument, guirlande, parallaxe ; photos et sapins précalculés dans `FondsMur`). Aperçus Python :
+  /home/claude/apercu/reels.py, reels_hq.py, nuit.py, photos.py.
   Les variantes d'une app sont tirées au hasard ; on ajoute les nouvelles À LA FIN de la liste
   (les réglages retiennent les variantes décochées par leur numéro).
   Chaque scène hérite de `Scene` et dessine **toute l'image à chaque instant** (pas d'état caché).
