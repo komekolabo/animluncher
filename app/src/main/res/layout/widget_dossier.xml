@@ -1,0 +1,62 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- LE WIDGET « DOSSIER ANIMÉ » AVEC LES VRAIES ICÔNES (10/11, voir WidgetDossier.kt). Même gabarit que
+     widget_groupe.xml : un galet de 62 dp, puis le nom du dossier dessous. Trois couches empilées :
+       1) le galet de verre brun chaud (teinté par la roue des couleurs, comme avant) ;
+       2) le FOLIOSCOPE (dossier_film) : les 150 images de la boucle de 12 s (étoile, points, icônes des apps),
+          dessinées par AnimLauncher. La visionneuse les fait défiler toute seule, une toutes les 80 ms,
+          et recommence au début quand elle arrive au bout ;
+       3) la bande de lumière qui traverse le verre toutes les 6 s (inchangée). -->
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:id="@+id/dossier_racine"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:gravity="center"
+    android:orientation="vertical">
+
+    <FrameLayout
+        android:layout_width="62dp"
+        android:layout_height="62dp">
+
+        <ImageView
+            android:id="@+id/dossier_galet"
+            android:layout_width="match_parent"
+            android:layout_height="match_parent"
+            android:scaleType="fitXY"
+            android:src="@drawable/widget_galet_chaud" />
+
+        <ViewFlipper
+            android:id="@+id/dossier_film"
+            android:layout_width="match_parent"
+            android:layout_height="match_parent"
+            android:autoStart="true"
+            android:flipInterval="80" />
+
+        <ProgressBar
+            style="@android:style/Widget.ProgressBar"
+            android:layout_width="match_parent"
+            android:layout_height="match_parent"
+            android:minWidth="62dp"
+            android:maxWidth="62dp"
+            android:minHeight="62dp"
+            android:maxHeight="62dp"
+            android:indeterminate="true"
+            android:indeterminateOnly="true"
+            android:indeterminateDrawable="@drawable/widget_galet_reflet_anime" />
+    </FrameLayout>
+
+    <TextView
+        android:id="@+id/dossier_nom"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="4dp"
+        android:ellipsize="end"
+        android:fontFamily="sans-serif"
+        android:maxLines="1"
+        android:shadowColor="#99000000"
+        android:shadowDx="0"
+        android:shadowDy="1"
+        android:shadowRadius="3"
+        android:text="AI"
+        android:textColor="#FFFFFF"
+        android:textSize="13sp" />
+</LinearLayout>
