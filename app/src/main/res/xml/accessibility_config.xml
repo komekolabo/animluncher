@@ -6,12 +6,16 @@
      Les autres types (appui long, sélection, focus) ne servent qu'au mouchard des dossiers :
        on les note dans le journal pour comprendre ce que le lanceur envoie.
      typeViewScrolled = l'écran d'accueil défile (changement de page) : pour l'icône vivante (essai).
+     ENQUÊTE DU 09/11 : on reçoit pour l'instant TOUS les types (typeAllMask), pour découvrir si
+       l'écran d'accueil signale l'ouverture du tiroir d'apps. À remettre comme avant ensuite :
+       typeWindowStateChanged|typeViewClicked|typeViewLongClicked|typeViewSelected|typeViewFocused|
+       typeViewAccessibilityFocused|typeAnnouncement|typeViewScrolled
      notificationTimeout=0 : événements livrés sans délai.
      canRetrieveWindowContent=true + flagReportViewIds : quand on touche un WIDGET sur l'écran
        d'accueil, on lit l'identifiant de l'élément touché (ex. "com.spotify.music:id/lecture")
        pour savoir quelle app il va ouvrir. Le service ne lit rien d'autre, et jamais dans les apps. -->
 <accessibility-service xmlns:android="http://schemas.android.com/apk/res/android"
-    android:accessibilityEventTypes="typeWindowStateChanged|typeViewClicked|typeViewLongClicked|typeViewSelected|typeViewFocused|typeViewAccessibilityFocused|typeAnnouncement|typeViewScrolled"
+    android:accessibilityEventTypes="typeAllMask"
     android:accessibilityFeedbackType="feedbackGeneric"
     android:notificationTimeout="0"
     android:canRetrieveWindowContent="true"

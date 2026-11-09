@@ -63,6 +63,10 @@ object IconeAccueil {
     @Volatile var dansTiroir = false
     // Le numéro de la page de l'accueil affichée (le X de « Page X sur N »), -1 = inconnu.
     @Volatile var pageActuelle = -1
+    // Est-on SÛR d'être sur l'accueil (et pas dans le tiroir d'apps) ? Vrai seulement juste après un
+    // « Page X sur N » de l'accueil. Faux dès qu'un doigt se pose ailleurs (on a peut-être ouvert le
+    // tiroir, ce que Samsung ne signale pas toujours), ou au retour d'une app.
+    @Volatile var accueilSur = false
 
     fun actif(c: Context) = carnet(c).getBoolean("actif", true)
     fun definirActif(c: Context, v: Boolean) { carnet(c).edit().putBoolean("actif", v).apply() }
@@ -77,8 +81,17 @@ object IconeAccueil {
             Journal.noter(c, "  (icône vivante : ouverte depuis le tiroir d'apps, position ignorée)")
             return
         }
+        // SÉCURITÉ (vu le 09/11) : le tiroir d'apps s'ouvre parfois SANS aucun signal. L'app a alors pris
+        // l'icône du tiroir pour celle de l'accueil, et le logo tournait au mauvais endroit. Donc si on
+        // connaît déjà une position, on ne la remplace que si on est SÛR d'être sur l'accueil.
+        // (Si on n'en connaît pas, ou si on l'a oubliée après un appui long : on prend la nouvelle.)
+        val ancienne = rect(c)
+        if (ancienne != null && ancienne != r && !accueilSur) {
+            Journal.noter(c, "  (icône vivante : pas sûr d'être sur l'accueil, position ignorée)")
+            return
+        }
         carnet(c).edit()
-            .putString("rect", r.flattenToString())
+            .putString("position_v2", r.flattenToString())
             .putInt("largeur", largeurEcran)
             // On NE note PAS la page tout de suite : la dernière page connue peut être périmée (le
             // bouton Accueil saute sur la page principale sans prévenir). Vu le 09/11 : le logo de
@@ -105,8 +118,8 @@ object IconeAccueil {
     fun nbPages(c: Context) = carnet(c).getInt("nb_pages", -1)
     fun definirNbPages(c: Context, n: Int) { carnet(c).edit().putInt("nb_pages", n).apply() }
     // On oublie la position (l'icône a peut-être été déplacée) : il faudra retoucher l'icône.
-    fun oublier(c: Context) { carnet(c).edit().remove("rect").apply(); surPageIcone = null }
-    fun rect(c: Context): Rect? = carnet(c).getString("rect", null)?.let { Rect.unflattenFromString(it) }
+    fun oublier(c: Context) { carnet(c).edit().remove("position_v2").apply(); surPageIcone = null }
+    fun rect(c: Context): Rect? = carnet(c).getString("position_v2", null)?.let { Rect.unflattenFromString(it) }
     fun largeur(c: Context) = carnet(c).getInt("largeur", 0)
     fun pageScroll(c: Context) = carnet(c).getInt("page_scroll", Int.MIN_VALUE)
     fun pageIndex(c: Context) = carnet(c).getInt("page_index", Int.MIN_VALUE)
@@ -165,6 +178,7 @@ class IconeVivante(private val service: AccessibilityService) {
             // On ne remet donc PAS « dansTiroir » à faux ici : c'est le prochain « Page X sur N » de
             // l'accueil (fermeture du tiroir, changement de page) qui le fera.
             enAttenteDePreuve = false
+            IconeAccueil.accueilSur = false     // accueil ou tiroir ? on ne sait pas encore
             minuteur.postDelayed({ evaluer("retour sur l'accueil") }, 300)
         }
     }
@@ -199,6 +213,7 @@ class IconeVivante(private val service: AccessibilityService) {
         }
         pageDuGeste = if (dansTiroir) -1 else n
         numeroDuGeste = if (dansTiroir) -1 else x
+        IconeAccueil.accueilSur = !dansTiroir
         if (!dansTiroir) {
             IconeAccueil.pageActuelle = x
             // On est sûr d'être sur l'accueil (ex. on vient de refermer le tiroir d'apps, qui ne
@@ -421,6 +436,8 @@ class IconeVivante(private val service: AccessibilityService) {
                 // On ne remet PLUS le logo au bout de 0,9 s : quand le doigt glisse vers le haut pour
                 // ouvrir le tiroir d'apps, Samsung ne prévient pas, et le logo revenait par-dessus.
                 enAttenteDePreuve = true
+                IconeAccueil.accueilSur = false
+                if (!BuildConfig.STORE) noter("  [enquête] --- doigt posé ailleurs ---")
                 minuteur.post { cacher("doigt posé ailleurs") }
             }
             MotionEvent.ACTION_DOWN -> {
@@ -465,6 +482,30 @@ class IconeVivante(private val service: AccessibilityService) {
         try { gestionnaire.removeView(v) } catch (_: Exception) {}
         vue = null; reglages = null
         if (notesRetrait < 15) { notesRetrait++; noter("  (icône vivante retirée : $pourquoi)") }
+    }
+
+    // L'ENQUÊTE (version Perso seulement, 09/11) : on note dans le journal TOUS les types de signaux
+    // envoyés par l'écran d'accueil, pour découvrir s'il y en a un qui annonce l'ouverture ou la
+    // fermeture du tiroir d'apps (glissement vers le haut ou le bas, sans changement de page).
+    // Un même signal répété en rafale n'est noté qu'une fois. 300 lignes au plus.
+    private var enqueteLignes = 0
+    private var enqueteCle = ""
+    private var enqueteA = 0L
+    fun enquete(event: AccessibilityEvent, accueil: String?) {
+        if (BuildConfig.STORE || enqueteLignes >= 300) return
+        if (event.packageName?.toString() != accueil) return
+        val type = AccessibilityEvent.eventTypeToString(event.eventType).removePrefix("TYPE_")
+        val classe = event.className?.toString()?.substringAfterLast('.') ?: "?"
+        val cle = "$type $classe ${event.contentChangeTypes}"
+        val maintenant = SystemClock.uptimeMillis()
+        val rafale = cle == enqueteCle && maintenant - enqueteA < 400
+        enqueteA = maintenant
+        if (rafale) return
+        enqueteCle = cle
+        enqueteLignes++
+        val texte = (event.text.joinToString(" ") + " " + (event.contentDescription ?: "")).trim().take(40)
+        noter("  [enquête] $type $classe changements=${event.contentChangeTypes} " +
+            "défilement=${event.scrollX},${event.scrollY} fenêtre=${event.windowId} « $texte »")
     }
 
     private fun noter(texte: String) {

@@ -77,6 +77,8 @@ class AppWatcherService : AccessibilityService() {
         // Si quelque chose se passe mal pendant le traitement d'un signal, on l'écrit dans le
         // journal au lieu de laisser planter le service (un service planté = plus aucune animation).
         try {
+            // ENQUÊTE (version Perso, 09/11) : tous les signaux de l'écran d'accueil vont dans le journal
+            iconeVivante.enquete(event, ecranAccueil)
             // L'ICÔNE VIVANTE (essai, voir IconeVivante.kt) est prévenue en premier : elle se cache
             // dès qu'on touche quelque chose ou qu'une autre fenêtre arrive, et suit les pages.
             when (event.eventType) {
