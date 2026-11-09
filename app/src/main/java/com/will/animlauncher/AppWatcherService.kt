@@ -303,6 +303,8 @@ class AppWatcherService : AccessibilityService() {
         if (precedente != null && precedente != ecranAccueil) dejaOuvertes[precedente] = SystemClock.uptimeMillis()
         val etaitOuverte = app != ecranAccueil && enArrierePlan(app)
         if (app != ecranAccueil) dejaOuvertes[app] = SystemClock.uptimeMillis()
+        // on retient aussi l'heure à laquelle chaque app a été ouverte (pour le dossier animé : « 5m ago »)
+        if (app != ecranAccueil) noterOuverture(this, app)
 
         // L'animation tourne déjà pour cette app (lancée au clic) : rien de plus à faire.
         if ((seanceEnCours != null && appAnimee == app) ||
@@ -695,6 +697,9 @@ class AppWatcherService : AccessibilityService() {
         return SystemClock.uptimeMillis() - vue < 30 * 60_000L
     }
 
+    // L'app est-elle encore ouverte en arrière-plan ? (pour le dossier animé : le petit point « Open »)
+    fun estOuverte(app: String): Boolean = enArrierePlan(app)
+
     override fun onInterrupt() {}
 
     override fun onDestroy() {
@@ -729,6 +734,15 @@ class AppWatcherService : AccessibilityService() {
     companion object {
         // Le service en marche (null s'il est éteint) : le dossier animé l'utilise pour lancer l'animation.
         var actif: AppWatcherService? = null
+
+        // L'HEURE DE LA DERNIÈRE OUVERTURE de chaque app (heure réelle, en millisecondes), gardée dans le
+        // carnet « ouvertures » : elle survit au redémarrage du téléphone. 0 = jamais vue s'ouvrir.
+        private const val OUVERTURES = "ouvertures"
+        fun noterOuverture(c: Context, app: String) {
+            c.getSharedPreferences(OUVERTURES, Context.MODE_PRIVATE).edit().putLong(app, System.currentTimeMillis()).apply()
+        }
+        fun derniereOuverture(c: Context, app: String): Long =
+            c.getSharedPreferences(OUVERTURES, Context.MODE_PRIVATE).getLong(app, 0L)
         const val CARNET = Journal.CARNET
         const val CLE_LISTE = Journal.CLE_LISTE
     }
