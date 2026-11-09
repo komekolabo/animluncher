@@ -100,6 +100,12 @@ Objectif : la publier sur le Google Play Store, avec une pub non invasive.
   arrive en 2 BANDES (haut et bas) ; les apps ÉCLOSENT (ressort + petite rotation + onde fine, nom qui glisse) ;
   case « + » en dernier -> `ChoixAppActivity.kt` (ajout retenu dans « avec_<groupe> », `Groupes.tous()`).
   Will a choisi la palette chaude, a écarté 6 pistes de logo (Facette, Constellation, Orbite, Pétales…).
+  V5 (09/11) : bulle « + » = ARC qui épouse le coin en haut à droite (à distance) ; dès 55 apps elle affiche les
+  places restantes ; `Groupes.MAX = 60` apps par dossier. Cadre : 2 colonnes (≤ 4 apps) sinon 3, au plus 4 lignes,
+  puis PAGES (glisser à gauche, points en bas). Sous chaque app : « Open » (point vert, `AppWatcherService.estOuverte`)
+  ou « 5m ago » (carnet « ouvertures », `noterOuverture` dans `fenetre()`). Appui sur une app = ouverture IMMÉDIATE
+  (dès 0,4 s). Geste « accueil » : l'écran du dossier disparaît sans pouvoir dessiner -> `onPause` demande au
+  service de dessiner le retour de l'étoile dans une fenêtre d'accessibilité temporaire (`RetourEtoile.kt`).
 - `Reglages.kt` : kill switch, « seulement au démarrage », réglages par app (durée, variantes).
 - `MainActivity.kt` : écran principal (logo animé, interrupteurs, écran d'explication Store).
 - `GuideDeblocage.kt` : guide plein écran pour l'accessibilité **grisée** (APK installé hors Play Store).
