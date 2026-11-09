@@ -59,6 +59,10 @@ object IconeAccueil {
     @Volatile var surPageIcone: Boolean? = null
     // true = la page de l'icône reste à confirmer au prochain changement de page (voir finDefilement).
     @Volatile var pageAConfirmer = false
+    // Le tiroir d'apps est-il affiché ? (rempli par IconeVivante, lu ici dans retenir)
+    @Volatile var dansTiroir = false
+    // Le numéro de la page de l'accueil affichée (le X de « Page X sur N »), -1 = inconnu.
+    @Volatile var pageActuelle = -1
 
     fun actif(c: Context) = carnet(c).getBoolean("actif", true)
     fun definirActif(c: Context, v: Boolean) { carnet(c).edit().putBoolean("actif", v).apply() }
@@ -66,6 +70,13 @@ object IconeAccueil {
     // On retient le rectangle de l'icône, la largeur de l'écran à ce moment-là (sur le Flip,
     // le petit écran extérieur n'a pas la même taille), et la page affichée.
     fun retenir(c: Context, r: Rect, largeurEcran: Int) {
+        // Ouverte depuis le TIROIR D'APPS : Samsung transmet aussi la position, mais c'est celle de
+        // l'icône dans le tiroir, pas sur l'accueil (vu le 09/11 : le logo flottait au milieu de la
+        // page). On l'ignore.
+        if (dansTiroir) {
+            Journal.noter(c, "  (icône vivante : ouverte depuis le tiroir d'apps, position ignorée)")
+            return
+        }
         carnet(c).edit()
             .putString("rect", r.flattenToString())
             .putInt("largeur", largeurEcran)
@@ -75,12 +86,20 @@ object IconeAccueil {
             // prochain changement de page (début du geste = la page de l'icône).
             .putInt("page_scroll", Int.MIN_VALUE)
             .putInt("page_index", dernierIndex)
+            // LE NUMÉRO DE LA PAGE : on était forcément sur la page de l'icône, et le dernier
+            // « Page X sur N » de l'accueil dit laquelle. Si on ne le connaît pas encore (service qui
+            // vient de démarrer), on le trouvera au prochain changement de page (voir finDefilement).
+            .putInt("page_x", pageActuelle)
             .apply()
+        if (pageActuelle > 0) Journal.noter(c, "  (icône vivante : l'icône est sur la page n° $pageActuelle de l'accueil)")
         surPageIcone = true
-        pageAConfirmer = true
+        pageAConfirmer = pageActuelle <= 0
     }
     // La page de l'icône, découverte plus tard (au 1er changement de page après l'avoir touchée).
     fun definirPageScroll(c: Context, x: Int) { carnet(c).edit().putInt("page_scroll", x).apply() }
+    // Le NUMÉRO de la page de l'icône (1, 2, 3…), -1 = inconnu. Plus sûr que la position de défilement.
+    fun pageIcone(c: Context) = carnet(c).getInt("page_x", -1)
+    fun definirPageIcone(c: Context, x: Int) { carnet(c).edit().putInt("page_x", x).apply() }
     // Le nombre de pages de l'écran d'accueil (appris grâce aux signaux « Page 2 sur 3 ») : le tiroir
     // d'apps a ses propres pages, en général pas le même nombre. -1 = inconnu.
     fun nbPages(c: Context) = carnet(c).getInt("nb_pages", -1)
@@ -115,9 +134,12 @@ class IconeVivante(private val service: AccessibilityService) {
     // page, l'écran envoie un signal « Page 2 sur 3 » : l'accueil et le tiroir n'ont pas le même nombre
     // de pages, et la page principale de l'accueil dit « Page par défaut ». On s'en sert pour savoir où
     // on est.
-    private var dansTiroir = false
+    private var dansTiroir: Boolean
+        get() = IconeAccueil.dansTiroir
+        set(v) { IconeAccueil.dansTiroir = v }
     private var selectionsRecues = 0        // signaux « Page X sur N » reçus (0 = ce téléphone n'en envoie pas)
     private var pageDuGeste = -1            // le N de « Page X sur N » reçu pendant le geste en cours (-1 = aucun)
+    private var numeroDuGeste = -1          // le X de « Page X sur N » reçu pendant le geste en cours
     private var notesSelection = 0
     private var selectionA = 0L             // heure du dernier « Page X sur N »
     // Après un doigt posé AILLEURS que sur le logo, on ne sait pas ce qui se passe (ouverture du tiroir ?
@@ -160,6 +182,7 @@ class IconeVivante(private val service: AccessibilityService) {
         val texte = event.text.joinToString(" ") + " " + (event.contentDescription ?: "")
         val m = Regex("""(\d+)\D+?(\d+)""").find(texte) ?: return
         val n = m.groupValues[2].toIntOrNull() ?: return
+        val x = m.groupValues[1].toIntOrNull() ?: return
         selectionsRecues++
         selectionA = SystemClock.uptimeMillis()
         // « Page par défaut » : c'est forcément l'accueil, on apprend son nombre de pages.
@@ -172,6 +195,14 @@ class IconeVivante(private val service: AccessibilityService) {
             else -> dansTiroir
         }
         pageDuGeste = if (dansTiroir) -1 else n
+        numeroDuGeste = if (dansTiroir) -1 else x
+        if (!dansTiroir) {
+            IconeAccueil.pageActuelle = x
+            // On est sûr d'être sur l'accueil (ex. on vient de refermer le tiroir d'apps, qui ne
+            // défile pas forcément) : on peut réafficher le logo, si c'est la bonne page.
+            enAttenteDePreuve = false
+            minuteur.postDelayed({ evaluer("page $x de l'accueil affichée") }, 350)
+        }
         if (notesSelection < 25) {
             notesSelection++
             noter("  (icône vivante : « ${texte.trim()} » -> ${if (dansTiroir) "tiroir" else "accueil"}, accueil = $nbAccueil pages)")
@@ -189,7 +220,7 @@ class IconeVivante(private val service: AccessibilityService) {
         if (SystemClock.uptimeMillis() - defileA > 290) {
             signauxGeste = 0
             // (sauf si le « Page X sur N » vient juste d'arriver : il appartient à ce geste-ci)
-            if (SystemClock.uptimeMillis() - selectionA > 300) pageDuGeste = -1
+            if (SystemClock.uptimeMillis() - selectionA > 300) { pageDuGeste = -1; numeroDuGeste = -1 }
             if (classeDuSignal != "RecyclerView" && surAccueil) debutGeste = event.scrollX
         }
         signauxGeste++
@@ -223,19 +254,36 @@ class IconeVivante(private val service: AccessibilityService) {
             // (Si le geste n'a envoyé qu'un seul signal, le début vaut la fin : on ne peut rien en tirer.)
             if (IconeAccueil.pageAConfirmer) {
                 IconeAccueil.pageAConfirmer = false
-                if (IconeAccueil.surPageIcone == true && debutGeste >= 0 && debutGeste != e.scrollX) {
+                // LE NUMÉRO DE LA PAGE quittée. Le 1er signal d'un geste arrive souvent au milieu du
+                // mouvement (vu le 09/11 : 275 ou 522 au lieu de 0 ou 1039), donc sa position ne dit pas
+                // d'où on vient. Mais elle dit dans quel SENS on va : si on arrive sur la page X en
+                // allant vers la droite (scrollX qui monte), on vient de la page X - 1 ; sinon de X + 1.
+                if (IconeAccueil.surPageIcone == true && numeroDuGeste > 0 && debutGeste >= 0 && debutGeste != e.scrollX) {
+                    val quittee = if (e.scrollX > debutGeste) numeroDuGeste - 1 else numeroDuGeste + 1
+                    IconeAccueil.definirPageIcone(service, quittee)
+                    noter("  (icône vivante : l'icône est sur la page n° $quittee de l'accueil)")
+                }
+                // et le nombre de pages de l'accueil, si on ne le connaît pas encore
+                if (pageDuGeste > 0 && IconeAccueil.nbPages(service) <= 0) IconeAccueil.definirNbPages(service, pageDuGeste)
+                if (IconeAccueil.pageIcone(service) > 0) {
+                    // trouvée grâce au numéro de page (juste au-dessus)
+                } else if (selectionsRecues == 0 && IconeAccueil.surPageIcone == true && debutGeste >= 0 && debutGeste != e.scrollX) {
+                    // (ancienne méthode, seulement si ce téléphone n'envoie pas les numéros de page)
                     IconeAccueil.definirPageScroll(service, debutGeste)
-                    // et le nombre de pages de l'accueil, si on ne le connaît pas encore
-                    if (pageDuGeste > 0 && IconeAccueil.nbPages(service) <= 0) IconeAccueil.definirNbPages(service, pageDuGeste)
                     noter("  (icône vivante : page de l'icône trouvée, scrollX $debutGeste)")
                 } else {
                     noter("  (icône vivante : page de l'icône pas trouvée, début $debutGeste, fin ${e.scrollX})")
                 }
             }
             // On sait maintenant si la nouvelle page est celle de l'icône (ou on ne sait plus).
+            val numIcone = IconeAccueil.pageIcone(service)
             val refApres = IconeAccueil.pageScroll(service)
-            IconeAccueil.surPageIcone = if (refApres != Int.MIN_VALUE && e.scrollX >= 0)
-                abs(e.scrollX - refApres) < service.resources.displayMetrics.widthPixels / 2 else null
+            IconeAccueil.surPageIcone = when {
+                numIcone > 0 && numeroDuGeste > 0 -> numeroDuGeste == numIcone
+                refApres != Int.MIN_VALUE && e.scrollX >= 0 ->
+                    abs(e.scrollX - refApres) < service.resources.displayMetrics.widthPixels / 2
+                else -> null
+            }
         } else if (!vraiePage) {
             // geste sans « Page X sur N » : on ne sait pas où on est, le logo reste caché
             enAttenteDePreuve = true
@@ -283,10 +331,14 @@ class IconeVivante(private val service: AccessibilityService) {
     // Est-on sur la page de l'icône ? On compare la page actuelle à celle notée à l'ouverture.
     // true = oui, false = non, null = on ne sait pas. Dans le doute, on n'affiche RIEN (sinon le logo
     // apparaissait au milieu d'une autre page, là où l'icône se trouve sur SA page).
-    //  - si on connaît la position de la page de l'icône ET celle de la page affichée : on compare ;
+    //  - si on connaît le numéro (ou la position) de la page de l'icône ET de la page affichée : on compare ;
     //  - sinon, on suit « surPageIcone » : vrai juste après avoir touché l'icône (au 2e essai, on
     //    exigeait d'abord un changement de page, et rien ne s'affichait).
     private fun bonnePage(): Boolean? {
+        // 1) le plus sûr : les numéros de page (« Page 2 sur 2 »)
+        val numIcone = IconeAccueil.pageIcone(service)
+        if (numIcone > 0 && IconeAccueil.pageActuelle > 0) return IconeAccueil.pageActuelle == numIcone
+        // 2) sinon, les positions de défilement (téléphones qui n'envoient pas les numéros)
         val refX = IconeAccueil.pageScroll(service)
         val x = IconeAccueil.dernierScrollX
         if (refX != Int.MIN_VALUE && x != Int.MIN_VALUE)
