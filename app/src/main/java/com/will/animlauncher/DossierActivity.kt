@@ -44,7 +44,8 @@ import kotlin.math.sin
 //  - la bulle « + » (ajouter une app) : un arc qui épouse le coin en haut à droite, à distance. À partir de
 //    55 apps, elle affiche le nombre de places restantes (60 au plus) ;
 //  - le cadre grandit vers le bas jusqu'à 4 lignes ; au-delà, des PAGES : on glisse vers la gauche.
-// Toucher une app l'ouvre TOUT DE SUITE (même avant la fin de l'animation, dès 0,4 s).
+// Toucher une app l'ouvre TOUT DE SUITE (même avant la fin de l'animation, dès 0,15 s).
+// Ouverture RAPIDE (09/11, Will trouvait ça long) : tout est en place en moins d'1 s.
 // Toucher à côté (ou le bouton retour) referme le dossier et l'étoile rentre dans le widget ; le geste
 // « accueil » aussi : là, c'est le service d'AnimLauncher qui dessine le retour (voir RetourEtoile.kt).
 class DossierActivity : Activity() {
@@ -62,10 +63,26 @@ class DossierActivity : Activity() {
         @Suppress("DEPRECATION")
         window.decorView.systemUiVisibility = View.SYSTEM_UI_FLAG_LAYOUT_STABLE or
             View.SYSTEM_UI_FLAG_LAYOUT_FULLSCREEN or View.SYSTEM_UI_FLAG_LAYOUT_HIDE_NAVIGATION
-        // sourceBounds = la place du widget sur l'écran (donnée par l'écran d'accueil) : l'étoile part de là.
-        val v = DossierVue(this, nom, apps, intent.sourceBounds, { ouvrir(it) }, { ajouter() }, { fermer() })
+        // sourceBounds = la place du widget sur l'écran (donnée par l'écran d'accueil) : l'étoile part de là
+        // et y revient. On la retient : si un jour l'écran d'accueil ne la donne pas, on reprend la dernière.
+        val v = DossierVue(this, nom, apps, placeDuWidget(), { ouvrir(it) }, { ajouter() }, { fermer() })
         vue = v
         setContentView(v)
+    }
+
+    // La place du widget sur l'écran (gauche, haut, droite, bas, en pixels), donnée par l'écran d'accueil,
+    // ou la dernière connue pour ce dossier. On l'écrit aussi dans le journal, pour vérifier.
+    private fun placeDuWidget(): Rect? {
+        val carnet = getSharedPreferences("dossier_place", MODE_PRIVATE)
+        val r = intent.sourceBounds
+        if (r != null) {
+            carnet.edit().putString(groupe, "${r.left},${r.top},${r.right},${r.bottom}").apply()
+            Journal.noter(this, "dossier $groupe : place du widget = $r")
+            return r
+        }
+        Journal.noter(this, "dossier $groupe : place du widget non transmise (on reprend la dernière connue)")
+        val n = carnet.getString(groupe, null)?.split(",")?.mapNotNull { it.toIntOrNull() } ?: return null
+        return if (n.size == 4) Rect(n[0], n[1], n[2], n[3]) else null
     }
 
     // On a touché une app : l'animation d'AnimLauncher d'abord (comme un appui sur une icône), puis l'app,
@@ -284,19 +301,19 @@ class DossierVue(
         }
 
         // 1) LES BANDES SOMBRES, qui arrivent du haut et du bas (et repartent à la fermeture)
-        voile = seg(t, 0f, 0.8f) * (1 - fer)
+        voile = seg(t, 0f, 0.35f) * (1 - fer)
         bandes(c, voile)
 
-        // 2) LE PANNEAU du dossier, qui grandit un peu en apparaissant
-        val p = seg(t, 0.85f, 1.45f) * (1 - fer)
+        // 2) LE PANNEAU du dossier : il sort du widget en grandissant (il part de la place du widget)
+        val p = seg(t, 0.08f, 0.42f) * (1 - fer)
         texte.typeface = gras
         val tw = texte.apply { textSize = 28f * k }.measureText(nom)
         val titreX = panneau.centerX() - (41f * k + tw) / 2 + 19f * k
         val titreY = panneau.top + 44f * k
         if (p > 0) {
-            val e = 0.88f + 0.12f * p
+            val e = 0.25f + 0.75f * freine(p)
             c.save()
-            c.scale(e, e, panneau.centerX(), panneau.centerY())
+            c.scale(e, e, sx, sy)          // agrandi depuis le widget : il « sort » de la boîte
             pinceau.shader = LinearGradient(0f, panneau.top, 0f, panneau.bottom,
                 Color.argb((235 * p).toInt(), 69, 42, 35), Color.argb((235 * p).toInt(), 41, 24, 20), Shader.TileMode.CLAMP)
             pinceau.style = Paint.Style.FILL
@@ -328,13 +345,13 @@ class DossierVue(
         c.save()
         c.clipRect(panneau.left + 4f * k, haut - 12f * k, panneau.right - 4f * k, panneau.bottom - 4f * k)
         val premiere = min(n, parPage)                 // les apps de la page 1 éclosent l'une après l'autre
-        val pas = min(0.15f, 0.9f / max(1, premiere))
+        val pas = min(0.04f, 0.3f / max(1, premiere))      // toutes les apps arrivent en moins d'1 s
         for (i in 0 until n) {
             val ax = placeX(i); val ay = placeY(i)
             if (ax < panneau.left - celluleL || ax > panneau.right + celluleL) continue      // page pas visible
-            val d = if (i < parPage) 1.05f + pas * i else 1.2f
+            val d = if (i < parPage) 0.2f + pas * i else 0.3f
             // la traînée (seulement pour la page 1, pendant l'ouverture)
-            val tr = ((t - d) / 0.45f).coerceIn(0f, 1f)
+            val tr = ((t - d) / 0.25f).coerceIn(0f, 1f)
             if (i < parPage && tr > 0 && tr < 1 && fer == 0f && page < 0.5f) {
                 for (q in 0 until 10) {
                     val u = lisse((tr - q * 0.04f).coerceIn(0f, 1f))
@@ -346,7 +363,7 @@ class DossierVue(
             }
             // l'éclosion : un point qui devient l'icône (ressort), avec une petite rotation qui se remet droite.
             // L'app qu'on vient de toucher apparaît tout de suite (même si son tour n'était pas encore venu).
-            var v = ((t - (d + 0.38f)) / 0.55f).coerceIn(0f, 1f)
+            var v = ((t - (d + 0.15f)) / 0.35f).coerceIn(0f, 1f)
             if (i == presse) v = max(v, ((t - presseA) / 0.15f).coerceIn(0f, 1f))
             if (v <= 0) continue
             val alpha = (v / 0.25f).coerceIn(0f, 1f) * (1 - fer)
@@ -373,7 +390,7 @@ class DossierVue(
             }
             c.restore()
             // le nom, puis l'info en dessous, glissent doucement en place un peu après
-            val nv = ((t - (d + 0.6f)) / 0.4f).coerceIn(0f, 1f) * (1 - fer)
+            val nv = ((t - (d + 0.3f)) / 0.3f).coerceIn(0f, 1f) * (1 - fer)
             if (nv > 0) {
                 val glisse = 8f * k * (1 - freine(nv))
                 texte.textSize = 19f * k
@@ -399,20 +416,19 @@ class DossierVue(
         c.restore()
 
         // 4) LA BULLE « + », en dernier
-        val vb = ((t - (1.05f + pas * premiere + 0.35f)) / 0.6f).coerceIn(0f, 1f)
+        val vb = ((t - (0.35f + pas * premiere)) / 0.45f).coerceIn(0f, 1f)
         bullePlus(c, vb, 1 - fer)
 
-        // 5) L'ÉTOILE : elle monte au centre en faisant un tour, puis se pose en petit à côté du titre ;
-        //    à la fermeture, elle retourne dans le widget.
-        val u = seg(t, 0f, 1.0f)
-        val v = seg(t, 1.0f, 1.9f)        // elle rejoint le titre en douceur (0,9 s)
-        var x = mix(mix(sx, panneau.centerX(), u), titreX, v)
-        var y = mix(mix(sy, panneau.centerY() - 40f * k, u), titreY, v)
-        var r = mix(mix(r0, 92f * k, u), 19f * k, v)
-        var angle = t * 18f + 360f * u + 90f * v
+        // 5) L'ÉTOILE : elle file directement du widget jusqu'à côté du titre (0,55 s), en décrivant une
+        //    petite courbe et un demi-tour ; à la fermeture, elle retourne dans le widget.
+        val u = seg(t, 0f, 0.55f)
+        var x = mix(sx, titreX, u)
+        var y = mix(sy, titreY, u) - 60f * k * sin(PI.toFloat() * u)
+        var r = mix(r0, 19f * k, u) * (1 + 0.35f * sin(PI.toFloat() * u))      // elle grossit un peu en route
+        var angle = t * 18f + 180f * u
         if (fer > 0) { x = mix(x, sx, fer); y = mix(y, sy, fer); r = mix(r, r0, fer); angle -= 180f * fer }
         etoileX = x; etoileY = y; etoileR = r; etoileA = angle
-        val lueur = 60f * (1 - v * 0.4f) * (1 - fer)
+        val lueur = 55f * (1 - u * 0.35f) * (1 - fer)
         // IMPORTANT : on remet le pinceau à « opaque ». Sinon il garde la transparence du dernier dessin
         // (une poussière presque invisible, l'onde d'une app…) et l'étoile disparaît ou clignote (vu le 09/11).
         pinceau.color = Color.WHITE
@@ -501,7 +517,7 @@ class DossierVue(
         pinceau.style = Paint.Style.FILL
     }
 
-    // LES APPUIS : toucher une app l'ouvre (dès 0,4 s, même si elle n'est pas encore apparue) ; toucher la
+    // LES APPUIS : toucher une app l'ouvre (dès 0,15 s, même si elle n'est pas encore apparue) ; toucher la
     // bulle « + » ajoute une app ; toucher à côté referme ; glisser à gauche / à droite change de page.
     private var basX = 0f; private var basY = 0f; private var basPage = 0f; private var glisse = false
     private var pageDepart = 0f
@@ -531,7 +547,7 @@ class DossierVue(
                     glissementA = SystemClock.uptimeMillis()
                     return true
                 }
-                if (t < 0.4f) return true          // trop tôt : le dossier commence à peine à s'ouvrir
+                if (t < 0.15f) return true          // trop tôt : le dossier commence à peine à s'ouvrir
                 // la bulle « + »
                 if (abs(e.x - bulleX()) < 40f * k && abs(e.y - bulleY()) < 40f * k) { surAjout(); return true }
                 if (!panneau.contains(e.x, e.y)) { refermer(); return true }

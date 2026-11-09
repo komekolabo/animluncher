@@ -63,8 +63,10 @@ class WidgetGroupe : AppWidgetProvider() {
             // (jamais par-dessus l'écran principal d'AnimLauncher).
             val ouvrir = Intent(c, DossierActivity::class.java).putExtra("groupe", groupe)
                 .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK)
+            // MUTABLE (et pas IMMUTABLE) : sinon Android ne peut pas y ajouter la PLACE du widget sur l'écran
+            // (« sourceBounds »), et l'étoile du dossier ne sait pas d'où partir ni où revenir (vu le 09/11).
             v.setOnClickPendingIntent(R.id.widget_groupe_racine, PendingIntent.getActivity(c, id, ouvrir,
-                PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT))
+                PendingIntent.FLAG_MUTABLE or PendingIntent.FLAG_UPDATE_CURRENT))
             return v
         }
 
