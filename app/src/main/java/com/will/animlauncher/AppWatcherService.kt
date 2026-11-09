@@ -77,7 +77,7 @@ class AppWatcherService : AccessibilityService() {
             when (event.eventType) {
                 AccessibilityEvent.TYPE_VIEW_CLICKED -> { diagnostic(event); clic(event) }
                 AccessibilityEvent.TYPE_WINDOW_STATE_CHANGED -> fenetre(event)
-                else -> diagnostic(event)
+                else -> { diagnostic(event); espionRecents(event) }
             }
         } catch (e: Exception) {
             noter("ERREUR (rattrapée) : " + Journal.pile(e))
@@ -91,6 +91,9 @@ class AppWatcherService : AccessibilityService() {
     private var diagLignes = 0
     private fun diagnostic(event: AccessibilityEvent) {
         if (SystemClock.uptimeMillis() - dernierClicAccueil > 5000 || diagLignes >= 12) return
+        // (les changements de contenu et défilements sont trop nombreux : réservés à l'espion des apps récentes)
+        if (event.eventType == AccessibilityEvent.TYPE_WINDOW_CONTENT_CHANGED ||
+            event.eventType == AccessibilityEvent.TYPE_VIEW_SCROLLED) return
         // seulement les signaux de l'écran d'accueil (ou sans expéditeur) : on ne note jamais
         // ce qui se passe à l'intérieur des autres apps
         val expediteur = event.packageName?.toString()
@@ -144,10 +147,6 @@ class AppWatcherService : AccessibilityService() {
             return
         }
         if (app in ignorees) return
-        // Le « peut-être fermée » (voir FERMETURE POSSIBLE plus bas) ne vaut que pour CE clic :
-        // on le lit, puis on l'efface tout de suite.
-        val peutEtreFermee = fermeturePossible
-        fermeturePossible = false
         if (!Reglages.actif(this)) return
         if (Catalogue.pour(app) == null) return
         // Réglages de l'app : désactivée, durée 0 s, ou aucune variante cochée -> rien
@@ -159,11 +158,7 @@ class AppWatcherService : AccessibilityService() {
         // ouverte en arrière-plan, on ne joue rien. Avant, on regardait si son écran de lancement
         // apparaissait, mais Gmail ou YouTube en affichent un à chaque fois, même en arrière-plan.
         // Un widget, lui, ouvre toujours l'app volontairement : l'animation est jouée dans tous les cas.
-        if (!parWidget && Reglages.seulementDemarrage(this, app) && enArrierePlan(app) && peutEtreFermee) {
-            // On vient de passer par les apps récentes sans rien ouvrir : l'app a peut-être été
-            // fermée d'un glissement. Dans le doute, on joue l'animation.
-            noter("  (passage par les apps récentes juste avant : $app a peut-être été fermée)")
-        } else if (!parWidget && Reglages.seulementDemarrage(this, app) && enArrierePlan(app)) {
+        if (!parWidget && Reglages.seulementDemarrage(this, app) && enArrierePlan(app)) {
             noter("clic sur « ${textes.firstOrNull() ?: "?"} » -> $app : déjà ouverte en arrière-plan, pas d'animation")
             // …sauf si son écran de démarrage arrive juste après (voir fenetre) : elle était en fait fermée.
             refuseeApp = app
@@ -283,18 +278,7 @@ class AppWatcherService : AccessibilityService() {
         // Une app qui disparaît de la liste pendant la visite a été fermée (glissée vers le haut).
         if (app == ecranAccueil && classe == "RecentsActivity") debutRecents()
         else if (dansRecents && ((app == ecranAccueil && classe == "Launcher") || (app != ecranAccueil && estVraieApp))) {
-            // A-t-on réussi à lire les apps récentes ? (La version Store n'en a pas le droit :
-            // elle ne voit rien, donc elle ne sait pas quelle carte on a glissée vers le haut.)
-            val rienLu = vusRecents.isEmpty()
             finRecents()
-            // FERMETURE POSSIBLE : on revient sur l'ACCUEIL depuis les apps récentes, sans avoir
-            // touché une carte, et on n'a pas pu lire la liste. On est souvent allé là pour fermer
-            // une app : au prochain appui sur une icône, on jouera l'animation même si l'app
-            // semblait encore ouverte. (Seul raté : regarder les apps récentes sans rien fermer.)
-            if (app == ecranAccueil && rienLu) {
-                fermeturePossible = true
-                noter("  (retour à l'accueil depuis les apps récentes : une app a peut-être été fermée)")
-            }
             // On a touché une carte des apps récentes : l'app reprend depuis l'arrière-plan.
             // Si elle affiche quand même son écran de démarrage, c'est PEUT-ÊTRE qu'elle le fait à
             // chaque fois (comme Gmail ou YouTube)… ou simplement qu'Android l'avait fermée en
@@ -312,9 +296,6 @@ class AppWatcherService : AccessibilityService() {
         }
 
         if (!estVraieApp) return
-        // Une app s'affiche sans passer par une icône (notification, carte des apps récentes…) :
-        // le « peut-être fermée » ne vaut plus.
-        if (app != ecranAccueil) fermeturePossible = false
 
         if (app == derniereApp) return
         val precedente = derniereApp
@@ -619,15 +600,34 @@ class AppWatcherService : AccessibilityService() {
 
     // ---------------- LES APPS RÉCENTES ----------------
     private var dansRecents = false
-    // true = on vient de revenir des apps récentes à l'accueil sans pouvoir voir ce qui a été
-    // fermé : le prochain appui sur une icône jouera l'animation (voir FERMETURE POSSIBLE).
-    private var fermeturePossible = false
     private val vusRecents = HashSet<String>()      // toutes les apps vues pendant cette visite
     private var dernierReleve: Set<String> = emptySet()
+
+    // ESPION DES APPS RÉCENTES (expérience) : pendant qu'on est dans les apps récentes, on note
+    // les signaux que l'écran d'accueil envoie (type, texte, description), 40 au plus par visite.
+    // But : trouver un signal qui dit QUELLE carte vient d'être glissée vers le haut, et qui
+    // arrive même sans lire l'écran (pour la version Store). Par exemple une « annonce »
+    // (TYPE_ANNOUNCEMENT) du genre « Instagram fermée », faite pour les lecteurs d'écran.
+    private var espionLignes = 0
+    private fun espionRecents(event: AccessibilityEvent) {
+        val expediteur = event.packageName?.toString()
+        val annonce = event.eventType == AccessibilityEvent.TYPE_ANNOUNCEMENT
+        if (expediteur != ecranAccueil && !annonce) return
+        if (!dansRecents && !annonce) return
+        if (espionLignes >= 40) return
+        val textes = event.text.map { it.toString() } + listOfNotNull(event.contentDescription?.toString())
+        // les petits changements sans texte sont très nombreux : on ne garde que ceux qui disent quelque chose
+        if (textes.all { it.isBlank() } && event.eventType == AccessibilityEvent.TYPE_WINDOW_CONTENT_CHANGED) return
+        espionLignes++
+        noter("  [récentes] ${AccessibilityEvent.eventTypeToString(event.eventType)} " +
+            "${event.className?.toString()?.substringAfterLast('.') ?: "?"} « ${textes.joinToString(" / ")} »" +
+            (if (event.eventType == AccessibilityEvent.TYPE_WINDOW_CONTENT_CHANGED) " (changement ${event.contentChangeTypes})" else ""))
+    }
 
     private fun debutRecents() {
         if (dansRecents) return
         dansRecents = true
+        espionLignes = 0
         vusRecents.clear()
         dernierReleve = emptySet()
         minuteur.postDelayed(object : Runnable {
