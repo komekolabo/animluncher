@@ -37,20 +37,31 @@ object RetourEtoile {
 
     private const val DUREE = 600L
 
-    // La fenêtre en cours (pour pouvoir l'effacer plus tôt, voir annuler).
+    // La fenêtre en cours (pour pouvoir l'effacer plus tôt, voir annuler), et l'heure à laquelle on a vu
+    // l'écran des apps récentes s'ouvrir pour la dernière fois.
     private var enCours: View? = null
+    private var recentsA = 0L
+
+    // TROP TARD = PAS DU TOUT (09/11, vidéo de Will) : quand on part vers les apps récentes, Android
+    // affiche notre fenêtre avec une demi-seconde de retard ; l'animation, déjà presque finie, passait
+    // alors « giga vite » par-dessus les cartes. Si la première image arrive plus de 250 ms après le
+    // départ, on n'affiche rien du tout.
+    private const val RETARD_MAX = 250L
 
     // ON EST PARTI VERS LES APPS RÉCENTES (et pas vers l'accueil) : Android y montre déjà sa propre
     // animation (les cartes qui se rangent). Nos bandes sombres et l'étoile par-dessus faisaient une
     // transition moche (vu par Will le 09/11) : on efface tout en douceur, en 0,15 s.
     // Appelé par le service dès qu'il voit l'écran des apps récentes s'ouvrir.
     fun annuler() {
+        recentsA = SystemClock.uptimeMillis()
         val vue = enCours ?: return
         enCours = null
         vue.animate().alpha(0f).setDuration(150).start()
     }
 
     fun jouer(service: AccessibilityService, etat: Etat) {
+        // les apps récentes viennent de s'ouvrir (le signal est arrivé avant nous) : rien à dessiner
+        if (SystemClock.uptimeMillis() - recentsA < 1000) return
         val gestionnaire = service.getSystemService(Context.WINDOW_SERVICE) as WindowManager
         val ecran = (service.getSystemService(Context.DISPLAY_SERVICE) as DisplayManager).getDisplay(Display.DEFAULT_DISPLAY)
         val taille = Point()
@@ -108,7 +119,17 @@ object RetourEtoile {
         private fun freine(x: Float) = 1 - (1 - x) * (1 - x) * (1 - x)
         private fun mix(a: Float, b: Float, u: Float) = a + (b - a) * u
 
+        private var premiere = true
+        private var abandon = false
+
         override fun onDraw(c: Canvas) {
+            // la première image arrive trop tard, ou on est parti vers les apps récentes : on ne dessine rien
+            if (premiere) {
+                premiere = false
+                if (SystemClock.uptimeMillis() - debut > RETARD_MAX) abandon = true
+            }
+            if (recentsA > debut) abandon = true
+            if (abandon) return
             val f = ((SystemClock.uptimeMillis() - debut) / DUREE.toFloat()).coerceIn(0f, 1f)
             val k = lisse(f)
             // 1) les bandes repartent (même dessin que dans le dossier, en sens inverse)
