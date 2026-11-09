@@ -7,9 +7,14 @@ import android.graphics.Canvas
 import android.graphics.Color
 import android.graphics.Paint
 import android.graphics.Typeface
+import android.graphics.drawable.ColorDrawable
 import android.graphics.drawable.GradientDrawable
+import android.view.Gravity
 import android.view.View
+import android.view.ViewGroup
+import android.view.WindowInsets
 import android.widget.Button
+import android.widget.LinearLayout
 import android.widget.Switch
 import android.widget.TextView
 import kotlin.math.cos
@@ -72,9 +77,79 @@ object Style {
     }
 
     // Barre d'état (en haut) et barre de navigation (en bas) en noir, comme l'écran.
+    // (Sur Android 15 et plus, ces deux couleurs ne se règlent plus : c'est le fond de la fenêtre
+    // qu'on voit derrière les barres. On le met donc en noir aussi.)
     fun fenetreNoire(a: Activity) {
+        @Suppress("DEPRECATION")
         a.window.statusBarColor = NOIR
+        @Suppress("DEPRECATION")
         a.window.navigationBarColor = NOIR
+        a.window.setBackgroundDrawable(ColorDrawable(NOIR))
+    }
+
+    // ANDROID 15 ET PLUS : « BORD À BORD ». Une app qui vise Android 16 est dessinée sur TOUT
+    // l'écran, y compris SOUS la barre d'état (l'heure, la batterie) et SOUS la barre de navigation.
+    // Sans précaution, le haut de nos écrans passerait sous l'heure. Android nous dit la place
+    // que prennent ces barres (les « insets ») : on écarte le contenu d'autant, et aussi de la
+    // place du clavier quand il est ouvert (pour les écrans avec une recherche).
+    // Appelée automatiquement pour chaque écran (voir AnimApp.kt), sauf le dossier animé, qui
+    // dessine exprès sur tout l'écran.
+    fun sousLesBarres(a: Activity) {
+        if (android.os.Build.VERSION.SDK_INT < 35 || a is DossierActivity) return
+        a.window.setBackgroundDrawable(ColorDrawable(NOIR))
+        val contenu = a.findViewById<View>(android.R.id.content) ?: return
+        contenu.setOnApplyWindowInsetsListener { v, insets ->
+            val b = insets.getInsets(WindowInsets.Type.systemBars() or WindowInsets.Type.displayCutout() or WindowInsets.Type.ime())
+            v.setPadding(b.left, b.top, b.right, b.bottom)
+            insets
+        }
+        contenu.requestApplyInsets()
+    }
+
+    // ---------- les éléments communs des écrans noirs (apps, réglages d'une app, dossiers…) ----------
+
+    // L'en-tête d'un écran : la flèche de retour à gauche, puis le titre.
+    fun entete(a: Activity, titre: String): LinearLayout = LinearLayout(a).apply {
+        orientation = LinearLayout.HORIZONTAL
+        gravity = Gravity.CENTER_VERTICAL
+        setPadding(px(a, 4f), 0, px(a, 16f), 0)
+        addView(Icone(a, Icone.RETOUR).apply {
+            contentDescription = "Retour"
+            setOnClickListener { a.finish() }
+        }, LinearLayout.LayoutParams(px(a, 48f), px(a, 48f)))
+        addView(texte(a, titre, 20f, TEXTE, gras = true).apply { setPadding(px(a, 6f), 0, 0, 0) },
+            LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f))
+        layoutParams = LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, px(a, 64f))
+    }
+
+    // Une « carte » : un bloc arrondi gris très foncé, avec un fin contour, qui range son contenu
+    // en colonne. « espaceDessous » : l'écart avec la carte suivante.
+    fun carte(c: Context, espaceDessous: Float = 12f): LinearLayout = LinearLayout(c).apply {
+        orientation = LinearLayout.VERTICAL
+        background = arrondi(c, CARTE, 22f, BORD)
+        setPadding(px(c, 18f), px(c, 16f), px(c, 18f), px(c, 16f))
+        layoutParams = LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT)
+            .apply { bottomMargin = px(c, espaceDessous) }
+    }
+
+    // Le petit titre gris, en majuscules espacées, en haut d'une carte.
+    fun titreCarte(c: Context, t: String): TextView = texte(c, t.uppercase(), 12f, MUET, gras = true).apply {
+        letterSpacing = 0.08f
+        setPadding(0, 0, 0, px(c, 10f))
+    }
+
+    // Le bouton secondaire : transparent, avec un contour, texte blanc cassé.
+    fun boutonDiscret(c: Context, t: String, action: () -> Unit): Button = Button(c).apply {
+        text = t
+        isAllCaps = false
+        textSize = 14f
+        setTextColor(TEXTE)
+        background = arrondi(c, Color.argb(20, 255, 255, 255), 14f, Color.rgb(63, 63, 70))
+        stateListAnimator = null
+        minHeight = px(c, 46f)
+        minimumHeight = px(c, 46f)
+        setPadding(px(c, 16f), 0, px(c, 16f), 0)
+        setOnClickListener { action() }
     }
 }
 

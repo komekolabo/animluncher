@@ -1,174 +1,115 @@
 package com.will.animlauncher
 
 import android.app.Activity
+import android.content.res.ColorStateList
 import android.graphics.Color
-import android.graphics.drawable.GradientDrawable
 import android.os.Bundle
 import android.os.Handler
 import android.os.Looper
 import android.view.Gravity
+import android.view.View
 import android.view.ViewGroup
-import android.widget.Button
 import android.widget.CheckBox
 import android.widget.FrameLayout
 import android.widget.ImageView
 import android.widget.LinearLayout
 import android.widget.ScrollView
-import android.widget.SeekBar
-import android.widget.Switch
 import android.widget.TextView
 import android.widget.Toast
 
-// LES RÉGLAGES D'UNE APP : activer ou couper son animation, choisir sa durée (0 à 4 s),
-// choisir ses variantes (pour Claude, Maps, les échecs…), et voir un aperçu.
+// LES RÉGLAGES D'UNE APP, refaits le 09/11 dans le style noir, le plus simple possible :
+//   1. un interrupteur (animation allumée ou coupée) et un gros bouton « Voir l'animation » ;
+//   2. la vitesse, en 3 choix : Rapide, Normale, Lente (fini le curseur de 0 à 4 s) ;
+//   3. les variantes, s'il y en a (une est tirée au hasard parmi celles qui sont cochées) ;
+//   4. « seulement au démarrage » pour cette app ;
+//   5. l'icône animée (le widget « galet ») à poser sur l'accueil.
 class ReglageAppActivity : Activity() {
 
     private lateinit var pkg: String
     private lateinit var entree: Entree
     private lateinit var racine: FrameLayout          // l'écran entier : l'aperçu s'affiche par-dessus
-    private lateinit var texteDuree: TextView
-    private lateinit var curseur: SeekBar
     private lateinit var avertissement: TextView
+    private val vitesses = ArrayList<TextView>()      // les 3 boutons Rapide / Normale / Lente
     private val principal = Handler(Looper.getMainLooper())
     private var apercuEnCours: AnimationView? = null
-    private var dp = 1f
+    private fun px(v: Float) = Style.px(this, v)
+
+    // Les 3 vitesses : leur nom, et par combien on multiplie la durée normale de l'animation.
+    // (Normale = la durée prévue pour cette app, rangée comme « -1 » dans les réglages.)
+    private val NOMS = listOf("Rapide", "Normale", "Lente")
+    private val FACTEURS = floatArrayOf(0.6f, 1f, 1.6f)
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        dp = resources.displayMetrics.density
+        Style.fenetreNoire(this)
         pkg = intent.getStringExtra("pkg") ?: run { finish(); return }
         entree = Catalogue.pour(pkg) ?: run { finish(); return }
         val nom = intent.getStringExtra("nom") ?: pkg
 
         val colonne = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
-            setPadding((22 * dp).toInt(), (40 * dp).toInt(), (22 * dp).toInt(), (40 * dp).toInt())
+            setPadding(px(16f), px(4f), px(16f), px(32f))
         }
 
-        // --- l'en-tête : icône et nom de l'app ---
-        val entete = LinearLayout(this).apply {
-            orientation = LinearLayout.HORIZONTAL
-            gravity = Gravity.CENTER_VERTICAL
-            setPadding(0, 0, 0, (24 * dp).toInt())
-            addView(ImageView(this@ReglageAppActivity).apply {
-                try { setImageDrawable(packageManager.getApplicationIcon(pkg)) } catch (_: Exception) {}
-            }, LinearLayout.LayoutParams((56 * dp).toInt(), (56 * dp).toInt()))
-            addView(TextView(this@ReglageAppActivity).apply {
-                text = nom
-                textSize = 26f
-                setTextColor(Color.WHITE)
-                setPadding((16 * dp).toInt(), 0, 0, 0)
-            })
-        }
-        colonne.addView(entete)
-
-        // --- 1. activer / couper l'animation de cette app ---
-        val carteActive = carte()
-        carteActive.addView(Switch(this).apply {
-            text = "Animation activée"
-            textSize = 19f
-            setTextColor(Color.WHITE)
+        // ---------- 1. allumer / couper, et voir ----------
+        val carteVoir = Style.carte(this)
+        val interActif = Style.interrupteur(this).apply {
+            text = "Animation"
+            textSize = 17f
+            setTextColor(Style.TEXTE)
             isChecked = Reglages.appActive(this@ReglageAppActivity, pkg)
             setOnCheckedChangeListener { _, coche ->
                 Reglages.definirAppActive(this@ReglageAppActivity, pkg, coche)
                 majAvertissement()
             }
-        })
-        // --- 1 bis. seulement au démarrage, pour cette app ---
-        // (sinon, l'app suit l'interrupteur général de l'écran principal)
-        val carteDemarrage = carte()
-        val noteDemarrage = TextView(this).apply {
-            textSize = 13f
-            setTextColor(Color.parseColor("#94A0C4"))
         }
-        var majAuto = false      // vrai quand c'est le programme (pas le doigt) qui bouge l'interrupteur
-        val interDemarrage = Switch(this).apply {
-            text = "Seulement au démarrage de l'app"
-            textSize = 17f
-            setTextColor(Color.WHITE)
-            isChecked = Reglages.seulementDemarrage(this@ReglageAppActivity, pkg)
-            setOnCheckedChangeListener { _, coche ->
-                if (majAuto) return@setOnCheckedChangeListener
-                Reglages.definirSeulementDemarrage(this@ReglageAppActivity, pkg, coche)
-                majNoteDemarrage(noteDemarrage)
-            }
-        }
-        carteDemarrage.addView(interDemarrage)
-        carteDemarrage.addView(noteDemarrage)
-        carteDemarrage.addView(Button(this).apply {
-            text = "Suivre le réglage général"
-            setOnClickListener {
-                Reglages.oublierSeulementDemarrage(this@ReglageAppActivity, pkg)
-                majAuto = true
-                interDemarrage.isChecked = Reglages.seulementDemarrage(this@ReglageAppActivity, pkg)
-                majAuto = false
-                majNoteDemarrage(noteDemarrage)
-            }
+        carteVoir.addView(LinearLayout(this).apply {
+            orientation = LinearLayout.HORIZONTAL
+            gravity = Gravity.CENTER_VERTICAL
+            addView(ImageView(this@ReglageAppActivity).apply {
+                try { setImageDrawable(packageManager.getApplicationIcon(pkg)) } catch (_: Exception) {}
+            }, LinearLayout.LayoutParams(px(44f), px(44f)).apply { rightMargin = px(14f) })
+            addView(interActif, LinearLayout.LayoutParams(0, px(48f), 1f))
         })
-        majNoteDemarrage(noteDemarrage)
-        colonne.addView(carteActive)
-        colonne.addView(carteDemarrage)
+        carteVoir.addView(Style.boutonBlanc(this, "▶   Voir l'animation") { apercu(-1) },
+            LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, px(50f)).apply { topMargin = px(12f) })
+        colonne.addView(carteVoir)
 
-        // --- 2. la durée : un curseur de 0 à 4 s, par pas de 0,1 s ---
-        val carteDuree = carte()
-        carteDuree.addView(titre("Durée de l'animation"))
-        texteDuree = TextView(this).apply { textSize = 16f; setTextColor(Color.parseColor("#DFE4F7")) }
-        carteDuree.addView(texteDuree)
-        curseur = SeekBar(this).apply {
-            max = 40                               // 40 crans de 0,1 s = 4 s
-            setPadding((8 * dp).toInt(), (16 * dp).toInt(), (8 * dp).toInt(), (16 * dp).toInt())
-            setOnSeekBarChangeListener(object : SeekBar.OnSeekBarChangeListener {
-                override fun onProgressChanged(s: SeekBar?, valeur: Int, parUtilisateur: Boolean) {
-                    if (parUtilisateur) {          // seulement quand c'est le doigt qui bouge le curseur
-                        Reglages.definirDuree(this@ReglageAppActivity, pkg, valeur * 100)
-                        majDuree()
-                    }
-                }
-                override fun onStartTrackingTouch(s: SeekBar?) {}
-                override fun onStopTrackingTouch(s: SeekBar?) {}
-            })
-        }
-        carteDuree.addView(curseur)
-        carteDuree.addView(TextView(this).apply {
-            text = "0 s = pas d'animation · 4 s = très lent"
-            textSize = 13f
-            setTextColor(Color.parseColor("#94A0C4"))
-        })
-        carteDuree.addView(Button(this).apply {
-            text = "Remettre la durée par défaut"
-            setOnClickListener {
-                Reglages.definirDuree(this@ReglageAppActivity, pkg, -1)
-                majDuree()
-            }
-        })
-        colonne.addView(carteDuree)
+        // l'avertissement (en orange) : il n'apparaît que si l'animation ne peut pas se lancer
+        avertissement = Style.texte(this, "", 13.5f, Style.AMBRE).apply { setPadding(px(6f), 0, px(6f), px(12f)) }
+        colonne.addView(avertissement)
 
-        // --- 2 bis. le widget « galet » de cette app (voir WidgetApp.kt) ---
-        val carteWidget = carte()
-        carteWidget.addView(titre("Widget animé"))
-        carteWidget.addView(TextView(this).apply {
-            text = "Le logo de $nom qui flotte doucement dans son icône. À poser sur l'accueil, " +
-                "à la place de l'icône normale (elle reste dans l'écran des apps)."
-            textSize = 14f
-            setTextColor(Color.parseColor("#DFE4F7"))
-            setPadding(0, 0, 0, (8 * dp).toInt())
-        })
-        carteWidget.addView(Button(this).apply {
-            text = "✨  Mettre le widget sur l'accueil"
-            setOnClickListener {
-                if (!WidgetApp.proposer(this@ReglageAppActivity, pkg)) {
-                    Toast.makeText(this@ReglageAppActivity, "Appui long sur l'accueil → Widgets → " +
-                        getString(R.string.app_name), Toast.LENGTH_LONG).show()
+        // ---------- 2. la vitesse ----------
+        val carteVitesse = Style.carte(this)
+        carteVitesse.addView(Style.titreCarte(this, "Vitesse"))
+        val rangee = LinearLayout(this).apply { orientation = LinearLayout.HORIZONTAL }
+        for (i in NOMS.indices) {
+            val bouton = Style.texte(this, NOMS[i], 14.5f, Style.TEXTE).apply {
+                gravity = Gravity.CENTER
+                isClickable = true
+                setOnClickListener {
+                    // Normale -> on efface le choix (-1) ; sinon on range la durée en millisecondes
+                    val ms = if (i == 1) -1 else Math.round(entree.dureeDefaut * FACTEURS[i])
+                    Reglages.definirDuree(this@ReglageAppActivity, pkg, ms)
+                    majVitesse()
                 }
             }
-        })
-        colonne.addView(carteWidget)
+            vitesses.add(bouton)
+            rangee.addView(bouton, LinearLayout.LayoutParams(0, px(46f), 1f).apply { if (i > 0) leftMargin = px(8f) })
+        }
+        carteVitesse.addView(rangee)
+        colonne.addView(carteVitesse)
 
-        // --- 3. les variantes (seulement pour les apps qui en ont plusieurs) ---
+        // ---------- 3. les variantes (seulement pour les apps qui en ont plusieurs) ----------
         if (entree.variantes.isNotEmpty()) {
-            val carteVariantes = carte()
-            carteVariantes.addView(titre("Variantes (une est tirée au hasard parmi celles cochées)"))
+            val carteVariantes = Style.carte(this)
+            carteVariantes.addView(Style.titreCarte(this, "Variantes"))
+            carteVariantes.addView(Style.texte(this, "Une est tirée au hasard à chaque ouverture, parmi celles cochées.", 13f, Style.MUET)
+                .apply { setPadding(0, 0, 0, px(6f)) })
             val eteintes = Reglages.variantesDesactivees(this, pkg)
+            // les cases à cocher aux couleurs de la refonte : blanche quand elle est cochée, grise sinon
+            val teinte = ColorStateList(arrayOf(intArrayOf(android.R.attr.state_checked), intArrayOf()),
+                intArrayOf(Style.TEXTE, Color.rgb(113, 113, 122)))
             for ((numero, nomVariante) in entree.variantes.withIndex()) {
                 val ligne = LinearLayout(this).apply {
                     orientation = LinearLayout.HORIZONTAL
@@ -176,105 +117,143 @@ class ReglageAppActivity : Activity() {
                 }
                 ligne.addView(CheckBox(this).apply {
                     text = nomVariante
-                    textSize = 16f
-                    setTextColor(Color.WHITE)
+                    textSize = 15.5f
+                    setTextColor(Style.TEXTE)
+                    buttonTintList = teinte
                     isChecked = numero !in eteintes
                     setOnCheckedChangeListener { _, coche ->
                         Reglages.definirVariante(this@ReglageAppActivity, pkg, numero, coche)
                         majAvertissement()
                     }
-                }, LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f))
-                ligne.addView(Button(this).apply {
-                    text = "▶"
+                }, LinearLayout.LayoutParams(0, px(48f), 1f))
+                // le petit bouton rond ▶ : voir CETTE variante
+                ligne.addView(Style.texte(this, "▶", 13f, Style.TEXTE).apply {
+                    gravity = Gravity.CENTER
+                    contentDescription = "Voir $nomVariante"
+                    background = Style.arrondi(this@ReglageAppActivity, Color.argb(20, 255, 255, 255), 20f, Color.rgb(63, 63, 70))
+                    isClickable = true
                     setOnClickListener { apercu(numero) }
-                })
+                }, LinearLayout.LayoutParams(px(40f), px(40f)))
                 carteVariantes.addView(ligne)
             }
             colonne.addView(carteVariantes)
         }
 
-        // --- 4. l'aperçu et l'avertissement ---
-        avertissement = TextView(this).apply {
-            textSize = 14f
-            setTextColor(Color.parseColor("#FFB4A0"))
-            setPadding(0, (8 * dp).toInt(), 0, (8 * dp).toInt())
+        // ---------- 4. seulement au démarrage, pour cette app ----------
+        // (tant qu'on n'y touche pas, l'app suit l'interrupteur général des réglages)
+        val carteDemarrage = Style.carte(this)
+        val noteDemarrage = Style.texte(this, "", 13f, Style.MUET)
+        val suivre = Style.texte(this, "Revenir au réglage général ›", 13f, Style.DOUX).apply {
+            setPadding(0, px(10f), 0, 0)
+            isClickable = true
         }
-        colonne.addView(avertissement)
-        colonne.addView(Button(this).apply {
-            text = "▶  Voir l'animation"
-            textSize = 17f
-            setOnClickListener { apercu(-1) }
+        var majAuto = false      // vrai quand c'est le programme (pas le doigt) qui bouge l'interrupteur
+        val interDemarrage = Style.interrupteur(this).apply {
+            text = "Seulement au démarrage"
+            textSize = 16f
+            setTextColor(Style.TEXTE)
+            isChecked = Reglages.seulementDemarrage(this@ReglageAppActivity, pkg)
+            setOnCheckedChangeListener { _, coche ->
+                if (majAuto) return@setOnCheckedChangeListener
+                Reglages.definirSeulementDemarrage(this@ReglageAppActivity, pkg, coche)
+                majNoteDemarrage(noteDemarrage, suivre)
+            }
+        }
+        suivre.setOnClickListener {
+            Reglages.oublierSeulementDemarrage(this, pkg)
+            majAuto = true
+            interDemarrage.isChecked = Reglages.seulementDemarrage(this, pkg)
+            majAuto = false
+            majNoteDemarrage(noteDemarrage, suivre)
+        }
+        carteDemarrage.addView(interDemarrage, LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, px(48f)))
+        carteDemarrage.addView(noteDemarrage)
+        carteDemarrage.addView(suivre)
+        majNoteDemarrage(noteDemarrage, suivre)
+        colonne.addView(carteDemarrage)
+
+        // ---------- 5. l'icône animée de cette app (voir WidgetApp.kt) ----------
+        val carteWidget = Style.carte(this)
+        carteWidget.addView(Style.titreCarte(this, "Icône animée"))
+        carteWidget.addView(Style.texte(this, "Le logo de $nom qui flotte doucement dans son icône, à poser sur " +
+            "l'accueil à la place de l'icône normale.", 13.5f, Style.MUET).apply { setLineSpacing(0f, 1.15f); setPadding(0, 0, 0, px(12f)) })
+        carteWidget.addView(Style.boutonDiscret(this, "Mettre sur l'accueil") {
+            if (!WidgetApp.proposer(this, pkg)) {
+                Toast.makeText(this, "Appui long sur l'accueil → Widgets → " + getString(R.string.app_name), Toast.LENGTH_LONG).show()
+            }
         })
+        colonne.addView(carteWidget)
 
         racine = FrameLayout(this).apply {
-            setBackgroundColor(Color.parseColor("#1B2340"))
-            addView(ScrollView(this@ReglageAppActivity).apply { addView(colonne) })
+            setBackgroundColor(Style.NOIR)
+            addView(LinearLayout(this@ReglageAppActivity).apply {
+                orientation = LinearLayout.VERTICAL
+                addView(Style.entete(this@ReglageAppActivity, nom))
+                addView(ScrollView(this@ReglageAppActivity).apply {
+                    isVerticalScrollBarEnabled = false
+                    addView(colonne)
+                }, LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, 0, 1f))
+            })
         }
         setContentView(racine)
-        majDuree()
-        majAvertissement()
+        majVitesse()
     }
 
-    // Une « carte » : un bloc arrondi un peu plus clair que le fond.
-    private fun carte() = LinearLayout(this).apply {
-        orientation = LinearLayout.VERTICAL
-        background = GradientDrawable().apply { setColor(Color.parseColor("#242E52")); cornerRadius = 18 * dp }
-        setPadding((18 * dp).toInt(), (16 * dp).toInt(), (18 * dp).toInt(), (16 * dp).toInt())
-        layoutParams = LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT)
-            .apply { bottomMargin = (14 * dp).toInt() }
-    }
+    // La durée réglée pour cette app, en millisecondes (la durée normale si rien n'est choisi).
+    private fun dureeMs(): Int = Reglages.duree(this, pkg).let { if (it < 0) entree.dureeDefaut else it }
 
-    private fun titre(t: String) = TextView(this).apply {
-        text = t
-        textSize = 15f
-        setTextColor(Color.parseColor("#94A0C4"))
-        setPadding(0, 0, 0, (8 * dp).toInt())
-    }
-
-    private fun secondes(ms: Int) = String.format("%.2f", ms / 1000f).trimEnd('0').trimEnd(',', '.') + " s"
-
-    // La petite explication sous l'interrupteur « Seulement au démarrage ».
-    private fun majNoteDemarrage(note: TextView) {
-        val choix = if (Reglages.seulementDemarrage(this, pkg))
-            "Pas d'animation si l'app est encore ouverte en arrière-plan."
-            else "Animation à chaque appui sur l'icône."
-        note.text = choix + if (Reglages.seulementDemarrageChoisi(this, pkg)) "  (réglé pour cette app)"
-                            else "  (réglage général)"
-    }
-
-    // Met à jour le texte et la position du curseur de durée.
-    private fun majDuree() {
+    // Quelle vitesse est choisie ? 0 = Rapide, 1 = Normale, 2 = Lente, -1 = aucune (durée à 0).
+    // (Une ancienne durée réglée au curseur est rangée dans la vitesse la plus proche.)
+    private fun vitesseChoisie(): Int {
         val choisie = Reglages.duree(this, pkg)
-        val ms = if (choisie < 0) entree.dureeDefaut else choisie
-        curseur.progress = Math.round(ms / 100f)
-        texteDuree.text = when {
-            ms == 0 -> "0 s : pas d'animation"
-            choisie < 0 -> secondes(ms) + " (par défaut)"
-            else -> secondes(ms) + " (par défaut : ${secondes(entree.dureeDefaut)})"
+        if (choisie < 0) return 1
+        if (choisie == 0) return -1
+        val rapport = choisie.toFloat() / entree.dureeDefaut
+        return if (rapport < 0.8f) 0 else if (rapport > 1.3f) 2 else 1
+    }
+
+    // Colore les 3 boutons : celui qui est choisi devient blanc, les autres restent sombres.
+    private fun majVitesse() {
+        val choix = vitesseChoisie()
+        for ((i, bouton) in vitesses.withIndex()) {
+            val actif = i == choix
+            bouton.background = if (actif) Style.arrondi(this, Style.TEXTE, 14f)
+                                else Style.arrondi(this, Color.argb(20, 255, 255, 255), 14f, Color.rgb(63, 63, 70))
+            bouton.setTextColor(if (actif) Style.ENCRE else Style.TEXTE)
         }
         majAvertissement()
+    }
+
+    // La petite explication sous l'interrupteur « Seulement au démarrage », et le lien pour
+    // revenir au réglage général (il n'apparaît que si on a fait un choix pour cette app).
+    private fun majNoteDemarrage(note: TextView, suivre: View) {
+        note.text = if (Reglages.seulementDemarrage(this, pkg))
+            "Pas d'animation si l'app était encore ouverte en arrière-plan."
+            else "L'animation se joue à chaque appui sur l'icône."
+        suivre.visibility = if (Reglages.seulementDemarrageChoisi(this, pkg)) View.VISIBLE else View.GONE
     }
 
     // Prévient si, avec ces réglages, l'animation ne se lancera jamais.
     private fun majAvertissement() {
-        avertissement.text = when {
-            !Reglages.appActive(this, pkg) -> "⚠️ L'animation de cette app est coupée."
-            Reglages.duree(this, pkg) == 0 -> "⚠️ Durée de 0 s : l'animation ne se lance pas."
+        val texte = when {
+            !Reglages.appActive(this, pkg) -> "L'animation de cette app est coupée."
+            Reglages.duree(this, pkg) == 0 -> "Choisis une vitesse : avec une durée de 0, l'animation ne se lance pas."
             entree.variantes.isNotEmpty() &&
                 Reglages.variantesDesactivees(this, pkg).size >= entree.variantes.size ->
-                "⚠️ Aucune variante cochée : l'animation ne se lance pas."
+                "Aucune variante cochée : l'animation ne se lance pas."
             else -> ""
         }
+        avertissement.text = texte
+        avertissement.visibility = if (texte.isEmpty()) View.GONE else View.VISIBLE
     }
 
     // L'APERÇU : joue l'animation par-dessus cet écran, comme si on ouvrait l'app.
     // numero = la variante à montrer (-1 = une au hasard parmi celles cochées).
     private fun apercu(numero: Int) {
         if (apercuEnCours != null) return
-        val choisie = Reglages.duree(this, pkg)
-        val ms = if (choisie < 0) entree.dureeDefaut else choisie
+        val ms = dureeMs()
         if (ms == 0) {
-            Toast.makeText(this, "Durée de 0 s : pas d'animation", Toast.LENGTH_SHORT).show()
+            Toast.makeText(this, "Choisis d'abord une vitesse", Toast.LENGTH_SHORT).show()
             return
         }
         var n = numero

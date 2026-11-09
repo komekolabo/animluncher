@@ -1,6 +1,7 @@
 // Recette de fabrication de l'app.
 plugins {
-    id("com.android.application") version "8.5.2"       // c'est une app Android
+    // (version 8.7 : il en faut une assez récente pour savoir compiler pour Android 16)
+    id("com.android.application") version "8.7.3"       // c'est une app Android
     id("org.jetbrains.kotlin.android") version "2.0.20"  // écrite en Kotlin
 }
 
@@ -10,12 +11,15 @@ val numeroCompilation = (System.getenv("GITHUB_RUN_NUMBER") ?: "0").toInt()
 
 android {
     namespace = "com.will.animlauncher"
-    compileSdk = 34
+    // compileSdk = la version d'Android dont on utilise les outils pour compiler ;
+    // targetSdk (plus bas) = la version pour laquelle l'app se déclare prête.
+    // Depuis le 31 août 2026, Google Play n'accepte que les apps qui visent Android 16 (niveau 36).
+    compileSdk = 36
 
     defaultConfig {
         applicationId = "com.will.animlauncher"
         minSdk = 26
-        targetSdk = 34
+        targetSdk = 36
         versionCode = numeroCompilation.coerceAtLeast(1)
         versionName = "0.$numeroCompilation"
     }
