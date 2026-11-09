@@ -113,6 +113,22 @@ Objectif : la publier sur le Google Play Store, avec une pub non invasive.
   ou « 5m ago » (carnet « ouvertures », `noterOuverture` dans `fenetre()`). Appui sur une app = ouverture IMMÉDIATE
   (dès 0,4 s). Geste « accueil » : l'écran du dossier disparaît sans pouvoir dessiner -> `onPause` demande au
   service de dessiner le retour de l'étoile dans une fenêtre d'accessibilité temporaire (`RetourEtoile.kt`).
+- RÉACTION SONORE (10/11) : les bords de l'écran réagissent à la musique du téléphone, PARTOUT (hors de l'app aussi).
+  `EcouteSon.kt` = l'outil Android `Visualizer(0)` (niveau du son en direct, rien d'enregistré ; exige les
+  permissions RECORD_AUDIO + MODIFY_AUDIO_SETTINGS, ajoutées au manifest commun) -> 5 valeurs 0..1 : grave, medium,
+  aigu, hauteur (note dominante), claque (son sec). `ReactionSonore.kt` = carnet « son » (actif, style) + `VueSonore`,
+  une fenêtre d'accessibilité transparente et non touchable posée par le service (c'est `Rideau.onAttachedToWindow`
+  qui appelle `ReactionSonore.demarrer` : pas besoin de toucher à AppWatcherService). Elle ne dessine que si
+  `AudioManager.isMusicActive`, et s'efface en plein écran (barre d'état cachée = vidéo / jeu) et en paysage.
+  4 styles choisis par Will sur aperçu : Aurore, Cordes, Verre liquide, Prisme (graves / mélodie / aigus ont chacun
+  leur effet ; lumière additive, halos BlurMaskFilter ; rien en bas de l'écran = réservé à Claude).
+  `ReactionSonoreUi.kt` = `BoutonSon` (rond en bas à droite de l'accueil) + `FenetreSon` (feuille du bas :
+  explication « rien n'est enregistré », choix du style, Activer -> question micro d'Android).
+  Textes dans `res/values*/strings_son.xml` (6 langues). Aperçus : /home/claude/apercu/premium.py (avec musique).
+  PAS ENCORE TESTÉ SUR TÉLÉPHONE (écrit sans pouvoir compiler ici) : à vérifier = le Visualizer donne-t-il bien des
+  mesures quand l'app est en arrière-plan (Samsung, Android 16) ? la détection du plein écran marche-t-elle ?
+  Play Store : la permission micro devra être justifiée dans la fiche (option éteinte de base, écran d'explication).
+  Will aimait aussi le style « Souffle » (les cartes de l'accueil qui respirent sur les basses) : pas encore codé.
 - `Reglages.kt` : kill switch, « seulement au démarrage », réglages par app (durée, variantes).
 - `MainActivity.kt` : écran principal (logo animé, interrupteurs, écran d'explication Store).
 - `GuideDeblocage.kt` : guide plein écran pour l'accessibilité **grisée** (APK installé hors Play Store).
