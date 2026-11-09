@@ -63,18 +63,20 @@ class WidgetGroupe : AppWidgetProvider() {
             val groupe = c.getSharedPreferences(CARNET, Context.MODE_PRIVATE).getString("groupe_$id", "ia") ?: "ia"
             val v = RemoteViews(c.packageName, R.layout.widget_groupe)
             v.setTextViewText(R.id.widget_groupe_nom, Groupes.categorie(groupe)?.nom ?: "?")
-            // LA COULEUR CHOISIE (roue du dossier) : on « teinte » le galet et l'étoile animée. Le mode COLOR
-            // garde les ombres et les reflets du dessin d'origine (sa luminosité) et ne remplace que la teinte
-            // et l'intensité : l'étoile garde son relief, le galet reste sombre.
+            // LA COULEUR CHOISIE (roue du dossier) : on « teinte » le galet et l'étoile animée.
+            // Mode SRC_ATOP : la couleur ne se pose QUE là où il y a déjà du dessin (la forme arrondie du galet,
+            // la forme de l'étoile). Le 09/11, le mode COLOR remplissait aussi les coins transparents : le
+            // galet devenait un CARRÉ rouge (vu sur l'accueil de Will). La couleur est un peu transparente
+            // (alpha 175 et 190 sur 255) : on voit encore un peu le dessin d'origine dessous (reflets, dégradé).
             // Android 12 et plus seulement (avant, un widget ne peut pas changer de teinte).
             val hsv = Groupes.couleur(c, groupe)
             if (hsv != null && Build.VERSION.SDK_INT >= 31) {
-                val vive = Color.HSVToColor(hsv)
-                val sombre = Color.HSVToColor(floatArrayOf(hsv[0], 0.35f + 0.3f * hsv[1], 0.5f))
+                val vive = Teinte.avecAlpha(Color.HSVToColor(hsv), 190f)
+                val sombre = Teinte.avecAlpha(Teinte.depuis(hsv).haut, 175f)
                 v.setColorStateList(R.id.widget_groupe_etoile, "setIndeterminateTintList", ColorStateList.valueOf(vive))
-                v.setBlendMode(R.id.widget_groupe_etoile, "setIndeterminateTintBlendMode", BlendMode.COLOR)
+                v.setBlendMode(R.id.widget_groupe_etoile, "setIndeterminateTintBlendMode", BlendMode.SRC_ATOP)
                 v.setColorStateList(R.id.widget_groupe_galet, "setImageTintList", ColorStateList.valueOf(sombre))
-                v.setBlendMode(R.id.widget_groupe_galet, "setImageTintBlendMode", BlendMode.COLOR)
+                v.setBlendMode(R.id.widget_groupe_galet, "setImageTintBlendMode", BlendMode.SRC_ATOP)
             }
             // NEW_TASK + CLEAR_TASK : le dossier s'ouvre toujours seul, dans sa propre tâche
             // (jamais par-dessus l'écran principal d'AnimLauncher).
