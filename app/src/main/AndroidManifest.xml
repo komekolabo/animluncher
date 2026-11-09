@@ -17,10 +17,14 @@
         </intent>
     </queries>
 
+    <!-- enableOnBackInvokedCallback="false" : avec Android 16, le bouton « retour » ne prévient plus
+         les écrans de la même façon. Trois de nos écrans s'en servent (fermer le menu de l'accueil,
+         finir l'édition d'un dossier…) : on garde l'ancien fonctionnement, qui marche toujours. -->
     <application
         android:name=".AnimApp"
         android:label="@string/app_name"
         android:icon="@mipmap/ic_launcher"
+        android:enableOnBackInvokedCallback="false"
         android:theme="@android:style/Theme.Material.NoActionBar">
 
         <!-- L'écran principal, avec son icône dans le tiroir d'applications. -->
