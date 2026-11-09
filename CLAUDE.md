@@ -97,11 +97,19 @@ Objectif : la publier sur le Google Play Store, avec une pub non invasive.
   compte sur le RATTRAPAGE (écran de démarrage < 300 ms après le clic = l'app était fermée).
   La liste « affiche toujours son écran de démarrage » (`splash_toujours_v2`) bloque ce rattrapage :
   elle ne doit retenir une app qu'avec prudence (Claude y avait été mis à tort).
+- « FERMETURE POSSIBLE » (Store) : comme elle ne voit pas quelle carte on glisse dans les apps
+  récentes, un retour apps récentes → accueil (sans toucher de carte) fait jouer l'animation au
+  prochain appui sur une icône. Solution provisoire choisie par Will (09/11) ; raté connu :
+  regarder les apps récentes sans rien fermer. **À remplacer par une vraie détection de fermeture.**
+- Mesure du démarrage (journal « .. mesure : ») : Instagram reprend en ~40 ms même après
+  « Tout fermer » (processus encore vivant), ~500 ms quand Android l'avait vraiment tuée.
 - Le journal envoyé sur GitHub est celui de la version **Perso** : si Will teste la version Store,
   le journal Perso ne montre aucune animation (interrupteur Perso éteint).
 
 ## Feuille de route
 1. Tester la version Store (le clic sur les icônes doit marcher sans lecture d'écran).
+   Demandé par Will : **bien détecter quand une app se ferme** (glissement d'une seule carte,
+   fermeture par Android), pour remplacer la « fermeture possible » provisoire.
 2. Fusionner `version-store` dans `main`.
 3. Vraie clé de signature (Secrets GitHub), fichier `.aab`, retirer `debug.keystore.b64`.
 4. Compte Google Play, test fermé (~12 testeurs, 14 jours), politique de confidentialité,

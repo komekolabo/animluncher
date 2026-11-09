@@ -144,6 +144,10 @@ class AppWatcherService : AccessibilityService() {
             return
         }
         if (app in ignorees) return
+        // Le « peut-être fermée » (voir FERMETURE POSSIBLE plus bas) ne vaut que pour CE clic :
+        // on le lit, puis on l'efface tout de suite.
+        val peutEtreFermee = fermeturePossible
+        fermeturePossible = false
         if (!Reglages.actif(this)) return
         if (Catalogue.pour(app) == null) return
         // Réglages de l'app : désactivée, durée 0 s, ou aucune variante cochée -> rien
@@ -155,7 +159,11 @@ class AppWatcherService : AccessibilityService() {
         // ouverte en arrière-plan, on ne joue rien. Avant, on regardait si son écran de lancement
         // apparaissait, mais Gmail ou YouTube en affichent un à chaque fois, même en arrière-plan.
         // Un widget, lui, ouvre toujours l'app volontairement : l'animation est jouée dans tous les cas.
-        if (!parWidget && Reglages.seulementDemarrage(this, app) && enArrierePlan(app)) {
+        if (!parWidget && Reglages.seulementDemarrage(this, app) && enArrierePlan(app) && peutEtreFermee) {
+            // On vient de passer par les apps récentes sans rien ouvrir : l'app a peut-être été
+            // fermée d'un glissement. Dans le doute, on joue l'animation.
+            noter("  (passage par les apps récentes juste avant : $app a peut-être été fermée)")
+        } else if (!parWidget && Reglages.seulementDemarrage(this, app) && enArrierePlan(app)) {
             noter("clic sur « ${textes.firstOrNull() ?: "?"} » -> $app : déjà ouverte en arrière-plan, pas d'animation")
             // …sauf si son écran de démarrage arrive juste après (voir fenetre) : elle était en fait fermée.
             refuseeApp = app
@@ -275,7 +283,18 @@ class AppWatcherService : AccessibilityService() {
         // Une app qui disparaît de la liste pendant la visite a été fermée (glissée vers le haut).
         if (app == ecranAccueil && classe == "RecentsActivity") debutRecents()
         else if (dansRecents && ((app == ecranAccueil && classe == "Launcher") || (app != ecranAccueil && estVraieApp))) {
+            // A-t-on réussi à lire les apps récentes ? (La version Store n'en a pas le droit :
+            // elle ne voit rien, donc elle ne sait pas quelle carte on a glissée vers le haut.)
+            val rienLu = vusRecents.isEmpty()
             finRecents()
+            // FERMETURE POSSIBLE : on revient sur l'ACCUEIL depuis les apps récentes, sans avoir
+            // touché une carte, et on n'a pas pu lire la liste. On est souvent allé là pour fermer
+            // une app : au prochain appui sur une icône, on jouera l'animation même si l'app
+            // semblait encore ouverte. (Seul raté : regarder les apps récentes sans rien fermer.)
+            if (app == ecranAccueil && rienLu) {
+                fermeturePossible = true
+                noter("  (retour à l'accueil depuis les apps récentes : une app a peut-être été fermée)")
+            }
             // On a touché une carte des apps récentes : l'app reprend depuis l'arrière-plan.
             // Si elle affiche quand même son écran de démarrage, c'est PEUT-ÊTRE qu'elle le fait à
             // chaque fois (comme Gmail ou YouTube)… ou simplement qu'Android l'avait fermée en
@@ -293,6 +312,9 @@ class AppWatcherService : AccessibilityService() {
         }
 
         if (!estVraieApp) return
+        // Une app s'affiche sans passer par une icône (notification, carte des apps récentes…) :
+        // le « peut-être fermée » ne vaut plus.
+        if (app != ecranAccueil) fermeturePossible = false
 
         if (app == derniereApp) return
         val precedente = derniereApp
@@ -597,6 +619,9 @@ class AppWatcherService : AccessibilityService() {
 
     // ---------------- LES APPS RÉCENTES ----------------
     private var dansRecents = false
+    // true = on vient de revenir des apps récentes à l'accueil sans pouvoir voir ce qui a été
+    // fermé : le prochain appui sur une icône jouera l'animation (voir FERMETURE POSSIBLE).
+    private var fermeturePossible = false
     private val vusRecents = HashSet<String>()      // toutes les apps vues pendant cette visite
     private var dernierReleve: Set<String> = emptySet()
 
