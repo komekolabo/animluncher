@@ -109,10 +109,13 @@ object Groupes {
             .map { it to nomApp(c, it).lowercase() }.sortedBy { it.second }.map { it.first }
     }
 
-    // Les apps du dossier : toutes, sauf celles que l'utilisateur a décochées.
+    // Un dossier contient au plus 60 apps (5 pages de 12), choix de Will le 09/11.
+    const val MAX = 60
+
+    // Les apps du dossier : toutes, sauf celles que l'utilisateur a décochées (60 au plus).
     fun apps(c: Context, id: String): List<String> {
         val sans = retirees(c, id)
-        return tous(c, id).filter { it !in sans }
+        return tous(c, id).filter { it !in sans }.take(MAX)
     }
 
     // LE CARNET « groupes » : pour chaque groupe, les apps décochées (« sans_… ») et les apps

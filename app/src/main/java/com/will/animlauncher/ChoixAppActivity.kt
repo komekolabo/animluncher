@@ -13,6 +13,7 @@ import android.widget.ImageView
 import android.widget.LinearLayout
 import android.widget.ScrollView
 import android.widget.TextView
+import android.widget.Toast
 
 // AJOUTER UNE APP À UN DOSSIER (09/11) : la liste de toutes les apps du téléphone qui ne sont pas
 // encore dans le groupe, avec une barre de recherche. Un appui sur une app l'ajoute au groupe.
@@ -29,6 +30,12 @@ class ChoixAppActivity : Activity() {
 
         // Toutes les apps qui ont une icône, sauf AnimLauncher et celles déjà dans le dossier.
         val dejaDedans = Groupes.apps(this, groupe).toSet()
+        // Le dossier est plein (60 apps) : on ne peut plus rien ajouter.
+        if (dejaDedans.size >= Groupes.MAX) {
+            Toast.makeText(this, "Dossier plein : ${Groupes.MAX} apps maximum", Toast.LENGTH_LONG).show()
+            finish()
+            return
+        }
         val intention = Intent(Intent.ACTION_MAIN).addCategory(Intent.CATEGORY_LAUNCHER)
         val apps = packageManager.queryIntentActivities(intention, 0)
             .map { it.activityInfo.packageName }.distinct()
