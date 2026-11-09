@@ -99,9 +99,11 @@ Objectif : la publier sur le Google Play Store, avec une pub non invasive.
   elle ne doit retenir une app qu'avec prudence (Claude y avait été mis à tort).
 - « FERMETURE POSSIBLE » (essayée le 09/11, RETIRÉE) : rejouer l'animation après tout passage
   apps récentes → accueil déclenchait l'animation presque à chaque fois. Ne pas refaire.
-- ESPION DES APPS RÉCENTES (expérience en cours, journal « [récentes] ») : on écoute les annonces
-  (TYPE_ANNOUNCEMENT), changements de contenu et défilements de l'écran d'accueil pendant la visite
-  des apps récentes, pour trouver un signal « telle carte a été fermée » utilisable SANS lire l'écran.
+- **ANNONCES DE FERMETURE** (trouvées le 09/11) : quand on glisse une carte dans les apps récentes,
+  le lanceur Samsung envoie un `TYPE_ANNOUNCEMENT` « application Instagram fermée » (et « Toutes les
+  applications ont été fermées » pour « Tout fermer »). Reçu SANS lire l'écran → marche en Store.
+  `AppWatcherService.annonce()` retire l'app de la liste des apps ouvertes. Textes en français :
+  on cherche « ferm »/« closed » + un nom d'app connu.
 - Mesure du démarrage (journal « .. mesure : ») : Instagram reprend en ~40 ms même après
   « Tout fermer » (processus encore vivant), ~500 ms quand Android l'avait vraiment tuée.
 - Le journal envoyé sur GitHub est celui de la version **Perso** : si Will teste la version Store,
@@ -109,8 +111,8 @@ Objectif : la publier sur le Google Play Store, avec une pub non invasive.
 
 ## Feuille de route
 1. Tester la version Store (le clic sur les icônes doit marcher sans lecture d'écran).
-   Demandé par Will : **bien détecter quand une app se ferme** (glissement d'une seule carte,
-   fermeture par Android), pour remplacer la « fermeture possible » provisoire.
+   Fermeture d'une carte : réglée par les annonces (à confirmer en Store sur le téléphone).
+   Reste : la fermeture en douce par Android (mesure du délai de démarrage, piste en cours).
 2. Fusionner `version-store` dans `main`.
 3. Vraie clé de signature (Secrets GitHub), fichier `.aab`, retirer `debug.keystore.b64`.
 4. Compte Google Play, test fermé (~12 testeurs, 14 jours), politique de confidentialité,

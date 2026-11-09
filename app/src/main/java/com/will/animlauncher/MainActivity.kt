@@ -175,7 +175,8 @@ class MainActivity : Activity() {
 
             Ce que l'app reçoit :
             • le nom écrit sous l'icône que tu touches sur l'écran d'accueil ;
-            • le nom de l'application qui passe au premier plan.
+            • le nom de l'application qui passe au premier plan ;
+            • les annonces de l'écran d'accueil quand tu fermes une application (« application … fermée »), pour rejouer l'animation à sa prochaine ouverture.
 
             Ce que l'app ne fait PAS :
             • elle ne lit pas le contenu de tes écrans, ni ce que tu tapes (messages, mots de passe…) ;
