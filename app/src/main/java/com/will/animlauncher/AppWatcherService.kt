@@ -77,7 +77,8 @@ class AppWatcherService : AccessibilityService() {
             when (event.eventType) {
                 AccessibilityEvent.TYPE_VIEW_CLICKED -> { diagnostic(event); clic(event) }
                 AccessibilityEvent.TYPE_WINDOW_STATE_CHANGED -> fenetre(event)
-                else -> { diagnostic(event); espionRecents(event) }
+                AccessibilityEvent.TYPE_ANNOUNCEMENT -> annonce(event)
+                else -> diagnostic(event)
             }
         } catch (e: Exception) {
             noter("ERREUR (rattrapée) : " + Journal.pile(e))
@@ -91,9 +92,6 @@ class AppWatcherService : AccessibilityService() {
     private var diagLignes = 0
     private fun diagnostic(event: AccessibilityEvent) {
         if (SystemClock.uptimeMillis() - dernierClicAccueil > 5000 || diagLignes >= 12) return
-        // (les changements de contenu et défilements sont trop nombreux : réservés à l'espion des apps récentes)
-        if (event.eventType == AccessibilityEvent.TYPE_WINDOW_CONTENT_CHANGED ||
-            event.eventType == AccessibilityEvent.TYPE_VIEW_SCROLLED) return
         // seulement les signaux de l'écran d'accueil (ou sans expéditeur) : on ne note jamais
         // ce qui se passe à l'intérieur des autres apps
         val expediteur = event.packageName?.toString()
@@ -603,31 +601,41 @@ class AppWatcherService : AccessibilityService() {
     private val vusRecents = HashSet<String>()      // toutes les apps vues pendant cette visite
     private var dernierReleve: Set<String> = emptySet()
 
-    // ESPION DES APPS RÉCENTES (expérience) : pendant qu'on est dans les apps récentes, on note
-    // les signaux que l'écran d'accueil envoie (type, texte, description), 40 au plus par visite.
-    // But : trouver un signal qui dit QUELLE carte vient d'être glissée vers le haut, et qui
-    // arrive même sans lire l'écran (pour la version Store). Par exemple une « annonce »
-    // (TYPE_ANNOUNCEMENT) du genre « Instagram fermée », faite pour les lecteurs d'écran.
-    private var espionLignes = 0
-    private fun espionRecents(event: AccessibilityEvent) {
-        val expediteur = event.packageName?.toString()
-        val annonce = event.eventType == AccessibilityEvent.TYPE_ANNOUNCEMENT
-        if (expediteur != ecranAccueil && !annonce) return
-        if (!dansRecents && !annonce) return
-        if (espionLignes >= 40) return
-        val textes = event.text.map { it.toString() } + listOfNotNull(event.contentDescription?.toString())
-        // les petits changements sans texte sont très nombreux : on ne garde que ceux qui disent quelque chose
-        if (textes.all { it.isBlank() } && event.eventType == AccessibilityEvent.TYPE_WINDOW_CONTENT_CHANGED) return
-        espionLignes++
-        noter("  [récentes] ${AccessibilityEvent.eventTypeToString(event.eventType)} " +
-            "${event.className?.toString()?.substringAfterLast('.') ?: "?"} « ${textes.joinToString(" / ")} »" +
-            (if (event.eventType == AccessibilityEvent.TYPE_WINDOW_CONTENT_CHANGED) " (changement ${event.contentChangeTypes})" else ""))
+    // LES ANNONCES DE FERMETURE. Quand on glisse une carte vers le haut dans les apps récentes,
+    // l'écran d'accueil Samsung « annonce » la fermeture pour les lecteurs d'écran :
+    // « application Instagram fermée », ou « Toutes les applications ont été fermées ».
+    // Une annonce arrive avec son texte, SANS avoir besoin de lire l'écran : ça marche donc aussi
+    // dans la version Store. On retire l'app de la liste des apps ouvertes : au prochain appui sur
+    // son icône, l'animation sera jouée. (Découvert le 09/11 grâce au journal.)
+    private fun annonce(event: AccessibilityEvent) {
+        if (event.packageName?.toString() != ecranAccueil) return
+        val texte = event.text.joinToString(" ") { it.toString() }.trim()
+        if (texte.isEmpty()) return
+        val bas = texte.lowercase()
+        // ce n'est pas une annonce de fermeture : on l'ignore
+        if (!bas.contains("ferm") && !bas.contains("closed") && !bas.contains("dismissed")) return
+        if (bas.contains("toutes les applications") || bas.startsWith("all apps") || bas.contains("all apps closed")) {
+            dejaOuvertes.clear()
+            noter("annonce « $texte » : toutes les apps sont fermées")
+            return
+        }
+        // On cherche le nom d'une app dans le texte, en mot entier (pour qu'une app nommée « X »
+        // ne soit pas trouvée dans « eXemple »), et le plus long qui va (« Google Photos » plutôt que « Google »).
+        val nom = noms.keys.filter { n ->
+            n.isNotBlank() && Regex("(^|\\W)" + Regex.escape(n) + "(\\W|$)", RegexOption.IGNORE_CASE).containsMatchIn(texte)
+        }.maxByOrNull { it.length }
+        val app = nom?.let { noms[it] }
+        if (app == null) {
+            noter("annonce « $texte » : app non reconnue")
+            return
+        }
+        dejaOuvertes.remove(app)
+        noter("annonce « $texte » : $app fermée")
     }
 
     private fun debutRecents() {
         if (dansRecents) return
         dansRecents = true
-        espionLignes = 0
         vusRecents.clear()
         dernierReleve = emptySet()
         minuteur.postDelayed(object : Runnable {
