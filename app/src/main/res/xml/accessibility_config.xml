@@ -10,7 +10,7 @@
        d'accueil, on lit l'identifiant de l'élément touché (ex. "com.spotify.music:id/lecture")
        pour savoir quelle app il va ouvrir. Le service ne lit rien d'autre, et jamais dans les apps. -->
 <accessibility-service xmlns:android="http://schemas.android.com/apk/res/android"
-    android:accessibilityEventTypes="typeWindowStateChanged|typeViewClicked|typeViewLongClicked|typeViewSelected|typeViewFocused|typeViewAccessibilityFocused|typeAnnouncement|typeWindowContentChanged|typeViewScrolled"
+    android:accessibilityEventTypes="typeWindowStateChanged|typeViewClicked|typeViewLongClicked|typeViewSelected|typeViewFocused|typeViewAccessibilityFocused|typeAnnouncement"
     android:accessibilityFeedbackType="feedbackGeneric"
     android:notificationTimeout="0"
     android:canRetrieveWindowContent="true"
