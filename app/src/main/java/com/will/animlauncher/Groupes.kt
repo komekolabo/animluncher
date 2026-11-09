@@ -100,16 +100,37 @@ object Groupes {
         }.toMap()
     }
 
-    // Les apps d'un groupe, sans celles que l'utilisateur a décochées.
-    fun apps(c: Context, id: String): List<String> {
-        val sans = retirees(c, id)
-        return (detecter(c)[id] ?: emptyList()).filter { it !in sans }
+    // TOUTES les apps d'un groupe : celles trouvées automatiquement + celles que l'utilisateur a ajoutées
+    // avec le « + » (seulement si elles sont encore installées), par ordre alphabétique.
+    fun tous(c: Context, id: String): List<String> {
+        val pm = c.packageManager
+        val ajout = ajoutees(c, id).filter { pm.getLaunchIntentForPackage(it) != null }
+        return ((detecter(c)[id] ?: emptyList()) + ajout).distinct()
+            .map { it to nomApp(c, it).lowercase() }.sortedBy { it.second }.map { it.first }
     }
 
-    // LE CARNET « groupes » : pour chaque groupe, les apps décochées.
+    // Les apps du dossier : toutes, sauf celles que l'utilisateur a décochées.
+    fun apps(c: Context, id: String): List<String> {
+        val sans = retirees(c, id)
+        return tous(c, id).filter { it !in sans }
+    }
+
+    // LE CARNET « groupes » : pour chaque groupe, les apps décochées (« sans_… ») et les apps
+    // ajoutées à la main (« avec_… »).
     private const val CARNET = "groupes"
     fun retirees(c: Context, id: String): Set<String> =
         c.getSharedPreferences(CARNET, Context.MODE_PRIVATE).getStringSet("sans_$id", emptySet()) ?: emptySet()
+
+    fun ajoutees(c: Context, id: String): Set<String> =
+        c.getSharedPreferences(CARNET, Context.MODE_PRIVATE).getStringSet("avec_$id", emptySet()) ?: emptySet()
+
+    // Ajoute une app au groupe (le « + » du dossier) : elle y entre, cochée.
+    fun ajouter(c: Context, id: String, pkg: String) {
+        val carnet = c.getSharedPreferences(CARNET, Context.MODE_PRIVATE)
+        val avec = HashSet(ajoutees(c, id)).apply { add(pkg) }
+        val sans = HashSet(retirees(c, id)).apply { remove(pkg) }
+        carnet.edit().putStringSet("avec_$id", avec).putStringSet("sans_$id", sans).apply()
+    }
 
     fun definir(c: Context, id: String, pkg: String, dedans: Boolean) {
         val carnet = c.getSharedPreferences(CARNET, Context.MODE_PRIVATE)

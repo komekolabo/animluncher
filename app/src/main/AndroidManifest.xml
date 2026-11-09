@@ -61,6 +61,11 @@
             android:noHistory="true"
             android:taskAffinity=""
             android:theme="@style/Theme.Dossier" />
+        <!-- La liste pour ajouter une app à un dossier (le « + »). -->
+        <activity
+            android:name=".ChoixAppActivity"
+            android:exported="false"
+            android:windowSoftInputMode="adjustResize" />
 
         <!-- Le guide plein écran pour débloquer l'accessibilité grisée (apps installées hors Play Store). -->
         <activity

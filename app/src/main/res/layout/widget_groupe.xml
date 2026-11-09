@@ -1,7 +1,8 @@
 <?xml version="1.0" encoding="utf-8"?>
 <!-- LE WIDGET « DOSSIER ANIMÉ » (09/11, voir WidgetGroupe.kt). Trois couches empilées (FrameLayout) :
-       1) le galet de verre sombre (le même que le widget « une app ») ;
-       2) l'étoile qui tourne et respire (une ProgressBar joue etoile_ia_anime.xml en boucle) ;
+       1) le galet de verre brun chaud (widget_galet_chaud.xml) ;
+       2) la « mini-vidéo » de 12 s en boucle : l'étoile, les points qui tournent, les tuiles…
+          (une ProgressBar joue etoile_ia_anime.xml en boucle) ;
        3) la bande de lumière qui traverse le verre toutes les 6 s.
      Puis le nom du groupe dessous (« AI », « Games »…). Un appui ouvre le dossier (DossierActivity). -->
 <LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
@@ -19,7 +20,7 @@
             android:layout_width="match_parent"
             android:layout_height="match_parent"
             android:scaleType="fitXY"
-            android:src="@drawable/widget_galet" />
+            android:src="@drawable/widget_galet_chaud" />
 
         <ProgressBar
             style="@android:style/Widget.ProgressBar"

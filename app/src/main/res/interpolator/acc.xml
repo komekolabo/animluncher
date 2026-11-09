@@ -1,0 +1,3 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Raccourci pour les animations du widget dossier : démarre doucement puis accélère. -->
+<accelerateInterpolator xmlns:android="http://schemas.android.com/apk/res/android" />

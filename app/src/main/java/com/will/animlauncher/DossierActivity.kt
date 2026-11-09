@@ -6,6 +6,7 @@ import android.content.Intent
 import android.graphics.Bitmap
 import android.graphics.Canvas
 import android.graphics.Color
+import android.graphics.DashPathEffect
 import android.graphics.LinearGradient
 import android.graphics.Paint
 import android.graphics.Path
@@ -28,12 +29,17 @@ import kotlin.math.min
 import kotlin.math.sin
 
 // LE DOSSIER ANIMÉ (09/11) : l'écran qui s'ouvre quand on touche un widget « dossier » (WidgetGroupe).
-// C'est un écran TRANSPARENT posé sur l'accueil : on voit l'accueil derrière, qui s'assombrit.
-// L'animation, validée par Will sur l'aperçu : l'étoile du widget s'envole au centre en faisant un
-// tour, le dossier s'ouvre, l'étoile se pose à côté du titre, et 4 traînées de poussière partent vers
-// les places des apps, qui apparaissent l'une après l'autre en flottant doucement.
+// C'est un écran TRANSPARENT posé sur l'accueil : on voit l'accueil derrière.
+// L'animation (version 2, validée par Will sur l'aperçu, en palette chaude) :
+//  - deux bandes sombres arrivent du haut et du bas du téléphone et se rejoignent au milieu ;
+//  - l'étoile du widget s'envole au centre en faisant un tour, le dossier s'ouvre, l'étoile se pose
+//    à côté du titre ;
+//  - des traînées de poussière partent vers la place de chaque app, qui ÉCLOT d'un point (effet ressort,
+//    petite rotation qui se remet droite, onde fine autour), puis son nom glisse en place ;
+//  - en dernier, la case « + » (Add) pour ajouter une app au groupe (ChoixAppActivity).
 // On touche une app -> son animation d'ouverture habituelle se joue et l'app s'ouvre.
-// On touche à côté (ou le bouton retour) -> le dossier se referme et l'étoile retourne dans le widget.
+// On touche à côté (ou le bouton retour) -> le dossier se referme (les bandes repartent) et l'étoile
+// retourne dans le widget.
 class DossierActivity : Activity() {
 
     private var vue: DossierVue? = null
@@ -49,7 +55,7 @@ class DossierActivity : Activity() {
         window.decorView.systemUiVisibility = View.SYSTEM_UI_FLAG_LAYOUT_STABLE or
             View.SYSTEM_UI_FLAG_LAYOUT_FULLSCREEN or View.SYSTEM_UI_FLAG_LAYOUT_HIDE_NAVIGATION
         // sourceBounds = la place du widget sur l'écran (donnée par l'écran d'accueil) : l'étoile part de là.
-        val v = DossierVue(this, nom, apps, intent.sourceBounds, { ouvrir(it) }, { fermer() })
+        val v = DossierVue(this, nom, apps, intent.sourceBounds, { ouvrir(it) }, { ajouter(groupe) }, { fermer() })
         vue = v
         setContentView(v)
     }
@@ -62,6 +68,13 @@ class DossierActivity : Activity() {
             it.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
             try { startActivity(it) } catch (_: Exception) {}
         }
+        fermer()
+    }
+
+    // On a touché le « + » : la liste des apps s'ouvre ; le dossier se rouvrira avec l'app choisie.
+    private fun ajouter(groupe: String) {
+        if (fini) return
+        startActivity(Intent(this, ChoixAppActivity::class.java).putExtra("groupe", groupe).putExtra("depuisDossier", true))
         fermer()
     }
 
@@ -94,6 +107,7 @@ class DossierVue(
     private val apps: List<String>,
     private val depart: Rect?,
     private val surApp: (String) -> Unit,
+    private val surAjout: () -> Unit,
     private val surFin: () -> Unit
 ) : View(c) {
 
@@ -130,17 +144,21 @@ class DossierVue(
         quadTo(-0.085f, -0.085f, 0f, -1f)
         close()
     }
+    // la palette CHAUDE validée par Will : orange -> rose -> vert-jaune
     private val degradeEtoile = LinearGradient(-1f, -1f, 1f, 1f,
-        intArrayOf(Color.rgb(91, 140, 255), Color.rgb(155, 107, 255), Color.rgb(63, 209, 196)),
+        intArrayOf(Color.rgb(255, 140, 91), Color.rgb(255, 107, 155), Color.rgb(196, 209, 63)),
         floatArrayOf(0f, 0.5f, 1f), Shader.TileMode.CLAMP)
 
     private fun lisse(x: Float) = x * x * (3 - 2 * x)               // départ et arrêt en douceur
     private fun seg(t: Float, a: Float, b: Float) = lisse(((t - a) / (b - a)).coerceIn(0f, 1f))
     private fun mix(a: Float, b: Float, u: Float) = a + (b - a) * u
+    private fun freine(x: Float) = 1 - (1 - x) * (1 - x) * (1 - x)     // arrive vite, puis ralentit
+    // l'effet RESSORT : dépasse un peu le but, puis revient
+    private fun ressort(x: Float, tension: Float = 2.6f): Float { val y = x - 1; return y * y * ((tension + 1) * y + tension) + 1 }
 
     override fun onSizeChanged(w: Int, h: Int, ow: Int, oh: Int) {
         k = w / 540f
-        val n = apps.size
+        val n = apps.size + 1          // les apps, plus la case « + »
         colonnes = when { n <= 4 -> 2; n <= 9 -> 3; else -> 4 }
         icone = when (colonnes) { 2 -> 96f; 3 -> 84f; else -> 70f } * k
         val largeur = min(440f * k, w - 40f * k)
@@ -189,12 +207,11 @@ class DossierVue(
         val fer = if (fermeA < 0) 0f else seg(tf, 0f, 0.55f)
         val n = apps.size
 
-        // 1) LE VOILE SOMBRE sur l'accueil
-        val sombre = seg(t, 0f, 0.95f) * (1 - fer)
-        c.drawColor(Color.argb((215 * sombre).toInt(), 5, 6, 12))
+        // 1) LES BANDES SOMBRES, qui arrivent du haut et du bas (et repartent à la fermeture)
+        bandes(c, seg(t, 0f, 0.8f) * (1 - fer))
 
         // 2) LE PANNEAU du dossier, qui grandit un peu en apparaissant
-        val p = seg(t, 1.0f, 1.65f) * (1 - fer)
+        val p = seg(t, 0.85f, 1.45f) * (1 - fer)
         val tw = texte.apply { textSize = 28f * k }.measureText(nom)
         val etoileX = panneau.centerX() - (41f * k + tw) / 2 + 19f * k
         val etoileY = panneau.top + 47f * k
@@ -203,7 +220,7 @@ class DossierVue(
             c.save()
             c.scale(e, e, panneau.centerX(), panneau.centerY())
             pinceau.shader = LinearGradient(0f, panneau.top, 0f, panneau.bottom,
-                Color.argb((235 * p).toInt(), 35, 42, 69), Color.argb((235 * p).toInt(), 20, 24, 41), Shader.TileMode.CLAMP)
+                Color.argb((235 * p).toInt(), 69, 42, 35), Color.argb((235 * p).toInt(), 41, 24, 20), Shader.TileMode.CLAMP)
             pinceau.style = Paint.Style.FILL
             c.drawRoundRect(panneau, 46f * k, 46f * k, pinceau)
             pinceau.shader = null
@@ -212,58 +229,72 @@ class DossierVue(
             pinceau.color = Color.argb((22 * p).toInt(), 255, 255, 255)
             c.drawRoundRect(panneau, 46f * k, 46f * k, pinceau)
             pinceau.style = Paint.Style.FILL
-            texte.color = Color.argb((235 * p).toInt(), 236, 239, 247)
+            texte.color = Color.argb((235 * p).toInt(), 247, 239, 236)
             c.drawText(nom, etoileX + 22f * k, panneau.top + 56f * k, texte)
             c.restore()
-            if (n == 0) {
-                texte.textSize = 19f * k
-                texte.color = Color.argb((180 * p).toInt(), 255, 255, 255)
-                val m = "No apps in this group"
-                c.drawText(m, panneau.centerX() - texte.measureText(m) / 2, haut + 40f * k, texte)
-            }
         }
 
-        // 3) LES TRAÎNÉES DE POUSSIÈRE puis LES APPS (découpées à la zone de la grille, qui peut défiler)
+        // 3) LES TRAÎNÉES DE POUSSIÈRE puis LES APPS QUI ÉCLOSENT (découpées à la zone de la grille, qui peut défiler)
         c.save()
         c.clipRect(panneau.left, haut - 12f * k, panneau.right, haut + hauteurGrille + 6f * k)
-        val pas = min(0.15f, 0.9f / max(1, n))
-        for (i in 0 until n) {
+        val cases = n + 1                     // les apps, puis la case « + »
+        val pas = min(0.15f, 0.9f / cases)
+        for (i in 0 until cases) {
+            val plus = i == n
             val ax = placeX(i); val ay = placeY(i)
-            val d = 1.2f + pas * i
-            val tr = seg(t, d, d + 0.45f)
-            if (tr > 0 && tr < 1 && fer == 0f) {
+            val d = 1.05f + pas * i
+            // la traînée (pas pour la case « + »)
+            val tr = ((t - d) / 0.45f).coerceIn(0f, 1f)
+            if (!plus && tr > 0 && tr < 1 && fer == 0f) {
                 for (q in 0 until 10) {
-                    val u = (tr - q * 0.04f).coerceIn(0f, 1f)
+                    val u = lisse((tr - q * 0.04f).coerceIn(0f, 1f))
                     val x = mix(panneau.centerX(), ax, u)
                     val y = mix(panneau.centerY() - 40f * k, ay, u) - 30f * k * sin(PI.toFloat() * u)
-                    pinceau.color = Color.argb(((200 - 18 * q) * (1 - tr * 0.5f)).toInt(), 185, 196, 255)
+                    pinceau.color = Color.argb(((200 - 18 * q) * (1 - tr * 0.5f)).toInt(), 255, 196, 185)
                     c.drawCircle(x, y, (3.2f - q * 0.25f) * k, pinceau)
                 }
             }
-            val ap = seg(t, d + 0.3f, d + 0.75f) * (1 - fer)
-            if (ap <= 0) continue
+            // l'éclosion : un point qui devient l'icône (ressort), avec une petite rotation qui se remet droite
+            val v = ((t - (d + 0.38f)) / 0.55f).coerceIn(0f, 1f)
+            if (v <= 0) continue
+            val alpha = (v / 0.25f).coerceIn(0f, 1f) * (1 - fer)
             val flot = 4f * k * sin(t * 2f + i * 1.6f)
             val appui = if (i == presse) 1 - 0.08f * sin(PI.toFloat() * ((t - presseA) / 0.25f).coerceIn(0f, 1f)) else 1f
-            val e = (0.6f + 0.4f * ap) * appui
-            images.getOrNull(i)?.let { b ->
-                c.save()
-                c.scale(e, e, ax, ay + flot)
-                pinceau.alpha = (255 * ap).toInt()
+            val e = (0.2f + 0.8f * ressort(v)) * appui
+            val penche = -14f * (1 - freine(v))
+            // l'onde fine qui s'écarte autour de l'app au moment où elle éclot (très discrète)
+            if (!plus && v < 1) {
+                pinceau.style = Paint.Style.STROKE
+                pinceau.strokeWidth = 1.6f * k
+                pinceau.color = Color.argb((70 * (1 - v) * alpha).toInt(), 255, 192, 175)
+                c.drawCircle(ax, ay + flot, icone * (0.45f + 0.5f * freine(v)), pinceau)
+                pinceau.style = Paint.Style.FILL
+            }
+            c.save()
+            c.rotate(penche, ax, ay + flot)
+            c.scale(e, e, ax, ay + flot)
+            if (plus) casePlus(c, ax, ay + flot, icone * 0.86f, alpha)
+            else images.getOrNull(i)?.let { b ->
+                pinceau.alpha = (255 * alpha).toInt()
                 c.drawBitmap(b, ax - b.width / 2f, ay + flot - b.height / 2f, pinceau)
                 pinceau.alpha = 255
-                c.restore()
             }
-            texte.textSize = 19f * k
-            texte.color = Color.argb((200 * ap).toInt(), 255, 255, 255)
-            val etiquette = TextUtils.ellipsize(noms[i], texte, celluleL - 8f * k, TextUtils.TruncateAt.END).toString()
-            c.drawText(etiquette, ax - texte.measureText(etiquette) / 2, ay + icone / 2 + 30f * k, texte)
+            c.restore()
+            // le nom glisse doucement en place, un peu après
+            val nv = ((t - (d + 0.6f)) / 0.4f).coerceIn(0f, 1f) * (1 - fer)
+            if (nv > 0) {
+                texte.textSize = 19f * k
+                texte.color = Color.argb((200 * nv).toInt(), 255, 255, 255)
+                val etiquette = if (plus) "Add" else TextUtils.ellipsize(noms[i], texte, celluleL - 8f * k, TextUtils.TruncateAt.END).toString()
+                c.drawText(etiquette, ax - texte.measureText(etiquette) / 2, ay + icone / 2 + 30f * k + 8f * k * (1 - freine(nv)), texte)
+            }
         }
         c.restore()
 
         // 4) L'ÉTOILE : elle monte au centre en faisant un tour, puis se pose en petit à côté du titre ;
         //    à la fermeture, elle retourne dans le widget.
-        val u = seg(t, 0f, 1.05f)
-        val v = seg(t, 1.05f, 1.75f)
+        val u = seg(t, 0f, 1.0f)
+        val v = seg(t, 1.0f, 1.6f)
         var x = mix(mix(sx, panneau.centerX(), u), etoileX, v)
         var y = mix(mix(sy, panneau.centerY() - 40f * k, u), etoileY, v)
         var r = mix(mix(r0, 92f * k, u), 19f * k, v)
@@ -271,7 +302,7 @@ class DossierVue(
         val lueur = 60f * (1 - v * 0.4f) * (1 - fer)
         if (lueur > 1) {
             pinceau.shader = RadialGradient(x, y, r * 2.6f,
-                intArrayOf(Color.argb(lueur.toInt(), 122, 107, 255), Color.argb((lueur * 0.4f).toInt(), 58, 75, 255), Color.TRANSPARENT),
+                intArrayOf(Color.argb(lueur.toInt(), 255, 107, 122), Color.argb((lueur * 0.4f).toInt(), 255, 75, 58), Color.TRANSPARENT),
                 floatArrayOf(0f, 0.45f, 1f), Shader.TileMode.CLAMP)
             c.drawCircle(x, y, r * 2.6f, pinceau)
             pinceau.shader = null
@@ -293,6 +324,48 @@ class DossierVue(
         postInvalidateOnAnimation()
     }
 
+    // LES BANDES SOMBRES : celle du haut descend depuis le haut de l'écran, celle du bas monte depuis le bas.
+    // Leur bord est doux pendant le trajet, et devient net quand elles se rejoignent au milieu.
+    private fun bandes(c: Canvas, ouv: Float) {
+        if (ouv <= 0) return
+        val w = width.toFloat(); val h = height.toFloat()
+        val flou = 110f * k * (1 - ouv)
+        val bordHaut = h / 2 * freine(ouv)
+        val bordBas = h - h / 2 * freine(ouv)
+        val plein = Color.argb(215, 12, 6, 5)
+        val vide = Color.argb(0, 12, 6, 5)
+        pinceau.color = plein
+        c.drawRect(0f, 0f, w, max(0f, bordHaut - flou), pinceau)
+        c.drawRect(0f, min(h, bordBas + flou), w, h, pinceau)
+        if (flou > 0.5f) {
+            pinceau.shader = LinearGradient(0f, bordHaut - flou, 0f, bordHaut, plein, vide, Shader.TileMode.CLAMP)
+            c.drawRect(0f, bordHaut - flou, w, bordHaut, pinceau)
+            pinceau.shader = LinearGradient(0f, bordBas, 0f, bordBas + flou, vide, plein, Shader.TileMode.CLAMP)
+            c.drawRect(0f, bordBas, w, bordBas + flou, pinceau)
+            pinceau.shader = null
+        }
+    }
+
+    // LA CASE « + » : un carré arrondi en pointillés, avec un « + » au milieu.
+    private fun casePlus(c: Canvas, x: Float, y: Float, s: Float, a: Float) {
+        val r = RectF(x - s / 2, y - s / 2, x + s / 2, y + s / 2)
+        pinceau.style = Paint.Style.FILL
+        pinceau.color = Color.argb((14 * a).toInt(), 255, 255, 255)
+        c.drawRoundRect(r, s * 0.26f, s * 0.26f, pinceau)
+        pinceau.style = Paint.Style.STROKE
+        pinceau.strokeWidth = 2f * k
+        pinceau.color = Color.argb((150 * a).toInt(), 232, 184, 174)
+        pinceau.pathEffect = DashPathEffect(floatArrayOf(9f * k, 7f * k), 0f)
+        c.drawRoundRect(r, s * 0.26f, s * 0.26f, pinceau)
+        pinceau.pathEffect = null
+        pinceau.strokeWidth = 4f * k
+        pinceau.strokeCap = Paint.Cap.ROUND
+        pinceau.color = Color.argb((220 * a).toInt(), 255, 226, 220)
+        c.drawLine(x - s * 0.17f, y, x + s * 0.17f, y, pinceau)
+        c.drawLine(x, y - s * 0.17f, x, y + s * 0.17f, pinceau)
+        pinceau.style = Paint.Style.FILL
+    }
+
     // LES APPUIS : toucher une app l'ouvre ; toucher à côté du dossier le referme ;
     // glisser le doigt fait défiler les apps (s'il y en a trop pour la hauteur du dossier).
     private var basX = 0f; private var basY = 0f; private var basDefilement = 0f; private var glisse = false
@@ -309,14 +382,15 @@ class DossierVue(
             MotionEvent.ACTION_UP -> {
                 if (glisse) return true
                 if (!panneau.contains(e.x, e.y)) { refermer(); return true }
-                if (t < 1.3f) return true          // le dossier n'est pas encore ouvert
-                for (i in apps.indices) {
+                if (t < 1.2f) return true          // le dossier n'est pas encore ouvert
+                for (i in 0..apps.size) {          // les apps, puis la case « + » (numéro apps.size)
                     val ay = placeY(i)
-                    if (ay < haut - 8f * k || ay > haut + hauteurGrille) continue     // app cachée par le défilement
+                    if (ay < haut - 8f * k || ay > haut + hauteurGrille) continue     // case cachée par le défilement
                     if (abs(e.x - placeX(i)) < celluleL / 2 && abs(e.y - ay - 14f * k) < celluleH / 2) {
                         presse = i
                         presseA = t
-                        postDelayed({ surApp(apps[i]) }, 160)
+                        if (i == apps.size) postDelayed({ surAjout() }, 160)
+                        else postDelayed({ surApp(apps[i]) }, 160)
                         return true
                     }
                 }

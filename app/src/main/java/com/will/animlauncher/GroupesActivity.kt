@@ -25,7 +25,11 @@ class GroupesActivity : Activity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         dp = resources.displayMetrics.density
+    }
 
+    // L'écran est (re)construit à chaque retour ici : on voit tout de suite l'app qu'on vient d'ajouter.
+    override fun onResume() {
+        super.onResume()
         val colonne = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
             setPadding((22 * dp).toInt(), (40 * dp).toInt(), (22 * dp).toInt(), (40 * dp).toInt())
@@ -38,16 +42,16 @@ class GroupesActivity : Activity() {
         })
         colonne.addView(TextView(this).apply {
             text = "AnimLauncher a rangé tes apps par catégorie. Pose un dossier sur l'accueil : " +
-                "une étoile animée qui s'ouvre sur les apps du groupe. Décoche une app pour la retirer du dossier."
+                "une étoile animée qui s'ouvre sur les apps du groupe. Décoche une app pour la retirer du dossier, " +
+                "ou ajoute-en une avec « ＋ »."
             textSize = 14f
             setTextColor(Color.parseColor("#94A0C4"))
             setPadding(0, 0, 0, (18 * dp).toInt())
         })
 
-        val detectees = Groupes.detecter(this)
         var aucun = true
         for (cat in Groupes.CATEGORIES) {
-            val liste = detectees[cat.id] ?: continue
+            val liste = Groupes.tous(this, cat.id)
             if (liste.size < 2) continue          // un dossier d'une seule app n'a pas d'intérêt
             aucun = false
             colonne.addView(carteGroupe(cat, liste))
@@ -106,6 +110,14 @@ class GroupesActivity : Activity() {
             })
             carte.addView(ligne)
         }
+
+        // Ajouter une app à ce groupe (la liste de toutes les apps s'ouvre)
+        carte.addView(Button(this).apply {
+            text = "＋  Ajouter une app"
+            setOnClickListener {
+                startActivity(Intent(this@GroupesActivity, ChoixAppActivity::class.java).putExtra("groupe", cat.id))
+            }
+        })
 
         val boutons = LinearLayout(this).apply {
             orientation = LinearLayout.HORIZONTAL

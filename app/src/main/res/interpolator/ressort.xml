@@ -1,0 +1,3 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Raccourci pour les animations du widget dossier : dépasse un peu le but puis revient (effet ressort). -->
+<overshootInterpolator xmlns:android="http://schemas.android.com/apk/res/android" />
