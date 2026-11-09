@@ -36,6 +36,9 @@ import kotlin.math.floor
 //  └──────────────────────────────┘
 //
 // Tout ce qu'il y avait sur l'ancien écran principal est maintenant dans ReglagesActivity (la roue).
+//
+// LES TEXTES ne sont plus écrits ici : « getString(R.string.xxx) » va chercher le texte « xxx »
+// dans la langue du téléphone (fichiers res/values*/strings.xml : un dossier par langue).
 class MainActivity : Activity() {
 
     private var dp = 1f
@@ -51,6 +54,7 @@ class MainActivity : Activity() {
     // ce qui change quand on revient sur l'écran
     private lateinit var demo: DemoAnimations      // la démo en boucle de la carte 1 (voir DemoAccueil.kt)
     private lateinit var chiffreApps: TextView
+    private lateinit var phraseApps: TextView      // le petit message « N apps compatibles trouvées… »
     private lateinit var etat: TextView
     private lateinit var interrupteur: Switch
     private lateinit var interrupteurMenu: Switch
@@ -80,14 +84,14 @@ class MainActivity : Activity() {
             setPadding(px(4f), 0, px(4f), 0)
         }
         entete.addView(Icone(this, Icone.MENU).apply {
-            contentDescription = "Ouvrir le menu"
+            contentDescription = getString(R.string.menu_ouvrir)
             setOnClickListener { ouvrirMenu() }
         }, LinearLayout.LayoutParams(px(48f), px(48f)))
         entete.addView(Style.texte(this, "AnimLauncher", 18f, Style.TEXTE, gras = true).apply {
             gravity = Gravity.CENTER
         }, LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f))
         entete.addView(Icone(this, Icone.ROUE).apply {
-            contentDescription = "Réglages"
+            contentDescription = getString(R.string.reglages)
             setOnClickListener { ouvrir(ReglagesActivity::class.java) }
         }, LinearLayout.LayoutParams(px(48f), px(48f)))
 
@@ -127,13 +131,13 @@ class MainActivity : Activity() {
         }
 
         // ---------- 3. le bas : avertissement, points, interrupteur général ----------
-        alerte = Style.texte(this, "Détection désactivée : touche ici pour l'activer", 13f, Style.AMBRE).apply {
+        alerte = Style.texte(this, getString(R.string.detection_coupee), 13f, Style.AMBRE).apply {
             gravity = Gravity.CENTER
             setPadding(px(16f), px(10f), px(16f), px(4f))
             setOnClickListener { ouvrir(ReglagesActivity::class.java) }
         }
         val rangeePoints = LinearLayout(this).apply { orientation = LinearLayout.HORIZONTAL; gravity = Gravity.CENTER }
-        val noms = listOf("Animations d'apps", "Logos animés", "Fonds d'écran")
+        val noms = listOf(getString(R.string.carte_apps), getString(R.string.carte_logos), getString(R.string.carte_fonds))
         for (i in 0..2) {
             val point = View(this)
             points.add(point)
@@ -147,7 +151,7 @@ class MainActivity : Activity() {
         }
         etat = Style.texte(this, "", 14f, Style.TEXTE, gras = true)
         interrupteur = Style.interrupteur(this).apply {
-            contentDescription = "Toutes les animations"
+            contentDescription = getString(R.string.toutes_animations)
             setOnCheckedChangeListener { _, coche -> if (!majAuto) changerActif(coche) }
         }
         val pastille = LinearLayout(this).apply {
@@ -202,10 +206,16 @@ class MainActivity : Activity() {
         majAuto = false
         majEtat()
         alerte.visibility = if (serviceActif()) View.GONE else View.VISIBLE
-        // les chiffres de la carte 1
-        val jouables = appsJouables()
-        val avecAnimation = appsAvecAnimation()
-        chiffreApps.text = "${jouables.size} actives · ${avecAnimation.size - jouables.size} coupées"
+        // La carte 1 : on regarde quelles apps du téléphone ont une animation (les « compatibles »).
+        val jouables = appsJouables()               // celles dont l'animation est allumée
+        val avecAnimation = appsAvecAnimation()     // toutes celles qui ont une animation
+        chiffreApps.text = getString(R.string.compte_actives, jouables.size, avecAnimation.size - jouables.size)
+        // le petit message : « 12 apps compatibles trouvées sur ton téléphone. Voici ce que ça donne. »
+        // (« getQuantityString » choisit tout seul le singulier ou le pluriel selon le nombre)
+        phraseApps.text = if (avecAnimation.isEmpty()) getString(R.string.phrase_apps_aucune)
+            else resources.getQuantityString(R.plurals.apps_trouvees, avecAnimation.size, avecAnimation.size)
+        // la démo joue les animations de 5 de CES apps-là (voir DemoAccueil.kt)
+        demo.choisir(if (jouables.isNotEmpty()) jouables else avecAnimation)
     }
 
     // ================= LES CARTES =================
@@ -239,14 +249,12 @@ class MainActivity : Activity() {
 
     // Le bas d'une carte : titre (sur 2 lignes), phrase, puis une ligne avec le chiffre à gauche
     // et une petite flèche ronde à droite (elle rappelle que la carte s'ouvre d'un appui).
-    private fun texteBas(titre: String, phrase: String, chiffre: TextView): LinearLayout =
+    private fun texteBas(titre: String, phrase: TextView, chiffre: TextView): LinearLayout =
         LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
             setPadding(px(24f), 0, px(24f), px(22f))
             addView(Style.texte(this@MainActivity, titre, 32f, Style.TEXTE, gras = true).apply { setLineSpacing(0f, 0.95f) })
-            addView(Style.texte(this@MainActivity, phrase, 13.5f, Style.MUET).apply {
-                setLineSpacing(0f, 1.15f); setPadding(0, px(8f), 0, px(10f))
-            })
+            addView(phrase)
             addView(LinearLayout(this@MainActivity).apply {
                 orientation = LinearLayout.HORIZONTAL
                 gravity = Gravity.CENTER_VERTICAL
@@ -257,6 +265,11 @@ class MainActivity : Activity() {
                 }, LinearLayout.LayoutParams(px(40f), px(40f)).apply { leftMargin = px(10f) })
             })
         }
+
+    // La phrase grise sous le titre d'une carte.
+    private fun phrase(t: String): TextView = Style.texte(this, t, 13.5f, Style.MUET).apply {
+        setLineSpacing(0f, 1.15f); setPadding(0, px(8f), 0, px(10f))
+    }
 
     // Une carte « classique » : numéro en haut, animation au milieu (elle prend la place libre), texte en bas.
     private fun carteEmpilee(lueur: Int, num: String, nom: String, animation: View, bas: View, action: () -> Unit): FrameLayout {
@@ -279,8 +292,9 @@ class MainActivity : Activity() {
     private fun carteApps(): FrameLayout {
         demo = DemoAnimations(this)
         chiffreApps = Style.texte(this, "", 12.5f, Style.DOUX)
-        return carteEmpilee(Color.rgb(23, 16, 13), "01", "Animations d'apps", demo,
-            texteBas("Animations\nd'apps", "Une animation plein écran à chaque app que tu ouvres.", chiffreApps)
+        phraseApps = phrase(getString(R.string.phrase_apps_aucune))      // le vrai message arrive dans onResume
+        return carteEmpilee(Color.rgb(23, 16, 13), "01", getString(R.string.carte_apps), demo,
+            texteBas(getString(R.string.titre2_apps), phraseApps, chiffreApps)
         ) { ouvrir(AppsActivity::class.java) }
     }
 
@@ -292,30 +306,29 @@ class MainActivity : Activity() {
             addView(LogoAnime(this@MainActivity), FrameLayout.LayoutParams(taille, taille, Gravity.CENTER))
         }
         // (ce petit lien a sa propre action : un appui dessus n'ouvre pas la carte)
-        val lien = Style.texte(this, "Poser le logo sur l'accueil ›", 12.5f, Style.DOUX).apply {
+        val lien = Style.texte(this, getString(R.string.lien_poser_logo), 12.5f, Style.DOUX).apply {
             setPadding(0, px(10f), 0, px(10f))
             setOnClickListener {
                 if (!LogoWidget.proposer(this@MainActivity)) {
-                    Toast.makeText(this@MainActivity, "Appuie longuement sur un endroit vide de l'accueil, " +
-                        "puis « Widgets », et cherche « ${getString(R.string.app_name)} ».", Toast.LENGTH_LONG).show()
+                    Toast.makeText(this@MainActivity, getString(R.string.aide_widget, getString(R.string.app_name)), Toast.LENGTH_LONG).show()
                 }
             }
         }
-        return carteEmpilee(Color.rgb(18, 20, 26), "02", "Logos animés", scene,
-            texteBas("Logos\nanimés", "Des icônes vivantes sur ton écran d'accueil : logo, galets d'apps et dossiers.", lien)
+        return carteEmpilee(Color.rgb(18, 20, 26), "02", getString(R.string.carte_logos), scene,
+            texteBas(getString(R.string.titre2_logos), phrase(getString(R.string.phrase_logos)), lien)
         ) { ouvrir(GroupesActivity::class.java) }
     }
 
     // CARTE 3 : fonds d'écran. Ici, la carte ENTIÈRE est un fond animé ; le texte est posé
     // par-dessus, sur un dégradé noir pour rester lisible.
     private fun carteFonds(): FrameLayout {
-        val chiffre = Style.texte(this, "Bientôt dans l'app, puis la communauté", 12.5f, Style.DOUX)
-        val bas = texteBas("Fonds\nd'écran", "Animés, sombres et légers pour la batterie. Celui-ci en est un.", chiffre).apply {
+        val chiffre = Style.texte(this, getString(R.string.chiffre_fonds), 12.5f, Style.DOUX)
+        val bas = texteBas(getString(R.string.titre2_fonds), phrase(getString(R.string.phrase_fonds)), chiffre).apply {
             setPadding(px(24f), px(60f), px(24f), px(22f))
             background = GradientDrawable(GradientDrawable.Orientation.TOP_BOTTOM,
                 intArrayOf(Color.TRANSPARENT, Color.argb(230, 0, 0, 0), Color.argb(230, 0, 0, 0)))
         }
-        return cadre(Color.rgb(3, 3, 4), "Fonds d'écran") { ouvrir(FondsActivity::class.java) }.apply {
+        return cadre(Color.rgb(3, 3, 4), getString(R.string.carte_fonds)) { ouvrir(FondsActivity::class.java) }.apply {
             addView(DessinFonds(this@MainActivity))
             addView(numero("03"), FrameLayout.LayoutParams(ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT).apply {
                 leftMargin = px(24f); topMargin = px(22f)
@@ -354,7 +367,7 @@ class MainActivity : Activity() {
 
     private fun majEtat() {
         val actif = Reglages.actif(this)
-        etat.text = if (actif) "Animations ON" else "En pause"
+        etat.text = getString(if (actif) R.string.etat_on else R.string.etat_pause)
         etat.setTextColor(if (actif) Style.TEXTE else Style.AMBRE)
     }
 
@@ -380,7 +393,7 @@ class MainActivity : Activity() {
         })
         // l'interrupteur général, aussi ici
         interrupteurMenu = Style.interrupteur(this).apply {
-            text = "Toutes les animations"
+            text = getString(R.string.toutes_animations)
             textSize = 14.5f
             setTextColor(Style.TEXTE)
             setOnCheckedChangeListener { _, coche -> if (!majAuto) changerActif(coche) }
@@ -405,12 +418,12 @@ class MainActivity : Activity() {
                 setOnClickListener { fermerMenu(); action() }
             })
         }
-        entree("Accueil") { }
-        entree("Animations d'apps") { ouvrir(AppsActivity::class.java) }
-        entree("Logos & dossiers animés") { ouvrir(GroupesActivity::class.java) }
-        entree("Fonds d'écran") { ouvrir(FondsActivity::class.java) }
-        entree("Réglages") { ouvrir(ReglagesActivity::class.java) }
-        entree("Journal (diagnostic)") { ouvrir(JournalActivity::class.java) }
+        entree(getString(R.string.menu_accueil)) { }
+        entree(getString(R.string.carte_apps)) { ouvrir(AppsActivity::class.java) }
+        entree(getString(R.string.menu_logos)) { ouvrir(GroupesActivity::class.java) }
+        entree(getString(R.string.carte_fonds)) { ouvrir(FondsActivity::class.java) }
+        entree(getString(R.string.reglages)) { ouvrir(ReglagesActivity::class.java) }
+        entree(getString(R.string.menu_journal)) { ouvrir(JournalActivity::class.java) }
         return menu
     }
 

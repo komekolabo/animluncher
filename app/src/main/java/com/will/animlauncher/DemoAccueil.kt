@@ -19,9 +19,10 @@ import kotlin.math.min
 // On ne voit qu'UNE SEULE app à la fois (une grande icône au milieu de l'écran) :
 //   l'icône de l'app → un doigt la touche → son animation se joue → elle s'efface en fondu
 //   transparent, et dessous c'est déjà l'icône de l'app SUIVANTE qui arrive → le doigt la touche…
-// Les 5 apps, dans l'ordre : Maps (Paris), Claude (la tour de Babel, monde « Bibliothèque »),
-// les échecs (Anderssen – Dufresne), Duolingo « Bulles » (des « Bonjour » dans toutes les langues)
-// et ChatGPT (la collision de galaxies). Puis ça recommence.
+// QUELLES APPS ? Celles du TÉLÉPHONE : l'accueil nous donne la liste des apps installées qui ont
+// une animation (voir « choisir »), et on en prend 5, les plus connues d'abord. Chacun voit donc
+// SES apps. Si aucune app compatible n'est installée, on montre un exemple avec 5 apps par défaut
+// (Maps, Claude, les échecs, Duolingo, ChatGPT), dessinées comme des carrés de couleur.
 //
 // Ce ne sont PAS des vidéos : ce sont les VRAIES scènes de l'app (celles du catalogue), dessinées
 // en petit. Chacune croit qu'elle dessine sur tout l'écran du téléphone (même taille, même
@@ -40,18 +41,68 @@ class DemoAnimations(context: Context) : DessinVivant(context) {
     private val DEPART = 1.0f         // l'animation commence
     private val ENTREE = 0.3f         // elle apparaît en 0,3 s
     private val FONDU = 0.8f          // à la fin, elle s'efface en fondu transparent (on revoit l'accueil)
-    private val plans = listOf(
+    // L'exemple par défaut (quand aucune app compatible n'est installée).
+    private val parDefaut = listOf(
         Plan({ Capitales(0) }, "com.google.android.apps.maps", Color.rgb(52, 140, 90), 3.4f, Categorie.ESSENTIELLE.intro / 1000f),      // Maps : Paris
         Plan({ Horizons(6) }, "com.anthropic.claude", Color.rgb(200, 110, 80), 4.0f, Categorie.ESSENTIELLE.intro / 1000f),        // Claude : Babel
         Plan({ CoupsBrillants(0) }, "com.chess", Color.rgb(100, 130, 60), 4.4f, Categorie.ECHECS.intro / 1000f),       // échecs
         Plan({ DuoBulles() }, "com.duolingo", Color.rgb(100, 170, 40), 3.4f, Categorie.COURANTE.intro / 1000f),           // Duolingo
         Plan({ Collision() }, "com.openai.chatgpt", Color.rgb(40, 140, 120), 4.0f, Categorie.ESSENTIELLE.intro / 1000f)        // ChatGPT : galaxies
     )
-    // Le tour d'une app dure : DEPART + la durée de son animation. Le tour complet : la somme des 5.
-    private val debuts = FloatArray(plans.size).also { d -> var x = 0f; for (k in plans.indices) { d[k] = x; x += DEPART + plans[k].duree } }
-    private val BOUCLE = debuts.last() + DEPART + plans.last().duree
-    // Les scènes sont fabriquées une seule fois (la première fois qu'on en a besoin), puis gardées.
-    private val scenes = arrayOfNulls<Scene>(plans.size)
+    // Pour ces apps-là, la variante qu'on veut montrer (celles choisies par Will) : son numéro dans le catalogue.
+    private val VARIANTE = mapOf("com.google.android.apps.maps" to 0, "com.anthropic.claude" to 6, "com.chess" to 0,
+        "com.duolingo" to 2, "com.openai.chatgpt" to 1)
+    // Les apps les plus connues, dans l'ordre où on préfère les montrer. Les autres apps compatibles
+    // du téléphone viennent ensuite, par ordre alphabétique.
+    private val CONNUES = listOf("com.google.android.apps.maps", "com.anthropic.claude", "com.chess", "com.duolingo",
+        "com.openai.chatgpt", "com.spotify.music", "com.instagram.android", "com.google.android.gm", "com.android.chrome",
+        "com.google.android.apps.bard", "com.discord", "com.google.android.apps.photos", "com.android.vending",
+        "com.google.android.googlequicksearchbox", "ai.x.grok", "com.twitter.android")
+
+    // Ce que la démo joue en ce moment. Tout ceci est recalculé par « installer » quand la liste change :
+    private var plans: List<Plan> = parDefaut
+    private var debuts = FloatArray(0)                 // l'instant où commence le tour de chaque app
+    private var BOUCLE = 1f                            // la durée du tour complet
+    private var scenes = arrayOfNulls<Scene>(0)        // les scènes, fabriquées à la première utilisation puis gardées
+    private var icones: List<Drawable?> = emptyList()  // la vraie icône de chaque app (ou rien si elle n'est pas installée)
+    private var choix: List<String> = emptyList()      // les apps retenues la dernière fois (pour ne pas tout refaire pour rien)
+
+    private fun installer(nouveaux: List<Plan>) {
+        plans = nouveaux
+        // Le tour d'une app dure : DEPART + la durée de son animation. Le tour complet : la somme de tous.
+        debuts = FloatArray(plans.size).also { d -> var x = 0f; for (k in plans.indices) { d[k] = x; x += DEPART + plans[k].duree } }
+        BOUCLE = debuts.last() + DEPART + plans.last().duree
+        scenes = arrayOfNulls(plans.size)
+        icones = plans.map { p -> try { context.packageManager.getApplicationIcon(p.pkg) } catch (_: Exception) { null } }
+    }
+
+    // L'ACCUEIL NOUS DIT QUELLES APPS COMPATIBLES SONT INSTALLÉES : on en retient 5.
+    fun choisir(installees: List<String>) {
+        // (on laisse de côté l'animation de YouTube tant que son logo n'a pas été retiré)
+        val possibles = installees.filter { "youtube" !in it }
+        val triees = CONNUES.filter { it in possibles } + possibles.filter { it !in CONNUES }.sorted()
+        val retenues = ArrayList<String>()
+        for (pkg in triees) {
+            val e = Catalogue.pour(pkg) ?: continue
+            // Les apps moins connues de la catégorie « secondaire » ont souvent une simple transition
+            // d'une demi-seconde : pas assez parlant pour une démo, on les passe.
+            if (pkg !in CONNUES && e.categorie == Categorie.SECONDAIRE) continue
+            retenues.add(pkg)
+            if (retenues.size == 5) break
+        }
+        if (retenues == choix) return            // rien n'a changé depuis la dernière fois
+        choix = retenues
+        if (retenues.isEmpty()) { installer(parDefaut); return }
+        installer(retenues.map { pkg ->
+            val e = Catalogue.pour(pkg)!!        // (« !! » : on vient de vérifier juste au-dessus qu'elle existe)
+            val numero = VARIANTE[pkg]
+            Plan({
+                // la variante choisie par Will pour les 5 apps vedettes ; sinon, celle que l'app jouerait vraiment
+                if (numero != null) e.fabrique(numero)
+                else Catalogue.lancement(context, pkg)?.scene ?: e.fabrique(-1)
+            }, pkg, Color.rgb(26, 26, 30), if (e.categorie == Categorie.ECHECS) 4.4f else 3.6f, e.categorie.intro / 1000f)
+        })
+    }
 
     // La taille du VRAI écran : c'est à cette taille que les scènes dessinent.
     private val ecranW = resources.displayMetrics.widthPixels
@@ -64,12 +115,6 @@ class DemoAnimations(context: Context) : DessinVivant(context) {
     private val noeud: RenderNode? =
         if (Build.VERSION.SDK_INT >= 29) RenderNode("demo").apply { setUseCompositingLayer(true, null) } else null
 
-    // La VRAIE icône de chaque app, si elle est installée sur le téléphone (sinon : rien, et on
-    // dessinera un carré arrondi de sa couleur à la place).
-    private val icones: List<Drawable?> = plans.map { p ->
-        try { context.packageManager.getApplicationIcon(p.pkg) } catch (_: Exception) { null }
-    }
-
     private val chemin = Path()
     private val cadre = RectF()
     private val visible = Rect()
@@ -79,6 +124,7 @@ class DemoAnimations(context: Context) : DessinVivant(context) {
     private val pBord = Paint(Paint.ANTI_ALIAS_FLAG).apply { style = Paint.Style.STROKE; color = Color.rgb(39, 39, 42) }
 
     init {
+        installer(parDefaut)          // en attendant que l'accueil nous donne la liste des apps du téléphone
         FilmCollision.preparer()      // le film des galaxies se calcule tout de suite, en arrière-plan
     }
 
