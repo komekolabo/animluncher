@@ -85,6 +85,7 @@ class AppWatcherService : AccessibilityService() {
                     event.packageName?.toString(),
                     event.className?.toString()?.substringAfterLast('.') ?: "?", ecranAccueil)
                 AccessibilityEvent.TYPE_VIEW_SCROLLED -> { iconeVivante.surDefilement(event, ecranAccueil); return }
+                AccessibilityEvent.TYPE_VIEW_SELECTED -> iconeVivante.surSelection(event, ecranAccueil)
             }
             when (event.eventType) {
                 AccessibilityEvent.TYPE_VIEW_CLICKED -> { diagnostic(event); clic(event) }

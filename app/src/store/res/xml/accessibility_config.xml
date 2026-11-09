@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <!-- VERSION STORE : le service d'accessibilité ALLÉGÉ (le strict minimum pour Google Play).
-     On reçoit seulement quatre signaux :
+     On reçoit seulement cinq signaux :
        typeViewClicked        = on a appuyé sur quelque chose (une icône de l'écran d'accueil) ;
        typeWindowStateChanged = une app passe au premier plan ;
        typeAnnouncement       = une « annonce » pour les lecteurs d'écran, par exemple
@@ -9,11 +9,13 @@
        typeViewScrolled       = l'écran d'accueil défile (changement de page) : sert à savoir si
                                 la page de l'icône d'AnimLauncher est affichée (icône vivante, essai).
                                 Le signal ne contient que des positions de défilement, aucun texte.
+       typeViewSelected       = « Page 2 sur 3 » quand une page de l'accueil ou du tiroir d'apps
+                                s'affiche : sert à savoir si on est dans le tiroir (icône vivante).
      PAS de canRetrieveWindowContent : le service ne peut PAS lire le contenu de l'écran
      (ni les widgets, ni les apps récentes). Il reçoit seulement le nom écrit sous l'icône touchée.
      (Ta version Perso utilise src/main/res/xml/accessibility_config.xml, plus complet.) -->
 <accessibility-service xmlns:android="http://schemas.android.com/apk/res/android"
-    android:accessibilityEventTypes="typeWindowStateChanged|typeViewClicked|typeAnnouncement|typeViewScrolled"
+    android:accessibilityEventTypes="typeWindowStateChanged|typeViewClicked|typeAnnouncement|typeViewScrolled|typeViewSelected"
     android:accessibilityFeedbackType="feedbackGeneric"
     android:notificationTimeout="0"
     android:canRetrieveWindowContent="false"
