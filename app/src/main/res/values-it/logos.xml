@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Les textes de l'écran « Logos animés » coupé en deux (italien). -->
+<resources>
+    <string name="icones_animees">Icone animate</string>
+    <string name="icones_zone_note">Un’app alla volta, con un’icona che si muove.</string>
+    <string name="icones_note">Tocca un’app per mettere la sua icona animata nella schermata Home.</string>
+    <string name="dossiers_choix">Tocca una cartella per vederla e metterla nella schermata Home.</string>
+    <string name="apps_du_dossier">App della cartella</string>
+</resources>

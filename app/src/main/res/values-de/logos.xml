@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Les textes de l'écran « Logos animés » coupé en deux (allemand). -->
+<resources>
+    <string name="icones_animees">Animierte Icons</string>
+    <string name="icones_zone_note">Eine App nach der anderen, mit einem Icon, das sich bewegt.</string>
+    <string name="icones_note">Tippe auf eine App, um ihr animiertes Icon auf den Startbildschirm zu legen.</string>
+    <string name="dossiers_choix">Tippe auf einen Ordner, um ihn anzusehen und auf den Startbildschirm zu legen.</string>
+    <string name="apps_du_dossier">Apps im Ordner</string>
+</resources>
