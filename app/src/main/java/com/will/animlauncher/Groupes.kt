@@ -131,6 +131,19 @@ object Groupes {
         c.getSharedPreferences(CARNET, Context.MODE_PRIVATE).edit().putString("ordre_$id", apps.joinToString(",")).apply()
     }
 
+    // LA COULEUR choisie pour un dossier avec la roue chromatique (teinte 0-360, intensité 0-1, luminosité 0-1),
+    // ou null si on n'a rien choisi (palette chaude d'origine). Voir Teinte.kt.
+    fun couleur(c: Context, id: String): FloatArray? {
+        val t = c.getSharedPreferences(CARNET, Context.MODE_PRIVATE).getString("couleur_$id", null) ?: return null
+        val n = t.split(",").mapNotNull { it.toFloatOrNull() }
+        return if (n.size == 3) n.toFloatArray() else null
+    }
+
+    fun definirCouleur(c: Context, id: String, hsv: FloatArray) {
+        c.getSharedPreferences(CARNET, Context.MODE_PRIVATE).edit()
+            .putString("couleur_$id", "${hsv[0]},${hsv[1]},${hsv[2]}").apply()
+    }
+
     // LE CARNET « groupes » : pour chaque groupe, les apps décochées (« sans_… ») et les apps
     // ajoutées à la main (« avec_… »).
     private const val CARNET = "groupes"

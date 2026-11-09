@@ -30,9 +30,10 @@ object RetourEtoile {
 
     // Ce qu'il faut savoir pour dessiner le retour : où est l'étoile (x, y, taille, angle) au moment où on
     // quitte, où elle doit aller (le widget), et à quel point les bandes sombres étaient fermées (0 à 1).
-    // Toutes les positions sont en pixels de l'ÉCRAN.
+    // Toutes les positions sont en pixels de l'ÉCRAN. teinte = les couleurs du dossier (roue chromatique).
     class Etat(val x: Float, val y: Float, val r: Float, val angle: Float,
-               val versX: Float, val versY: Float, val versR: Float, val voile: Float)
+               val versX: Float, val versY: Float, val versR: Float, val voile: Float,
+               val teinte: Teinte = Teinte.ORIGINE)
 
     private const val DUREE = 600L
 
@@ -83,8 +84,7 @@ object RetourEtoile {
             quadTo(-0.085f, -0.085f, 0f, -1f)
             close()
         }
-        private val degrade = LinearGradient(-1f, -1f, 1f, 1f,
-            intArrayOf(Color.rgb(255, 140, 91), Color.rgb(255, 107, 155), Color.rgb(196, 209, 63)),
+        private val degrade = LinearGradient(-1f, -1f, 1f, 1f, e.teinte.logo,
             floatArrayOf(0f, 0.5f, 1f), Shader.TileMode.CLAMP)
 
         private fun lisse(x: Float) = x * x * (3 - 2 * x)
@@ -122,7 +122,7 @@ object RetourEtoile {
             val lueur = 50f * (1 - k)
             if (lueur > 1) {
                 pinceau.shader = RadialGradient(x, y, r * 2.6f,
-                    intArrayOf(Color.argb(lueur.toInt(), 255, 107, 122), Color.argb((lueur * 0.4f).toInt(), 255, 75, 58), Color.TRANSPARENT),
+                    intArrayOf(Teinte.avecAlpha(e.teinte.lueur, lueur), Teinte.avecAlpha(e.teinte.lueur2, lueur * 0.4f), Color.TRANSPARENT),
                     floatArrayOf(0f, 0.45f, 1f), Shader.TileMode.CLAMP)
                 c.drawCircle(x, y, r * 2.6f, pinceau)
                 pinceau.shader = null

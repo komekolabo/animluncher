@@ -4,6 +4,8 @@
        2) la « mini-vidéo » de 12 s en boucle : l'étoile, les points qui tournent, les tuiles…
           (une ProgressBar joue etoile_ia_anime.xml en boucle) ;
        3) la bande de lumière qui traverse le verre toutes les 6 s.
+     La COULEUR choisie avec la roue du dossier est posée par-dessus le galet et l'étoile (« teinte »,
+     voir WidgetGroupe.vues), d'où les identifiants widget_groupe_galet et widget_groupe_etoile.
      Puis le nom du groupe dessous (« AI », « Games »…). Un appui ouvre le dossier (DossierActivity). -->
 <LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
     android:id="@+id/widget_groupe_racine"
@@ -17,12 +19,14 @@
         android:layout_height="62dp">
 
         <ImageView
+            android:id="@+id/widget_groupe_galet"
             android:layout_width="match_parent"
             android:layout_height="match_parent"
             android:scaleType="fitXY"
             android:src="@drawable/widget_galet_chaud" />
 
         <ProgressBar
+            android:id="@+id/widget_groupe_etoile"
             style="@android:style/Widget.ProgressBar"
             android:layout_width="match_parent"
             android:layout_height="match_parent"

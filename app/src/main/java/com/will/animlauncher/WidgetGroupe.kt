@@ -7,6 +7,10 @@ import android.appwidget.AppWidgetProvider
 import android.content.ComponentName
 import android.content.Context
 import android.content.Intent
+import android.content.res.ColorStateList
+import android.graphics.BlendMode
+import android.graphics.Color
+import android.os.Build
 import android.widget.RemoteViews
 
 // LE WIDGET « DOSSIER ANIMÉ » (09/11) : un galet de verre avec une étoile qui tourne doucement, et le
@@ -59,6 +63,19 @@ class WidgetGroupe : AppWidgetProvider() {
             val groupe = c.getSharedPreferences(CARNET, Context.MODE_PRIVATE).getString("groupe_$id", "ia") ?: "ia"
             val v = RemoteViews(c.packageName, R.layout.widget_groupe)
             v.setTextViewText(R.id.widget_groupe_nom, Groupes.categorie(groupe)?.nom ?: "?")
+            // LA COULEUR CHOISIE (roue du dossier) : on « teinte » le galet et l'étoile animée. Le mode COLOR
+            // garde les ombres et les reflets du dessin d'origine (sa luminosité) et ne remplace que la teinte
+            // et l'intensité : l'étoile garde son relief, le galet reste sombre.
+            // Android 12 et plus seulement (avant, un widget ne peut pas changer de teinte).
+            val hsv = Groupes.couleur(c, groupe)
+            if (hsv != null && Build.VERSION.SDK_INT >= 31) {
+                val vive = Color.HSVToColor(hsv)
+                val sombre = Color.HSVToColor(floatArrayOf(hsv[0], 0.35f + 0.3f * hsv[1], 0.5f))
+                v.setColorStateList(R.id.widget_groupe_etoile, "setIndeterminateTintList", ColorStateList.valueOf(vive))
+                v.setBlendMode(R.id.widget_groupe_etoile, "setIndeterminateTintBlendMode", BlendMode.COLOR)
+                v.setColorStateList(R.id.widget_groupe_galet, "setImageTintList", ColorStateList.valueOf(sombre))
+                v.setBlendMode(R.id.widget_groupe_galet, "setImageTintBlendMode", BlendMode.COLOR)
+            }
             // NEW_TASK + CLEAR_TASK : le dossier s'ouvre toujours seul, dans sa propre tâche
             // (jamais par-dessus l'écran principal d'AnimLauncher).
             val ouvrir = Intent(c, DossierActivity::class.java).putExtra("groupe", groupe)
@@ -68,6 +85,15 @@ class WidgetGroupe : AppWidgetProvider() {
             v.setOnClickPendingIntent(R.id.widget_groupe_racine, PendingIntent.getActivity(c, id, ouvrir,
                 PendingIntent.FLAG_MUTABLE or PendingIntent.FLAG_UPDATE_CURRENT))
             return v
+        }
+
+        // Repeint tous les widgets posés pour ce groupe (après un changement de couleur dans le dossier).
+        fun rafraichir(c: Context, groupe: String) {
+            val gestionnaire = AppWidgetManager.getInstance(c)
+            val carnet = c.getSharedPreferences(CARNET, Context.MODE_PRIVATE)
+            for (id in gestionnaire.getAppWidgetIds(ComponentName(c, WidgetGroupe::class.java))) {
+                if ((carnet.getString("groupe_$id", "ia") ?: "ia") == groupe) gestionnaire.updateAppWidget(id, vues(c, id))
+            }
         }
 
         // Demande à l'écran d'accueil d'ajouter le widget du groupe (Samsung affiche sa fenêtre
