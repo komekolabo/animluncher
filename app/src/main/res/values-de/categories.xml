@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Les noms des catégories de l'écran « Animations d'apps », et le choix de la langue (allemand). -->
+<resources>
+    <string name="cat_ia">KI</string>
+    <string name="cat_social">Soziale Netzwerke</string>
+    <string name="cat_musique">Musik &amp; Video</string>
+    <string name="cat_photo">Fotos</string>
+    <string name="cat_jeux">Spiele</string>
+    <string name="cat_finance">Finanzen</string>
+    <string name="cat_trajets">Karten &amp; Reisen</string>
+    <string name="cat_travail">Produktivität</string>
+    <string name="cat_infos">Nachrichten</string>
+    <string name="cat_autres">Nicht eingeordnet</string>
+    <string name="resume_categories">%1$d aktiv · wähle eine Kategorie</string>
+    <string name="langue">Sprache</string>
+    <string name="langue_systeme">Sprache des Telefons</string>
+</resources>
