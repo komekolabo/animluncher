@@ -92,6 +92,13 @@ Objectif : la publier sur le Google Play Store, avec une pub non invasive.
 - Un appui sur une **carte des apps récentes** arrive comme un clic sur l'accueil sans nom d'app :
   ne pas le prendre pour un widget (sinon l'animation arrive en retard).
 - Samsung : les apps comme AnimLauncher sont dans Accessibilité → « Applications installées ».
+- Mode « seulement au démarrage » : l'app est jugée « encore ouverte » si on l'a vue il y a moins de
+  30 min. La version Store ne peut pas lire les apps récentes : elle ne voit pas les fermetures et
+  compte sur le RATTRAPAGE (écran de démarrage < 300 ms après le clic = l'app était fermée).
+  La liste « affiche toujours son écran de démarrage » (`splash_toujours_v2`) bloque ce rattrapage :
+  elle ne doit retenir une app qu'avec prudence (Claude y avait été mis à tort).
+- Le journal envoyé sur GitHub est celui de la version **Perso** : si Will teste la version Store,
+  le journal Perso ne montre aucune animation (interrupteur Perso éteint).
 
 ## Feuille de route
 1. Tester la version Store (le clic sur les icônes doit marcher sans lecture d'écran).
