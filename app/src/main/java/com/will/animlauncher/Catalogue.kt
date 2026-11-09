@@ -65,7 +65,7 @@ object Catalogue {
         "com.google.android.googlequicksearchbox" to e(E) { Quatre() },
         "com.android.chrome" to e(E) { Tunnel() },
         "com.google.android.apps.maps" to v(E, listOf("Paris", "Londres", "Washington", "Amsterdam", "Moscou")) { Capitales(it) },   // une des 5 capitales, au hasard
-        "com.google.android.gm" to e(E) { Pli() },
+        "com.google.android.gm" to v(E, MAIL_VARIANTES) { mail(it) },   // Mail : « Tourbillon » ou « La lettre », au hasard (remplace « Pli »)
         "com.google.android.apps.photos" to e(E) { PoseLongue() },
         "app.revanced.android.youtube" to e(E) { Cinema() },
         "com.google.android.apps.googleassistant" to e(C) { Ecoute() },
@@ -111,7 +111,7 @@ object Catalogue {
         // Instagram : « Défilement sans fin » (Reels) ou « Mur dans la nuit », au hasard
         "com.instagram.android" to v(C, listOf("Défilement sans fin", "Mur dans la nuit")) { if (it == 1) MurNuit() else Reels() },
         "com.twitter.android" to e(C) { Eclipse() },
-        "com.discord" to e(C) { EnseigneNeon() },
+        "com.discord" to e(C) { SetupGaming() },   // le setup gaming en 3D, la caméra plonge dans l'écran (remplace « Enseigne néon »)
         "ee.mtakso.client" to e(C) { Route() },
         "com.duolingo" to v(C, DUO_VARIANTES) { duolingo(it) },   // une des 5 animations Duolingo, au hasard
         "com.suno.android" to e(C) { Spectre() },
