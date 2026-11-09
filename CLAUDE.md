@@ -80,6 +80,16 @@ Objectif : la publier sur le Google Play Store, avec une pub non invasive.
   image du téléphone (couche avant de l'icône adaptative) : on dessine les images de la flottaison au moment
   de poser le widget et un ViewFlipper les fait défiler (« folioscope », 60 images à 20 images/s ; 12/s saccadait). Will a refusé le halo
   (« juste l'ombre ») et veut que ce soit le logo qui flotte, pas le galet. Aperçus : /home/claude/apercu/widgets_*.py.
+- DOSSIERS ANIMÉS (09/11) : `Groupes.kt` range les apps par catégorie (AI, Social, Music & Video, Photos, Games,
+  Finance, Maps & Travel, Productivity, News) : d'abord NOTRE liste d'apps connues, sinon `ApplicationInfo.category` ;
+  apps décochables (carnet « groupes »). `GroupesActivity.kt` (bouton « ✦ Dossiers animés » de l'écran principal) :
+  un groupe = une carte, bouton « Voir » et « Mettre sur l'accueil ». `WidgetGroupe.kt` + `widget_groupe.xml` +
+  `etoile_ia(_anime).xml` : galet + étoile à 4 branches (dessin à nous) qui tourne (20 s/tour) et respire.
+  Appui -> `DossierActivity.kt` : écran TRANSPARENT (thème `Theme.Dossier`, taskAffinity vide, hors récents) qui
+  dessine l'animation validée par Will (aperçu /home/claude/apercu/dossier.py) : voile sombre, l'étoile part du
+  widget (`intent.sourceBounds`), monte au centre en faisant un tour, se pose près du titre, traînées de poussière
+  vers chaque app, apps qui apparaissent l'une après l'autre. Appui sur une app -> `AppWatcherService.actif
+  ?.depuisDossier(app)` (le lanceur n'envoie pas de clic pour NOTRE écran) puis on ouvre l'app.
 - `Reglages.kt` : kill switch, « seulement au démarrage », réglages par app (durée, variantes).
 - `MainActivity.kt` : écran principal (logo animé, interrupteurs, écran d'explication Store).
 - `GuideDeblocage.kt` : guide plein écran pour l'accessibilité **grisée** (APK installé hors Play Store).
