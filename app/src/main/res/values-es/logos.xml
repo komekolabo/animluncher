@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Les textes de l'écran « Logos animés » coupé en deux (espagnol). -->
+<resources>
+    <string name="icones_animees">Iconos animados</string>
+    <string name="icones_zone_note">Una app cada vez, con un icono que se mueve.</string>
+    <string name="icones_note">Toca una app para poner su icono animado en la pantalla de inicio.</string>
+    <string name="dossiers_choix">Toca una carpeta para verla y ponerla en la pantalla de inicio.</string>
+    <string name="apps_du_dossier">Apps de la carpeta</string>
+</resources>

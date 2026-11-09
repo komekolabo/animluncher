@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Les textes de l'écran « Logos animés » coupé en deux (anglais, par défaut). -->
+<resources>
+    <string name="icones_animees">Animated icons</string>
+    <string name="icones_zone_note">One app at a time, with an icon that moves.</string>
+    <string name="icones_note">Tap an app to put its animated icon on the home screen.</string>
+    <string name="dossiers_choix">Tap a folder to preview it and put it on the home screen.</string>
+    <string name="apps_du_dossier">Apps in the folder</string>
+</resources>
