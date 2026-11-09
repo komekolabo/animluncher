@@ -17,6 +17,8 @@ Objectif : la publier sur le Google Play Store, avec une pub non invasive.
   trame de points, colonnes, tuiles, fente.
 - Textes affichés dans les animations : **en anglais**.
 - Il n'a **pas Android Studio** : tout se compile sur GitHub (voir plus bas). Il teste sur son téléphone.
+- Aperçus Python : dans skia-python, `Image.makeShader()` est très lent → créer les shaders d'image UNE fois
+  (petites textures 128 x 128 répétées). Rendre une vidéo prend ~20 s à 1,5 min.
 
 ## Les deux versions (Gradle « flavors », voir app/build.gradle.kts)
 | | Perso | Store |
@@ -51,10 +53,17 @@ Objectif : la publier sur le Google Play Store, avec une pub non invasive.
   flou de mouvement via RenderNode sur Android 12+) et `ScenesMurNuit.kt` = « Mur dans la nuit » (20 polaroïds
   qui s'allument, guirlande, parallaxe ; photos et sapins précalculés dans `FondsMur`). Aperçus Python :
   /home/claude/apercu/reels.py, reels_hq.py, nuit.py, photos.py.
+  Détails Instagram : `Reels` garde UN état (`tRev` = l'instant où la révélation commence) car le swipe de
+  l'app doit tomber dans le rythme des swipes ; swipes à x0,82 avec un minimum de 0,07 s (sinon ça converge
+  vers ~2 s). Dans l'app, les 20 photos du mur sont FIXES (les petites animations de l'aperçu — vapeur,
+  phare, feux d'artifice — n'ont pas été portées). Will a rejeté : « Pellicule », Filtres/île, Le fil,
+  Mosaïque cœur, mur→arbre, tour de Babel ; il a validé Reels (swipes nets qui accélèrent) et le mur cosy.
   Les variantes d'une app sont tirées au hasard ; on ajoute les nouvelles À LA FIN de la liste
   (les réglages retiennent les variantes décochées par leur numéro).
   Chaque scène hérite de `Scene` et dessine **toute l'image à chaque instant** (pas d'état caché).
   Elles sont calibrées sur un écran « modèle » de 540 de large (k = largeur / 540).
+- `IconeVivante.kt` : essai d'« icône vivante » (logo animé posé sur l'icône d'AnimLauncher), fait par une
+  autre instance le 09/11 (branché dans le service et sur l'écran principal).
 - `Reglages.kt` : kill switch, « seulement au démarrage », réglages par app (durée, variantes).
 - `MainActivity.kt` : écran principal (logo animé, interrupteurs, écran d'explication Store).
 - `GuideDeblocage.kt` : guide plein écran pour l'accessibilité **grisée** (APK installé hors Play Store).
@@ -80,6 +89,11 @@ Objectif : la publier sur le Google Play Store, avec une pub non invasive.
   faire un `git fetch` et un `diff` pour vérifier que GitHub a reçu exactement le bon fichier.
 - Le connecteur **ne peut pas modifier `.github/workflows/`** : c'est Will qui le fait sur github.com.
 - Branche de travail actuelle : `version-store` (pas encore fusionnée dans `main`).
+- **Plusieurs instances de Claude travaillent parfois en même temps** sur ce repo. `push_files` REMPLACE
+  des fichiers entiers : toujours `git fetch` juste avant d'envoyer, repartir de la version GitHub du
+  fichier, et éviter qu'elles touchent au même fichier en même temps (surtout `Catalogue.kt` et ce CLAUDE.md).
+- Envoyer dans UN SEUL `push_files` tous les fichiers qui dépendent les uns des autres : chaque envoi
+  déclenche une compilation, et un envoi partiel échoue (arrivé le 09/11).
 - Signature : clé debug publique (`app/debug.keystore.b64`). **À remplacer avant le Play Store.**
 
 ## Décisions déjà prises (et pourquoi)
@@ -88,6 +102,13 @@ Objectif : la publier sur le Google Play Store, avec une pub non invasive.
   Ne jamais déclarer `isAccessibilityTool` (ce n'est pas un outil pour personnes handicapées).
 - **Marques** : pas de logos, pas de noms de marques affichés, pas de copie d'interface.
   S'inspirer des couleurs/ambiances, c'est OK. La scène Maps a un habillage spécial Store.
+- **Animations génériques** (apps hors catalogue) : deux séries proposées et rejetées le 09/11 (une douce,
+  une façon Lamborghini). Plan de Will : plus tard, faire la liste des apps les plus téléchargées et leur
+  faire une animation dédiée ; en dessous d'environ 200 000 téléchargements → animations génériques.
+- **Déclaration d'accessibilité Google Play** : la règle demande d'utiliser une API plus ciblée « quand c'est
+  possible ». Argument à donner : le journal d'utilisation (ModeStandard) a été testé et montre l'app
+  0,2-0,3 s AVANT l'animation ; seule l'accessibilité prévient à temps. Vidéo obligatoire : ouverture de l'app
+  → écran d'explication → consentement. Monétisation réaliste : surtout de l'argent de poche, sauf succès viral.
 - **Alternatives étudiées et écartées** pour l'instant : launcher complet (trop long), raccourcis
   épinglés (pas d'animation depuis le tiroir), Shizuku / contrôleur d'activités (idée « mode expert »,
   mise de côté ; nécessite le Wi-Fi au démarrage).
