@@ -74,6 +74,14 @@ object ReactionSonore {
     private var service: Context? = null
     private var vue: VueSonore? = null
 
+    // ---------- pour le DIAGNOSTIC affiché dans la fenêtre du rond (voir ReactionSonoreUi.kt) ----------
+    val servicePret: Boolean get() = service != null      // le service d'accessibilité nous a bien prévenus
+    val fenetrePosee: Boolean get() = vue != null         // la fenêtre des bords est posée sur l'écran
+    @Volatile var musique = false                          // Android dit qu'une musique joue
+    @Volatile var pleinEcran = false                       // on pense être en plein écran (vidéo, jeu)
+    @Volatile var sourcePleinEcran = "?"                   // comment on l'a su (pour comprendre une erreur)
+    @Volatile var dessine = false                          // les bords sont en train d'être dessinés
+
     // Appelé quand le service d'accessibilité est prêt (par le rideau, voir Rideau.kt)…
     fun demarrer(c: Context) {
         if (c !is AccessibilityService) return
@@ -120,6 +128,7 @@ object ReactionSonore {
         try {
             gestionnaire.addView(v, reglages)
             vue = v
+            AnimApp.noter("son : fenêtre des bords posée")
         } catch (e: Exception) {
             AnimApp.noter("son : fenêtre refusée (${e.javaClass.simpleName})")
         }
@@ -295,29 +304,59 @@ class VueSonore(context: Context) : View(context) {
 
     override fun onDetachedFromWindow() {
         minuteur.removeCallbacks(verification)
+        ReactionSonore.dessine = false
         EcouteSon.arreter()
         super.onDetachedFromWindow()
     }
 
     // Plein écran = la barre d'état (heure, batterie) est cachée : c'est le cas des vidéos et des jeux.
+    //
+    // PIÈGE (corrigé le 10/11) : notre fenêtre est posée AU-DESSUS de la barre d'état, et Android ne parle
+    // de la barre d'état qu'aux fenêtres posées EN DESSOUS. Notre fenêtre ne la « voyait » donc jamais,
+    // croyait être en plein écran tout le temps… et ne dessinait jamais rien.
+    // Maintenant : 1) on demande à notre fenêtre ; si elle ne connaît pas la barre d'état (hauteur 0),
+    // 2) on demande à Android l'état de l'ÉCRAN ; si personne ne sait, 3) on suppose « pas plein écran »
+    // (mieux vaut voir l'effet pendant une vidéo que ne jamais le voir).
     private fun pleinEcran(): Boolean {
         if (Build.VERSION.SDK_INT >= 30) {
-            val marges = rootWindowInsets ?: return false
-            return !marges.isVisible(WindowInsets.Type.statusBars())
+            val type = WindowInsets.Type.statusBars()
+            val marges = rootWindowInsets
+            if (marges != null && marges.getInsetsIgnoringVisibility(type).top > 0) {
+                ReactionSonore.sourcePleinEcran = "fenêtre"
+                return !marges.isVisible(type)
+            }
+            try {
+                val ecran = (context.getSystemService(Context.WINDOW_SERVICE) as WindowManager).currentWindowMetrics.windowInsets
+                if (ecran.getInsetsIgnoringVisibility(type).top > 0) {
+                    ReactionSonore.sourcePleinEcran = "écran"
+                    return !ecran.isVisible(type)
+                }
+            } catch (_: Throwable) {}
+            ReactionSonore.sourcePleinEcran = "inconnu"
+            return false
         }
+        ReactionSonore.sourcePleinEcran = "ancien Android"
         return pleinEcranAncien
     }
 
     private fun verifier() {
         val paysage = resources.configuration.orientation == Configuration.ORIENTATION_LANDSCAPE
         val musique = try { audio.isMusicActive } catch (_: Exception) { false }
+        val plein = pleinEcran()
         silences = if (musique) 0 else silences + 1
-        val voulu = !paysage && !pleinEcran() && silences < 3       // 3 s sans musique : on arrête
+        val voulu = !paysage && !plein && silences < 3              // 3 s sans musique : on arrête
+        // pour le diagnostic, et une ligne dans le journal quand quelque chose change
+        if (musique != ReactionSonore.musique || plein != ReactionSonore.pleinEcran) {
+            AnimApp.noter("son : musique ${if (musique) "oui" else "non"}, plein écran ${if (plein) "oui" else "non"} (${ReactionSonore.sourcePleinEcran})")
+        }
+        ReactionSonore.musique = musique
+        ReactionSonore.pleinEcran = plein
         if (voulu && !EcouteSon.enMarche) {
             if (!EcouteSon.demarrer()) return                        // le téléphone refuse : on ne dessine rien
         }
         if (!voulu && EcouteSon.enMarche && presence < 0.01f) EcouteSon.arreter()
         jouer = voulu
+        ReactionSonore.dessine = voulu
         if (jouer && !enBoucle) {
             enBoucle = true
             dernier = SystemClock.uptimeMillis()

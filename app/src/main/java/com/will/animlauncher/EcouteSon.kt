@@ -33,6 +33,12 @@ object EcouteSon {
 
     private var visu: Visualizer? = null
 
+    // Pour le diagnostic (fenêtre du rond) : la dernière erreur, et combien de mesures sont arrivées.
+    @Volatile var derniereErreur: String? = null
+        private set
+    @Volatile var mesures = 0
+        private set
+
     // Le « volume de référence » de chaque tranche : le plus fort entendu récemment. On compare
     // chaque mesure à cette référence, pour réagir aussi bien à une musique douce qu'à une forte.
     private var refGrave = 4f
@@ -60,9 +66,12 @@ object EcouteSon {
             }, Visualizer.getMaxCaptureRate(), false, true)
             v.setEnabled(true)
             visu = v
+            derniereErreur = null
+            AnimApp.noter("son : écoute démarrée")
             true
         } catch (e: Throwable) {
-            AnimApp.noter("son : écoute impossible (${e.javaClass.simpleName} ${e.message})")
+            derniereErreur = "${e.javaClass.simpleName} ${e.message ?: ""}".trim()
+            AnimApp.noter("son : écoute impossible ($derniereErreur)")
             false
         }
     }
@@ -91,6 +100,7 @@ object EcouteSon {
 
     private fun analyser(fft: ByteArray, frequenceMilliHz: Int) {
         if (fft.size < 16) return
+        mesures++
         val hzParCase = frequenceMilliHz / 1000f / fft.size
         if (hzParCase <= 0f) return
         val g = bande(fft, hzParCase, 43f, 170f)

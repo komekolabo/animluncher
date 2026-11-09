@@ -10,6 +10,8 @@ import android.graphics.Canvas
 import android.graphics.Color
 import android.graphics.Paint
 import android.graphics.drawable.ColorDrawable
+import android.os.Handler
+import android.os.Looper
 import android.os.SystemClock
 import android.view.Gravity
 import android.view.View
@@ -87,6 +89,7 @@ object FenetreSon {
         ouverte?.dismiss()
         val dialogue = Dialog(a)
         dialogue.requestWindowFeature(Window.FEATURE_NO_TITLE)
+        dialogue.setOnDismissListener { if (ouverte === dialogue) ouverte = null }   // (remplacé par le diagnostic s'il y en a un)
         dialogue.setContentView(contenu(a, dialogue))
         dialogue.window?.apply {
             setBackgroundDrawable(ColorDrawable(Color.TRANSPARENT))
@@ -95,7 +98,6 @@ object FenetreSon {
             setWindowAnimations(android.R.style.Animation_InputMethod)      // l'animation « monte du bas » d'Android
             setDimAmount(0.7f)
         }
-        dialogue.setOnDismissListener { if (ouverte === dialogue) ouverte = null }
         ouverte = dialogue
         dialogue.show()
     }
@@ -158,6 +160,27 @@ object FenetreSon {
         }
         majPoints()
 
+        // le DIAGNOSTIC (quand le mode est allumé) : ce que l'app voit vraiment, mis à jour 2 fois par seconde.
+        // Sert à comprendre pourquoi les bords n'apparaissent pas (à envoyer à Claude si besoin).
+        if (allume) {
+            val diag = Style.texte(a, "", 12.5f, Style.MUET).apply {
+                background = Style.arrondi(a, Color.argb(10, 255, 255, 255), 12f, Style.BORD)
+                setPadding(px(14f), px(10f), px(14f), px(10f))
+                setLineSpacing(0f, 1.25f)
+                setTextIsSelectable(true)          // on peut le copier d'un appui long
+            }
+            colonne.addView(diag, LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT).apply { topMargin = px(14f) })
+            val minuteur = Handler(Looper.getMainLooper())
+            val maj = object : Runnable {
+                override fun run() {
+                    diag.text = diagnostic(a)
+                    minuteur.postDelayed(this, 500)
+                }
+            }
+            minuteur.post(maj)
+            dialogue.setOnDismissListener { minuteur.removeCallbacks(maj); if (ouverte === dialogue) ouverte = null }
+        }
+
         // les avertissements, seulement quand ils servent
         if (!allume) ligne(a.getString(R.string.son_expl_micro), Style.MUET, haut = 14f)
         if (AppWatcherService.actif == null) ligne(a.getString(R.string.son_service), Style.AMBRE, haut = 10f)
@@ -176,6 +199,28 @@ object FenetreSon {
 
         // (sur un petit écran, le tout peut défiler)
         return ScrollView(a).apply { addView(colonne) }
+    }
+
+    // Le texte du diagnostic : une ligne par vérification, ✓ si c'est bon, ✗ sinon.
+    private fun diagnostic(a: Activity): String {
+        fun l(ok: Boolean, texte: String) = (if (ok) "✓ " else "✗ ") + texte
+        val oui = a.getString(R.string.son_diag_oui)
+        val non = a.getString(R.string.son_diag_non)
+        val ecoute = when {
+            EcouteSon.enMarche -> a.getString(R.string.son_diag_ecoute_ok, EcouteSon.mesures)
+            EcouteSon.derniereErreur != null -> a.getString(R.string.son_diag_ecoute_erreur, EcouteSon.derniereErreur)
+            else -> a.getString(R.string.son_diag_ecoute_arret)
+        }
+        return listOf(
+            a.getString(R.string.son_diag_titre),
+            l(ReactionSonore.servicePret, a.getString(R.string.son_diag_service, if (ReactionSonore.servicePret) oui else non)),
+            l(ReactionSonore.fenetrePosee, a.getString(R.string.son_diag_fenetre, if (ReactionSonore.fenetrePosee) oui else non)),
+            l(ReactionSonore.musique, a.getString(R.string.son_diag_musique, if (ReactionSonore.musique) oui else non)),
+            l(!ReactionSonore.pleinEcran, a.getString(R.string.son_diag_plein, if (ReactionSonore.pleinEcran) oui else non, ReactionSonore.sourcePleinEcran)),
+            l(EcouteSon.enMarche, ecoute),
+            l(ReactionSonore.dessine, a.getString(R.string.son_diag_dessine, if (ReactionSonore.dessine) oui else non)),
+            a.getString(R.string.son_diag_niveaux, (EcouteSon.grave * 100).toInt(), (EcouteSon.medium * 100).toInt(), (EcouteSon.aigu * 100).toInt())
+        ).joinToString("\n")
     }
 
     // « Activer » : si Android n'a pas encore donné la permission, on la demande (sa fenêtre officielle

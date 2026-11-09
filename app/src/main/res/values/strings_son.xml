@@ -24,4 +24,17 @@
     <string name="son_fermer">Close</string>
     <string name="son_active">Sound reaction on</string>
     <string name="son_refuse">Microphone access denied: sound reaction stays off.</string>
+    <!-- le diagnostic (fenêtre du rond) -->
+    <string name="son_diag_titre">Diagnostic</string>
+    <string name="son_diag_oui">yes</string>
+    <string name="son_diag_non">no</string>
+    <string name="son_diag_service">Accessibility service connected: %1$s</string>
+    <string name="son_diag_fenetre">Edge window placed: %1$s</string>
+    <string name="son_diag_musique">Music detected: %1$s</string>
+    <string name="son_diag_plein">Full screen: %1$s (%2$s)</string>
+    <string name="son_diag_ecoute_ok">Sound reading: on (%1$d readings)</string>
+    <string name="son_diag_ecoute_erreur">Sound reading: error (%1$s)</string>
+    <string name="son_diag_ecoute_arret">Sound reading: off</string>
+    <string name="son_diag_dessine">Edges drawn: %1$s</string>
+    <string name="son_diag_niveaux">Levels: bass %1$d%% · melody %2$d%% · treble %3$d%%</string>
 </resources>

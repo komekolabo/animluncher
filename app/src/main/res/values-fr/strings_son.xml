@@ -24,4 +24,17 @@
     <string name="son_fermer">Fermer</string>
     <string name="son_active">Réaction sonore activée</string>
     <string name="son_refuse">Accès au micro refusé : la réaction sonore reste éteinte.</string>
+    <!-- le diagnostic (fenêtre du rond) -->
+    <string name="son_diag_titre">Diagnostic</string>
+    <string name="son_diag_oui">oui</string>
+    <string name="son_diag_non">non</string>
+    <string name="son_diag_service">Service d’accessibilité branché : %1$s</string>
+    <string name="son_diag_fenetre">Fenêtre des bords posée : %1$s</string>
+    <string name="son_diag_musique">Musique détectée : %1$s</string>
+    <string name="son_diag_plein">Plein écran : %1$s (%2$s)</string>
+    <string name="son_diag_ecoute_ok">Écoute du son : en marche (%1$d mesures)</string>
+    <string name="son_diag_ecoute_erreur">Écoute du son : erreur (%1$s)</string>
+    <string name="son_diag_ecoute_arret">Écoute du son : arrêtée</string>
+    <string name="son_diag_dessine">Bords dessinés : %1$s</string>
+    <string name="son_diag_niveaux">Niveaux : graves %1$d %% · mélodie %2$d %% · aigus %3$d %%</string>
 </resources>
