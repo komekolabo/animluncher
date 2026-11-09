@@ -294,12 +294,16 @@ class DossierVue(
         // 4) L'ÉTOILE : elle monte au centre en faisant un tour, puis se pose en petit à côté du titre ;
         //    à la fermeture, elle retourne dans le widget.
         val u = seg(t, 0f, 1.0f)
-        val v = seg(t, 1.0f, 1.6f)
+        val v = seg(t, 1.0f, 1.9f)        // elle rejoint le titre en douceur (0,9 s)
         var x = mix(mix(sx, panneau.centerX(), u), etoileX, v)
         var y = mix(mix(sy, panneau.centerY() - 40f * k, u), etoileY, v)
         var r = mix(mix(r0, 92f * k, u), 19f * k, v)
         if (fer > 0) { x = mix(x, sx, fer); y = mix(y, sy, fer); r = mix(r, r0, fer) }
         val lueur = 60f * (1 - v * 0.4f) * (1 - fer)
+        // IMPORTANT : on remet le pinceau à « opaque ». Sinon il garde la transparence du dernier dessin
+        // (une poussière presque invisible, l'onde d'une app…) et l'étoile disparaît ou clignote (vu le 09/11).
+        pinceau.color = Color.WHITE
+        pinceau.style = Paint.Style.FILL
         if (lueur > 1) {
             pinceau.shader = RadialGradient(x, y, r * 2.6f,
                 intArrayOf(Color.argb(lueur.toInt(), 255, 107, 122), Color.argb((lueur * 0.4f).toInt(), 255, 75, 58), Color.TRANSPARENT),
