@@ -1,0 +1,27 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Textos de la reacción sonora. -->
+<resources>
+    <string name="son_titre">Reacción sonora</string>
+    <string name="son_expl_mode">Los bordes de tu pantalla se mueven suavemente al ritmo de la música del teléfono, incluso fuera de la app.</string>
+    <string name="son_expl_rien">No se graba ni se guarda nada.</string>
+    <string name="son_expl_direct">La app solo lee el nivel del sonido, en directo, y lo olvida al instante.</string>
+    <string name="son_expl_internet">Esta app no tiene acceso a Internet.</string>
+    <string name="son_expl_video">El efecto se oculta solo en vídeos y juegos a pantalla completa, y solo funciona cuando suena música.</string>
+    <string name="son_expl_micro">Android pedirá acceso al micrófono: es obligatorio para leer el nivel del sonido.</string>
+    <string name="son_service">Activa primero AnimLauncher en los ajustes de accesibilidad: el efecto lo necesita para mostrarse.</string>
+    <string name="son_style">Estilo</string>
+    <string name="son_style_1">Aurora</string>
+    <string name="son_desc_1">Una cortina de luz que crece con los graves</string>
+    <string name="son_style_2">Cuerdas</string>
+    <string name="son_desc_2">Tres cuerdas por borde: graves, melodía, agudos</string>
+    <string name="son_style_3">Vidrio líquido</string>
+    <string name="son_desc_3">El borde se hincha y ondula como un material blando</string>
+    <string name="son_style_4">Prisma</string>
+    <string name="son_desc_4">Un neón fino: cada sonido ilumina su zona</string>
+    <string name="son_activer">Activar</string>
+    <string name="son_desactiver">Desactivar</string>
+    <string name="son_plus_tard">Más tarde</string>
+    <string name="son_fermer">Cerrar</string>
+    <string name="son_active">Reacción sonora activada</string>
+    <string name="son_refuse">Acceso al micrófono denegado: la reacción sonora sigue apagada.</string>
+</resources>

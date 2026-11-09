@@ -59,6 +59,18 @@ class Rideau(context: Context) : SurfaceView(context), SurfaceHolder.Callback {
         holder.addCallback(this)
     }
 
+    // Le rideau est posé au démarrage du service, et retiré à son arrêt : c'est le bon moment pour
+    // poser / retirer aussi la fenêtre de la RÉACTION SONORE (voir ReactionSonore.kt), qui vit avec le service.
+    override fun onAttachedToWindow() {
+        super.onAttachedToWindow()
+        ReactionSonore.demarrer(context)
+    }
+
+    override fun onDetachedFromWindow() {
+        ReactionSonore.arreter(context)
+        super.onDetachedFromWindow()
+    }
+
     // Joue une animation tout de suite (celle qui tournait encore est arrêtée).
     fun jouer(s: Seance) {
         synchronized(verrou) {

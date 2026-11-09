@@ -1,0 +1,27 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Les textes de la réaction sonore (le bouton rond en bas à droite de l’accueil). Voir ReactionSonoreUi.kt. -->
+<resources>
+    <string name="son_titre">Réaction sonore</string>
+    <string name="son_expl_mode">Les bords de ton écran bougent doucement au rythme de la musique du téléphone, même en dehors de l’app.</string>
+    <string name="son_expl_rien">Rien n’est enregistré ni sauvegardé.</string>
+    <string name="son_expl_direct">L’app lit seulement le niveau du son, en direct, et l’oublie aussitôt.</string>
+    <string name="son_expl_internet">Cette app n’a pas accès à Internet.</string>
+    <string name="son_expl_video">L’effet se cache tout seul pendant les vidéos et les jeux en plein écran, et ne tourne que quand de la musique joue.</string>
+    <string name="son_expl_micro">Android va demander l’accès au micro : c’est obligatoire pour lire le niveau du son.</string>
+    <string name="son_service">Active d’abord AnimLauncher dans les réglages d’accessibilité : l’effet en a besoin pour s’afficher.</string>
+    <string name="son_style">Style</string>
+    <string name="son_style_1">Aurore</string>
+    <string name="son_desc_1">Un rideau de lumière qui gonfle sur les basses</string>
+    <string name="son_style_2">Cordes</string>
+    <string name="son_desc_2">Trois cordes par bord : basses, mélodie, aigus</string>
+    <string name="son_style_3">Verre liquide</string>
+    <string name="son_desc_3">Le bord gonfle et ondule comme une matière souple</string>
+    <string name="son_style_4">Prisme</string>
+    <string name="son_desc_4">Un fin néon : chaque son allume sa zone</string>
+    <string name="son_activer">Activer</string>
+    <string name="son_desactiver">Désactiver</string>
+    <string name="son_plus_tard">Plus tard</string>
+    <string name="son_fermer">Fermer</string>
+    <string name="son_active">Réaction sonore activée</string>
+    <string name="son_refuse">Accès au micro refusé : la réaction sonore reste éteinte.</string>
+</resources>

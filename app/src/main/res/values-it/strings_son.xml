@@ -1,0 +1,27 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Testi della reazione sonora. -->
+<resources>
+    <string name="son_titre">Reazione sonora</string>
+    <string name="son_expl_mode">I bordi dello schermo si muovono dolcemente al ritmo della musica del telefono, anche fuori dall’app.</string>
+    <string name="son_expl_rien">Niente viene registrato né salvato.</string>
+    <string name="son_expl_direct">L’app legge solo il livello del suono, in diretta, e lo dimentica subito.</string>
+    <string name="son_expl_internet">Questa app non ha accesso a Internet.</string>
+    <string name="son_expl_video">L’effetto si nasconde da solo con video e giochi a schermo intero, e funziona solo quando c’è musica.</string>
+    <string name="son_expl_micro">Android chiederà l’accesso al microfono: è obbligatorio per leggere il livello del suono.</string>
+    <string name="son_service">Attiva prima AnimLauncher nelle impostazioni di accessibilità: l’effetto ne ha bisogno per apparire.</string>
+    <string name="son_style">Stile</string>
+    <string name="son_style_1">Aurora</string>
+    <string name="son_desc_1">Una tenda di luce che si gonfia con i bassi</string>
+    <string name="son_style_2">Corde</string>
+    <string name="son_desc_2">Tre corde per bordo: bassi, melodia, acuti</string>
+    <string name="son_style_3">Vetro liquido</string>
+    <string name="son_desc_3">Il bordo si gonfia e ondeggia come un materiale morbido</string>
+    <string name="son_style_4">Prisma</string>
+    <string name="son_desc_4">Un neon sottile: ogni suono accende la sua zona</string>
+    <string name="son_activer">Attiva</string>
+    <string name="son_desactiver">Disattiva</string>
+    <string name="son_plus_tard">Più tardi</string>
+    <string name="son_fermer">Chiudi</string>
+    <string name="son_active">Reazione sonora attivata</string>
+    <string name="son_refuse">Accesso al microfono negato: la reazione sonora resta spenta.</string>
+</resources>

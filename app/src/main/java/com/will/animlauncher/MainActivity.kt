@@ -188,17 +188,32 @@ class MainActivity : Activity() {
         }
         tiroir = construireMenu()
 
+        // ---------- 5. le rond de la « réaction sonore », en bas à droite ----------
+        // (72 dp = le rond de 52 dp + la place de son halo ; il est à la hauteur de l'interrupteur général.
+        //  Un appui ouvre sa fenêtre d'explication, voir ReactionSonoreUi.kt.)
+        val boutonSon = BoutonSon(this).apply { setOnClickListener { FenetreSon.ouvrir(this@MainActivity) } }
+
         setContentView(FrameLayout(this).apply {
             setBackgroundColor(Style.NOIR)
             addView(contenu)
+            addView(boutonSon, FrameLayout.LayoutParams(px(72f), px(72f), Gravity.BOTTOM or Gravity.END).apply {
+                rightMargin = px(6f); bottomMargin = px(8f)
+            })
             addView(voile)
             addView(tiroir, FrameLayout.LayoutParams(px(300f), ViewGroup.LayoutParams.MATCH_PARENT, Gravity.START))
         })
         majPoints()
     }
 
+    // La réponse d'Android à la question « autoriser le micro ? » (posée par la fenêtre de la réaction sonore).
+    override fun onRequestPermissionsResult(demande: Int, permissions: Array<out String>, resultats: IntArray) {
+        super.onRequestPermissionsResult(demande, permissions, resultats)
+        FenetreSon.reponse(this, demande, resultats)
+    }
+
     override fun onResume() {
         super.onResume()
+        ReactionSonore.synchroniser(this)      // (la permission a pu être retirée dans les réglages du téléphone)
         // les interrupteurs suivent le réglage (il a pu changer dans le volet rapide ou les réglages)
         majAuto = true
         interrupteur.isChecked = Reglages.actif(this)

@@ -4,6 +4,13 @@
      (Internet, mode standard) est dans src/perso/AndroidManifest.xml : Android fusionne les deux. -->
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
 
+    <!-- RÉACTION SONORE (option, éteinte de base) : pour lire en direct le NIVEAU du son que joue le
+         téléphone (outil « Visualizer »), Android exige ces deux permissions. La première s'appelle
+         « enregistrer l'audio » mais l'app n'enregistre rien : elle n'est demandée à l'utilisateur
+         que s'il allume le mode, après un écran d'explication. Voir EcouteSon.kt. -->
+    <uses-permission android:name="android.permission.RECORD_AUDIO" />
+    <uses-permission android:name="android.permission.MODIFY_AUDIO_SETTINGS" />
+
     <!-- Depuis Android 11, une app ne "voit" pas les autres apps par défaut.
          On demande à voir : les apps qui ont une icône, et l'écran d'accueil. -->
     <queries>
