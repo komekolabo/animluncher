@@ -1,45 +1,416 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- L'ÉTOILE DES DOSSIERS, ANIMÉE (même astuce que le logo du widget : une ProgressBar la joue en boucle).
-     Elle fait un tour complet en 20 s (très lent), et respire (grossit de 6 %) toutes les 3 s. -->
+<!-- LA BOUCLE DU WIDGET « DOSSIER ANIMÉ » (12 s, recommence sans fin), validée par Will sur l'aperçu.
+     0-3 s : l'étoile respire et tourne doucement. 3-3,6 s : elle tourne vite et rétrécit ; 4 points
+     jaillissent. 3,6-6,4 s : les points font trois quarts de tour en traçant un anneau qui s'efface.
+     6,4-7,4 s : ils deviennent 4 tuiles. 7,6-9,7 s : une vague passe deux fois sur les tuiles.
+     9,8-10,6 s : les tuiles rentrent au centre. 10,4-11,2 s : l'étoile renaît avec un ressort.
+     Une « keyframe » = la valeur à un instant (fraction de la boucle : 0,5 = 6 s), et l'« interpolator »
+     dit comment on y arrive (en douceur, en accélérant, avec un petit dépassement…).
+     Fichier fabriqué par un programme : outils/generer_avd.py (le modifier là-bas, puis relancer). -->
 <animated-vector xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:aapt="http://schemas.android.com/aapt"
     android:drawable="@drawable/etoile_ia">
 
-    <target android:name="tour">
+    <!-- la lueur faiblit pendant que les points et les tuiles jouent -->
+    <target android:name="lueur">
         <aapt:attr name="android:animation">
-            <objectAnimator
-                android:propertyName="rotation"
-                android:valueFrom="0"
-                android:valueTo="360"
-                android:valueType="floatType"
-                android:duration="20000"
-                android:repeatCount="infinite"
-                android:interpolator="@android:interpolator/linear" />
+            <objectAnimator android:duration="12000" android:repeatCount="infinite" android:interpolator="@android:interpolator/linear">
+<propertyValuesHolder android:propertyName="fillAlpha" android:valueType="floatType">
+  <keyframe android:fraction="0.0" android:value="1" />
+  <keyframe android:fraction="0.25" android:value="1" android:interpolator="@interpolator/lin" />
+  <keyframe android:fraction="0.3" android:value="0.35" android:interpolator="@interpolator/doux" />
+  <keyframe android:fraction="0.8667" android:value="0.35" android:interpolator="@interpolator/lin" />
+  <keyframe android:fraction="0.9333" android:value="1" android:interpolator="@interpolator/doux" />
+  <keyframe android:fraction="1.0" android:value="1" android:interpolator="@interpolator/lin" />
+</propertyValuesHolder>
+            </objectAnimator>
         </aapt:attr>
     </target>
 
-    <target android:name="souffle">
+    <!-- la lueur respire (toutes les 3 s) -->
+    <target android:name="lueur_g">
         <aapt:attr name="android:animation">
-            <set>
-                <objectAnimator
-                    android:propertyName="scaleX"
-                    android:valueFrom="1"
-                    android:valueTo="1.06"
-                    android:valueType="floatType"
-                    android:duration="1500"
-                    android:repeatCount="infinite"
-                    android:repeatMode="reverse"
-                    android:interpolator="@android:interpolator/accelerate_decelerate" />
-                <objectAnimator
-                    android:propertyName="scaleY"
-                    android:valueFrom="1"
-                    android:valueTo="1.06"
-                    android:valueType="floatType"
-                    android:duration="1500"
-                    android:repeatCount="infinite"
-                    android:repeatMode="reverse"
-                    android:interpolator="@android:interpolator/accelerate_decelerate" />
-            </set>
+            <objectAnimator android:duration="12000" android:repeatCount="infinite" android:interpolator="@android:interpolator/linear">
+<propertyValuesHolder android:propertyName="scaleX" android:valueType="floatType">
+  <keyframe android:fraction="0.0" android:value="1" />
+  <keyframe android:fraction="0.125" android:value="1.06" android:interpolator="@interpolator/doux" />
+  <keyframe android:fraction="0.25" android:value="1" android:interpolator="@interpolator/doux" />
+  <keyframe android:fraction="0.375" android:value="1.06" android:interpolator="@interpolator/doux" />
+  <keyframe android:fraction="0.5" android:value="1" android:interpolator="@interpolator/doux" />
+  <keyframe android:fraction="0.625" android:value="1.06" android:interpolator="@interpolator/doux" />
+  <keyframe android:fraction="0.75" android:value="1" android:interpolator="@interpolator/doux" />
+  <keyframe android:fraction="0.875" android:value="1.06" android:interpolator="@interpolator/doux" />
+  <keyframe android:fraction="1.0" android:value="1" android:interpolator="@interpolator/doux" />
+</propertyValuesHolder>
+<propertyValuesHolder android:propertyName="scaleY" android:valueType="floatType">
+  <keyframe android:fraction="0.0" android:value="1" />
+  <keyframe android:fraction="0.125" android:value="1.06" android:interpolator="@interpolator/doux" />
+  <keyframe android:fraction="0.25" android:value="1" android:interpolator="@interpolator/doux" />
+  <keyframe android:fraction="0.375" android:value="1.06" android:interpolator="@interpolator/doux" />
+  <keyframe android:fraction="0.5" android:value="1" android:interpolator="@interpolator/doux" />
+  <keyframe android:fraction="0.625" android:value="1.06" android:interpolator="@interpolator/doux" />
+  <keyframe android:fraction="0.75" android:value="1" android:interpolator="@interpolator/doux" />
+  <keyframe android:fraction="0.875" android:value="1.06" android:interpolator="@interpolator/doux" />
+  <keyframe android:fraction="1.0" android:value="1" android:interpolator="@interpolator/doux" />
+</propertyValuesHolder>
+            </objectAnimator>
+        </aapt:attr>
+    </target>
+
+    <!-- l'étoile respire, rétrécit en tournant vite (3 s), renaît avec un ressort (10,4 s) -->
+    <target android:name="etoile_taille">
+        <aapt:attr name="android:animation">
+            <objectAnimator android:duration="12000" android:repeatCount="infinite" android:interpolator="@android:interpolator/linear">
+<propertyValuesHolder android:propertyName="scaleX" android:valueType="floatType">
+  <keyframe android:fraction="0.0" android:value="1" />
+  <keyframe android:fraction="0.125" android:value="1.06" android:interpolator="@interpolator/doux" />
+  <keyframe android:fraction="0.25" android:value="1" android:interpolator="@interpolator/doux" />
+  <keyframe android:fraction="0.3" android:value="0" android:interpolator="@interpolator/acc" />
+  <keyframe android:fraction="0.8667" android:value="0" android:interpolator="@interpolator/lin" />
+  <keyframe android:fraction="0.9333" android:value="1" android:interpolator="@interpolator/ressort" />
+  <keyframe android:fraction="1.0" android:value="1" android:interpolator="@interpolator/lin" />
+</propertyValuesHolder>
+<propertyValuesHolder android:propertyName="scaleY" android:valueType="floatType">
+  <keyframe android:fraction="0.0" android:value="1" />
+  <keyframe android:fraction="0.125" android:value="1.06" android:interpolator="@interpolator/doux" />
+  <keyframe android:fraction="0.25" android:value="1" android:interpolator="@interpolator/doux" />
+  <keyframe android:fraction="0.3" android:value="0" android:interpolator="@interpolator/acc" />
+  <keyframe android:fraction="0.8667" android:value="0" android:interpolator="@interpolator/lin" />
+  <keyframe android:fraction="0.9333" android:value="1" android:interpolator="@interpolator/ressort" />
+  <keyframe android:fraction="1.0" android:value="1" android:interpolator="@interpolator/lin" />
+</propertyValuesHolder>
+            </objectAnimator>
+        </aapt:attr>
+    </target>
+
+    <target android:name="etoile_tour">
+        <aapt:attr name="android:animation">
+            <objectAnimator android:duration="12000" android:repeatCount="infinite" android:interpolator="@android:interpolator/linear">
+<propertyValuesHolder android:propertyName="rotation" android:valueType="floatType">
+  <keyframe android:fraction="0.0" android:value="0" />
+  <keyframe android:fraction="0.25" android:value="45" android:interpolator="@interpolator/lin" />
+  <keyframe android:fraction="0.3" android:value="225" android:interpolator="@interpolator/acc" />
+  <keyframe android:fraction="0.3083" android:value="-105" android:interpolator="@interpolator/lin" />
+  <keyframe android:fraction="0.8667" android:value="-105" android:interpolator="@interpolator/lin" />
+  <keyframe android:fraction="0.9333" android:value="-15" android:interpolator="@interpolator/dec" />
+  <keyframe android:fraction="1.0" android:value="0" android:interpolator="@interpolator/lin" />
+</propertyValuesHolder>
+            </objectAnimator>
+        </aapt:attr>
+    </target>
+
+    <!-- l'anneau se trace (3,8 s) puis s'efface (5,4 s) derrière les points -->
+    <target android:name="anneau">
+        <aapt:attr name="android:animation">
+            <objectAnimator android:duration="12000" android:repeatCount="infinite" android:interpolator="@android:interpolator/linear">
+<propertyValuesHolder android:propertyName="trimPathEnd" android:valueType="floatType">
+  <keyframe android:fraction="0.0" android:value="0" />
+  <keyframe android:fraction="0.3167" android:value="0" android:interpolator="@interpolator/lin" />
+  <keyframe android:fraction="0.4167" android:value="1" android:interpolator="@interpolator/doux" />
+  <keyframe android:fraction="0.9917" android:value="1" android:interpolator="@interpolator/lin" />
+  <keyframe android:fraction="0.9958" android:value="0" android:interpolator="@interpolator/lin" />
+  <keyframe android:fraction="1.0" android:value="0" android:interpolator="@interpolator/lin" />
+</propertyValuesHolder>
+<propertyValuesHolder android:propertyName="trimPathStart" android:valueType="floatType">
+  <keyframe android:fraction="0.0" android:value="0" />
+  <keyframe android:fraction="0.45" android:value="0" android:interpolator="@interpolator/lin" />
+  <keyframe android:fraction="0.5333" android:value="1" android:interpolator="@interpolator/doux" />
+  <keyframe android:fraction="0.9917" android:value="1" android:interpolator="@interpolator/lin" />
+  <keyframe android:fraction="0.9958" android:value="0" android:interpolator="@interpolator/lin" />
+  <keyframe android:fraction="1.0" android:value="0" android:interpolator="@interpolator/lin" />
+</propertyValuesHolder>
+            </objectAnimator>
+        </aapt:attr>
+    </target>
+
+    <target android:name="anneau_tour">
+        <aapt:attr name="android:animation">
+            <objectAnimator android:duration="12000" android:repeatCount="infinite" android:interpolator="@android:interpolator/linear">
+<propertyValuesHolder android:propertyName="rotation" android:valueType="floatType">
+  <keyframe android:fraction="0.0" android:value="-90" />
+  <keyframe android:fraction="0.3" android:value="-90" android:interpolator="@interpolator/lin" />
+  <keyframe android:fraction="0.5333" android:value="180" android:interpolator="@interpolator/doux" />
+  <keyframe android:fraction="0.9917" android:value="180" android:interpolator="@interpolator/lin" />
+  <keyframe android:fraction="0.9958" android:value="-90" android:interpolator="@interpolator/lin" />
+  <keyframe android:fraction="1.0" android:value="-90" android:interpolator="@interpolator/lin" />
+</propertyValuesHolder>
+            </objectAnimator>
+        </aapt:attr>
+    </target>
+
+    <!-- les points font trois quarts de tour -->
+    <target android:name="orbite">
+        <aapt:attr name="android:animation">
+            <objectAnimator android:duration="12000" android:repeatCount="infinite" android:interpolator="@android:interpolator/linear">
+<propertyValuesHolder android:propertyName="rotation" android:valueType="floatType">
+  <keyframe android:fraction="0.0" android:value="0" />
+  <keyframe android:fraction="0.3" android:value="0" android:interpolator="@interpolator/lin" />
+  <keyframe android:fraction="0.5333" android:value="270" android:interpolator="@interpolator/doux" />
+  <keyframe android:fraction="0.9917" android:value="270" android:interpolator="@interpolator/lin" />
+  <keyframe android:fraction="0.9958" android:value="0" android:interpolator="@interpolator/lin" />
+  <keyframe android:fraction="1.0" android:value="0" android:interpolator="@interpolator/lin" />
+</propertyValuesHolder>
+            </objectAnimator>
+        </aapt:attr>
+    </target>
+
+    <!-- les points jaillissent puis se rangent -->
+    <target android:name="rayon">
+        <aapt:attr name="android:animation">
+            <objectAnimator android:duration="12000" android:repeatCount="infinite" android:interpolator="@android:interpolator/linear">
+<propertyValuesHolder android:propertyName="scaleX" android:valueType="floatType">
+  <keyframe android:fraction="0.0" android:value="0" />
+  <keyframe android:fraction="0.2667" android:value="0" android:interpolator="@interpolator/lin" />
+  <keyframe android:fraction="0.3167" android:value="1" android:interpolator="@interpolator/ressort" />
+  <keyframe android:fraction="0.5333" android:value="1" android:interpolator="@interpolator/lin" />
+  <keyframe android:fraction="0.5833" android:value="0.577" android:interpolator="@interpolator/doux" />
+  <keyframe android:fraction="0.6167" android:value="0" android:interpolator="@interpolator/acc" />
+  <keyframe android:fraction="1.0" android:value="0" android:interpolator="@interpolator/lin" />
+</propertyValuesHolder>
+<propertyValuesHolder android:propertyName="scaleY" android:valueType="floatType">
+  <keyframe android:fraction="0.0" android:value="0" />
+  <keyframe android:fraction="0.2667" android:value="0" android:interpolator="@interpolator/lin" />
+  <keyframe android:fraction="0.3167" android:value="1" android:interpolator="@interpolator/ressort" />
+  <keyframe android:fraction="0.5333" android:value="1" android:interpolator="@interpolator/lin" />
+  <keyframe android:fraction="0.5833" android:value="0.577" android:interpolator="@interpolator/doux" />
+  <keyframe android:fraction="0.6167" android:value="0" android:interpolator="@interpolator/acc" />
+  <keyframe android:fraction="1.0" android:value="0" android:interpolator="@interpolator/lin" />
+</propertyValuesHolder>
+            </objectAnimator>
+        </aapt:attr>
+    </target>
+
+    <!-- tuile 1 : sa place, puis elle rentre au centre -->
+    <target android:name="tuile_0">
+        <aapt:attr name="android:animation">
+            <objectAnimator android:duration="12000" android:repeatCount="infinite" android:interpolator="@android:interpolator/linear">
+<propertyValuesHolder android:propertyName="translateX" android:valueType="floatType">
+  <keyframe android:fraction="0.0" android:value="-8.98" />
+  <keyframe android:fraction="0.8167" android:value="-8.98" android:interpolator="@interpolator/lin" />
+  <keyframe android:fraction="0.8667" android:value="0" android:interpolator="@interpolator/acc" />
+  <keyframe android:fraction="0.9917" android:value="0" android:interpolator="@interpolator/lin" />
+  <keyframe android:fraction="0.9958" android:value="-8.98" android:interpolator="@interpolator/lin" />
+  <keyframe android:fraction="1.0" android:value="-8.98" android:interpolator="@interpolator/lin" />
+</propertyValuesHolder>
+<propertyValuesHolder android:propertyName="translateY" android:valueType="floatType">
+  <keyframe android:fraction="0.0" android:value="-8.98" />
+  <keyframe android:fraction="0.8167" android:value="-8.98" android:interpolator="@interpolator/lin" />
+  <keyframe android:fraction="0.8667" android:value="0" android:interpolator="@interpolator/acc" />
+  <keyframe android:fraction="0.9917" android:value="0" android:interpolator="@interpolator/lin" />
+  <keyframe android:fraction="0.9958" android:value="-8.98" android:interpolator="@interpolator/lin" />
+  <keyframe android:fraction="1.0" android:value="-8.98" android:interpolator="@interpolator/lin" />
+</propertyValuesHolder>
+            </objectAnimator>
+        </aapt:attr>
+    </target>
+
+    <!-- elle apparaît (ressort), ondule deux fois, puis disparaît -->
+    <target android:name="tuile_taille_0">
+        <aapt:attr name="android:animation">
+            <objectAnimator android:duration="12000" android:repeatCount="infinite" android:interpolator="@android:interpolator/linear">
+<propertyValuesHolder android:propertyName="scaleX" android:valueType="floatType">
+  <keyframe android:fraction="0.0" android:value="0" />
+  <keyframe android:fraction="0.5667" android:value="0" android:interpolator="@interpolator/lin" />
+  <keyframe android:fraction="0.6083" android:value="1" android:interpolator="@interpolator/ressort" />
+  <keyframe android:fraction="0.6333" android:value="1" android:interpolator="@interpolator/lin" />
+  <keyframe android:fraction="0.6542" android:value="1.14" android:interpolator="@interpolator/doux" />
+  <keyframe android:fraction="0.675" android:value="1" android:interpolator="@interpolator/doux" />
+  <keyframe android:fraction="0.725" android:value="1" android:interpolator="@interpolator/lin" />
+  <keyframe android:fraction="0.7458" android:value="1.14" android:interpolator="@interpolator/doux" />
+  <keyframe android:fraction="0.7667" android:value="1" android:interpolator="@interpolator/doux" />
+  <keyframe android:fraction="0.8167" android:value="1" android:interpolator="@interpolator/lin" />
+  <keyframe android:fraction="0.8667" android:value="0" android:interpolator="@interpolator/acc" />
+  <keyframe android:fraction="1.0" android:value="0" android:interpolator="@interpolator/lin" />
+</propertyValuesHolder>
+<propertyValuesHolder android:propertyName="scaleY" android:valueType="floatType">
+  <keyframe android:fraction="0.0" android:value="0" />
+  <keyframe android:fraction="0.5667" android:value="0" android:interpolator="@interpolator/lin" />
+  <keyframe android:fraction="0.6083" android:value="1" android:interpolator="@interpolator/ressort" />
+  <keyframe android:fraction="0.6333" android:value="1" android:interpolator="@interpolator/lin" />
+  <keyframe android:fraction="0.6542" android:value="1.14" android:interpolator="@interpolator/doux" />
+  <keyframe android:fraction="0.675" android:value="1" android:interpolator="@interpolator/doux" />
+  <keyframe android:fraction="0.725" android:value="1" android:interpolator="@interpolator/lin" />
+  <keyframe android:fraction="0.7458" android:value="1.14" android:interpolator="@interpolator/doux" />
+  <keyframe android:fraction="0.7667" android:value="1" android:interpolator="@interpolator/doux" />
+  <keyframe android:fraction="0.8167" android:value="1" android:interpolator="@interpolator/lin" />
+  <keyframe android:fraction="0.8667" android:value="0" android:interpolator="@interpolator/acc" />
+  <keyframe android:fraction="1.0" android:value="0" android:interpolator="@interpolator/lin" />
+</propertyValuesHolder>
+            </objectAnimator>
+        </aapt:attr>
+    </target>
+
+    <target android:name="tuile_1">
+        <aapt:attr name="android:animation">
+            <objectAnimator android:duration="12000" android:repeatCount="infinite" android:interpolator="@android:interpolator/linear">
+<propertyValuesHolder android:propertyName="translateX" android:valueType="floatType">
+  <keyframe android:fraction="0.0" android:value="8.98" />
+  <keyframe android:fraction="0.8233" android:value="8.98" android:interpolator="@interpolator/lin" />
+  <keyframe android:fraction="0.8733" android:value="0" android:interpolator="@interpolator/acc" />
+  <keyframe android:fraction="0.9917" android:value="0" android:interpolator="@interpolator/lin" />
+  <keyframe android:fraction="0.9958" android:value="8.98" android:interpolator="@interpolator/lin" />
+  <keyframe android:fraction="1.0" android:value="8.98" android:interpolator="@interpolator/lin" />
+</propertyValuesHolder>
+<propertyValuesHolder android:propertyName="translateY" android:valueType="floatType">
+  <keyframe android:fraction="0.0" android:value="-8.98" />
+  <keyframe android:fraction="0.8233" android:value="-8.98" android:interpolator="@interpolator/lin" />
+  <keyframe android:fraction="0.8733" android:value="0" android:interpolator="@interpolator/acc" />
+  <keyframe android:fraction="0.9917" android:value="0" android:interpolator="@interpolator/lin" />
+  <keyframe android:fraction="0.9958" android:value="-8.98" android:interpolator="@interpolator/lin" />
+  <keyframe android:fraction="1.0" android:value="-8.98" android:interpolator="@interpolator/lin" />
+</propertyValuesHolder>
+            </objectAnimator>
+        </aapt:attr>
+    </target>
+
+    <target android:name="tuile_taille_1">
+        <aapt:attr name="android:animation">
+            <objectAnimator android:duration="12000" android:repeatCount="infinite" android:interpolator="@android:interpolator/linear">
+<propertyValuesHolder android:propertyName="scaleX" android:valueType="floatType">
+  <keyframe android:fraction="0.0" android:value="0" />
+  <keyframe android:fraction="0.5733" android:value="0" android:interpolator="@interpolator/lin" />
+  <keyframe android:fraction="0.615" android:value="1" android:interpolator="@interpolator/ressort" />
+  <keyframe android:fraction="0.6483" android:value="1" android:interpolator="@interpolator/lin" />
+  <keyframe android:fraction="0.6692" android:value="1.14" android:interpolator="@interpolator/doux" />
+  <keyframe android:fraction="0.69" android:value="1" android:interpolator="@interpolator/doux" />
+  <keyframe android:fraction="0.74" android:value="1" android:interpolator="@interpolator/lin" />
+  <keyframe android:fraction="0.7608" android:value="1.14" android:interpolator="@interpolator/doux" />
+  <keyframe android:fraction="0.7817" android:value="1" android:interpolator="@interpolator/doux" />
+  <keyframe android:fraction="0.8233" android:value="1" android:interpolator="@interpolator/lin" />
+  <keyframe android:fraction="0.8733" android:value="0" android:interpolator="@interpolator/acc" />
+  <keyframe android:fraction="1.0" android:value="0" android:interpolator="@interpolator/lin" />
+</propertyValuesHolder>
+<propertyValuesHolder android:propertyName="scaleY" android:valueType="floatType">
+  <keyframe android:fraction="0.0" android:value="0" />
+  <keyframe android:fraction="0.5733" android:value="0" android:interpolator="@interpolator/lin" />
+  <keyframe android:fraction="0.615" android:value="1" android:interpolator="@interpolator/ressort" />
+  <keyframe android:fraction="0.6483" android:value="1" android:interpolator="@interpolator/lin" />
+  <keyframe android:fraction="0.6692" android:value="1.14" android:interpolator="@interpolator/doux" />
+  <keyframe android:fraction="0.69" android:value="1" android:interpolator="@interpolator/doux" />
+  <keyframe android:fraction="0.74" android:value="1" android:interpolator="@interpolator/lin" />
+  <keyframe android:fraction="0.7608" android:value="1.14" android:interpolator="@interpolator/doux" />
+  <keyframe android:fraction="0.7817" android:value="1" android:interpolator="@interpolator/doux" />
+  <keyframe android:fraction="0.8233" android:value="1" android:interpolator="@interpolator/lin" />
+  <keyframe android:fraction="0.8733" android:value="0" android:interpolator="@interpolator/acc" />
+  <keyframe android:fraction="1.0" android:value="0" android:interpolator="@interpolator/lin" />
+</propertyValuesHolder>
+            </objectAnimator>
+        </aapt:attr>
+    </target>
+
+    <target android:name="tuile_2">
+        <aapt:attr name="android:animation">
+            <objectAnimator android:duration="12000" android:repeatCount="infinite" android:interpolator="@android:interpolator/linear">
+<propertyValuesHolder android:propertyName="translateX" android:valueType="floatType">
+  <keyframe android:fraction="0.0" android:value="8.98" />
+  <keyframe android:fraction="0.83" android:value="8.98" android:interpolator="@interpolator/lin" />
+  <keyframe android:fraction="0.88" android:value="0" android:interpolator="@interpolator/acc" />
+  <keyframe android:fraction="0.9917" android:value="0" android:interpolator="@interpolator/lin" />
+  <keyframe android:fraction="0.9958" android:value="8.98" android:interpolator="@interpolator/lin" />
+  <keyframe android:fraction="1.0" android:value="8.98" android:interpolator="@interpolator/lin" />
+</propertyValuesHolder>
+<propertyValuesHolder android:propertyName="translateY" android:valueType="floatType">
+  <keyframe android:fraction="0.0" android:value="8.98" />
+  <keyframe android:fraction="0.83" android:value="8.98" android:interpolator="@interpolator/lin" />
+  <keyframe android:fraction="0.88" android:value="0" android:interpolator="@interpolator/acc" />
+  <keyframe android:fraction="0.9917" android:value="0" android:interpolator="@interpolator/lin" />
+  <keyframe android:fraction="0.9958" android:value="8.98" android:interpolator="@interpolator/lin" />
+  <keyframe android:fraction="1.0" android:value="8.98" android:interpolator="@interpolator/lin" />
+</propertyValuesHolder>
+            </objectAnimator>
+        </aapt:attr>
+    </target>
+
+    <target android:name="tuile_taille_2">
+        <aapt:attr name="android:animation">
+            <objectAnimator android:duration="12000" android:repeatCount="infinite" android:interpolator="@android:interpolator/linear">
+<propertyValuesHolder android:propertyName="scaleX" android:valueType="floatType">
+  <keyframe android:fraction="0.0" android:value="0" />
+  <keyframe android:fraction="0.58" android:value="0" android:interpolator="@interpolator/lin" />
+  <keyframe android:fraction="0.6217" android:value="1" android:interpolator="@interpolator/ressort" />
+  <keyframe android:fraction="0.6633" android:value="1" android:interpolator="@interpolator/lin" />
+  <keyframe android:fraction="0.6842" android:value="1.14" android:interpolator="@interpolator/doux" />
+  <keyframe android:fraction="0.705" android:value="1" android:interpolator="@interpolator/doux" />
+  <keyframe android:fraction="0.755" android:value="1" android:interpolator="@interpolator/lin" />
+  <keyframe android:fraction="0.7758" android:value="1.14" android:interpolator="@interpolator/doux" />
+  <keyframe android:fraction="0.7967" android:value="1" android:interpolator="@interpolator/doux" />
+  <keyframe android:fraction="0.83" android:value="1" android:interpolator="@interpolator/lin" />
+  <keyframe android:fraction="0.88" android:value="0" android:interpolator="@interpolator/acc" />
+  <keyframe android:fraction="1.0" android:value="0" android:interpolator="@interpolator/lin" />
+</propertyValuesHolder>
+<propertyValuesHolder android:propertyName="scaleY" android:valueType="floatType">
+  <keyframe android:fraction="0.0" android:value="0" />
+  <keyframe android:fraction="0.58" android:value="0" android:interpolator="@interpolator/lin" />
+  <keyframe android:fraction="0.6217" android:value="1" android:interpolator="@interpolator/ressort" />
+  <keyframe android:fraction="0.6633" android:value="1" android:interpolator="@interpolator/lin" />
+  <keyframe android:fraction="0.6842" android:value="1.14" android:interpolator="@interpolator/doux" />
+  <keyframe android:fraction="0.705" android:value="1" android:interpolator="@interpolator/doux" />
+  <keyframe android:fraction="0.755" android:value="1" android:interpolator="@interpolator/lin" />
+  <keyframe android:fraction="0.7758" android:value="1.14" android:interpolator="@interpolator/doux" />
+  <keyframe android:fraction="0.7967" android:value="1" android:interpolator="@interpolator/doux" />
+  <keyframe android:fraction="0.83" android:value="1" android:interpolator="@interpolator/lin" />
+  <keyframe android:fraction="0.88" android:value="0" android:interpolator="@interpolator/acc" />
+  <keyframe android:fraction="1.0" android:value="0" android:interpolator="@interpolator/lin" />
+</propertyValuesHolder>
+            </objectAnimator>
+        </aapt:attr>
+    </target>
+
+    <target android:name="tuile_3">
+        <aapt:attr name="android:animation">
+            <objectAnimator android:duration="12000" android:repeatCount="infinite" android:interpolator="@android:interpolator/linear">
+<propertyValuesHolder android:propertyName="translateX" android:valueType="floatType">
+  <keyframe android:fraction="0.0" android:value="-8.98" />
+  <keyframe android:fraction="0.8367" android:value="-8.98" android:interpolator="@interpolator/lin" />
+  <keyframe android:fraction="0.8867" android:value="0" android:interpolator="@interpolator/acc" />
+  <keyframe android:fraction="0.9917" android:value="0" android:interpolator="@interpolator/lin" />
+  <keyframe android:fraction="0.9958" android:value="-8.98" android:interpolator="@interpolator/lin" />
+  <keyframe android:fraction="1.0" android:value="-8.98" android:interpolator="@interpolator/lin" />
+</propertyValuesHolder>
+<propertyValuesHolder android:propertyName="translateY" android:valueType="floatType">
+  <keyframe android:fraction="0.0" android:value="8.98" />
+  <keyframe android:fraction="0.8367" android:value="8.98" android:interpolator="@interpolator/lin" />
+  <keyframe android:fraction="0.8867" android:value="0" android:interpolator="@interpolator/acc" />
+  <keyframe android:fraction="0.9917" android:value="0" android:interpolator="@interpolator/lin" />
+  <keyframe android:fraction="0.9958" android:value="8.98" android:interpolator="@interpolator/lin" />
+  <keyframe android:fraction="1.0" android:value="8.98" android:interpolator="@interpolator/lin" />
+</propertyValuesHolder>
+            </objectAnimator>
+        </aapt:attr>
+    </target>
+
+    <target android:name="tuile_taille_3">
+        <aapt:attr name="android:animation">
+            <objectAnimator android:duration="12000" android:repeatCount="infinite" android:interpolator="@android:interpolator/linear">
+<propertyValuesHolder android:propertyName="scaleX" android:valueType="floatType">
+  <keyframe android:fraction="0.0" android:value="0" />
+  <keyframe android:fraction="0.5867" android:value="0" android:interpolator="@interpolator/lin" />
+  <keyframe android:fraction="0.6283" android:value="1" android:interpolator="@interpolator/ressort" />
+  <keyframe android:fraction="0.6783" android:value="1" android:interpolator="@interpolator/lin" />
+  <keyframe android:fraction="0.6992" android:value="1.14" android:interpolator="@interpolator/doux" />
+  <keyframe android:fraction="0.72" android:value="1" android:interpolator="@interpolator/doux" />
+  <keyframe android:fraction="0.77" android:value="1" android:interpolator="@interpolator/lin" />
+  <keyframe android:fraction="0.7908" android:value="1.14" android:interpolator="@interpolator/doux" />
+  <keyframe android:fraction="0.8117" android:value="1" android:interpolator="@interpolator/doux" />
+  <keyframe android:fraction="0.8367" android:value="1" android:interpolator="@interpolator/lin" />
+  <keyframe android:fraction="0.8867" android:value="0" android:interpolator="@interpolator/acc" />
+  <keyframe android:fraction="1.0" android:value="0" android:interpolator="@interpolator/lin" />
+</propertyValuesHolder>
+<propertyValuesHolder android:propertyName="scaleY" android:valueType="floatType">
+  <keyframe android:fraction="0.0" android:value="0" />
+  <keyframe android:fraction="0.5867" android:value="0" android:interpolator="@interpolator/lin" />
+  <keyframe android:fraction="0.6283" android:value="1" android:interpolator="@interpolator/ressort" />
+  <keyframe android:fraction="0.6783" android:value="1" android:interpolator="@interpolator/lin" />
+  <keyframe android:fraction="0.6992" android:value="1.14" android:interpolator="@interpolator/doux" />
+  <keyframe android:fraction="0.72" android:value="1" android:interpolator="@interpolator/doux" />
+  <keyframe android:fraction="0.77" android:value="1" android:interpolator="@interpolator/lin" />
+  <keyframe android:fraction="0.7908" android:value="1.14" android:interpolator="@interpolator/doux" />
+  <keyframe android:fraction="0.8117" android:value="1" android:interpolator="@interpolator/doux" />
+  <keyframe android:fraction="0.8367" android:value="1" android:interpolator="@interpolator/lin" />
+  <keyframe android:fraction="0.8867" android:value="0" android:interpolator="@interpolator/acc" />
+  <keyframe android:fraction="1.0" android:value="0" android:interpolator="@interpolator/lin" />
+</propertyValuesHolder>
+            </objectAnimator>
         </aapt:attr>
     </target>
 </animated-vector>
