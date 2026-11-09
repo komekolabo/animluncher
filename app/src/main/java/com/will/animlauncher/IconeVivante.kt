@@ -83,9 +83,16 @@ class IconeVivante(private val service: AccessibilityService) {
     private var defileA = 0L                // dernier signal de défilement (pour attendre la fin)
     private var dernierDefilement: AccessibilityEvent? = null
     private var notesDefilement = 0         // pour ne pas inonder le journal
+    // DIAGNOSTIC : la dernière raison pour laquelle le logo n'est PAS affiché (on ne l'écrit dans
+    // le journal que quand elle change), et les noms d'écrans de l'accueil déjà vus.
+    private var derniereRaison: String? = null
+    private val ecransVus = HashSet<String>()
 
     // Une fenêtre passe au premier plan.
     fun surFenetre(app: String?, classe: String, accueil: String?) {
+        // on note une fois chaque nom d'écran de l'accueil (pour comprendre ce que Samsung envoie)
+        if (app == accueil && ecransVus.size < 20 && ecransVus.add(classe))
+            noter("  (icône vivante : écran de l'accueil « $classe »)")
         val avant = surAccueil
         surAccueil = app == accueil && classe == "Launcher"
         if (!surAccueil) { cacher(); return }
@@ -132,12 +139,24 @@ class IconeVivante(private val service: AccessibilityService) {
     // Doit-on afficher le logo vivant maintenant ?
     private fun evaluer(raison: String) {
         if (!surAccueil) return
-        if (!Reglages.actif(service) || !IconeAccueil.actif(service)) return
-        val r = IconeAccueil.rect(service) ?: return
+        if (!Reglages.actif(service)) return pas("animations coupées (interrupteur général)")
+        if (!IconeAccueil.actif(service)) return pas("interrupteur de l'essai coupé")
+        val r = IconeAccueil.rect(service)
+            ?: return pas("position de l'icône inconnue : ferme AnimLauncher, puis ouvre-la depuis son icône sur une page de l'accueil")
         val ecran = service.resources.displayMetrics
-        if (ecran.widthPixels != IconeAccueil.largeur(service)) { cacher(); return }   // autre écran
-        if (!bonnePage()) { cacher(); return }
+        if (ecran.widthPixels != IconeAccueil.largeur(service)) {                          // autre écran
+            cacher(); return pas("écran de ${ecran.widthPixels} de large au lieu de ${IconeAccueil.largeur(service)}")
+        }
+        if (!bonnePage()) { cacher(); return pas("pas sur la page de l'icône") }
+        derniereRaison = null
         montrer(r, raison)
+    }
+
+    // Écrit dans le journal pourquoi le logo n'est pas affiché (seulement si la raison change).
+    private fun pas(pourquoi: String) {
+        if (pourquoi == derniereRaison) return
+        derniereRaison = pourquoi
+        noter("  (icône vivante pas affichée : $pourquoi)")
     }
 
     // Est-on sur la page de l'icône ? On compare la page actuelle à celle notée à l'ouverture.
