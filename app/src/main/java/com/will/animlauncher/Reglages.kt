@@ -72,4 +72,39 @@ object Reglages {
         // on range une COPIE neuve : Android n'enregistre pas les modifications d'un ensemble existant
         carnet(c).edit().putStringSet("var_$app", liste.map { it.toString() }.toSet()).apply()
     }
+
+    // ---------------- LE TIRAGE « ÉQUILIBRÉ » DES VARIANTES ----------------
+    // Chaque variante a un compteur d'attente : le nombre d'ouvertures depuis qu'elle
+    // n'est pas passée. Son poids au tirage = 1 + attente (plafonné à ATTENTE_MAX).
+    // Quand une variante se joue, son compteur repart à 0 (elle a moins de chances de
+    // retomber) et celui des autres monte de 1 (elles ont plus de chances).
+    // Exemple avec 5 variantes : juste après « A », A pèse 1 et les 4 autres pèsent 2,
+    // donc A n'a plus que 1 chance sur 9 (11 %) et chaque autre 2 sur 9 (22 %).
+    private const val ATTENTE_MAX = 6
+
+    // Lit les compteurs, rangés sous la forme "0,2,1,3" (un nombre par variante).
+    private fun attentes(c: Context, app: String, nombre: Int): IntArray {
+        val brut = carnet(c).getString("attente_$app", null)?.split(",")?.map { it.toIntOrNull() ?: 0 }
+        // si le nombre de variantes a changé (une ajoutée ou retirée), on repart de zéro
+        return if (brut != null && brut.size == nombre) brut.toIntArray() else IntArray(nombre)
+    }
+
+    // Tire une variante parmi « permises » (les cochées) et met les compteurs à jour.
+    // nombre = le nombre total de variantes de l'app.
+    fun tirerVariante(c: Context, app: String, nombre: Int, permises: List<Int>): Int {
+        val att = attentes(c, app, nombre)
+        val poids = permises.map { 1 + att[it].coerceAtMost(ATTENTE_MAX) }
+        // tirage pondéré : on lance un « dé » entre 0 et la somme des poids,
+        // puis on avance dans la liste jusqu'à dépasser le nombre tiré
+        var de = kotlin.random.Random.nextInt(poids.sum())
+        var choisie = permises.last()
+        for (k in permises.indices) {
+            if (de < poids[k]) { choisie = permises[k]; break }
+            de -= poids[k]
+        }
+        // mise à jour : la gagnante repart à 0, les autres cochées attendent un tour de plus
+        for (v in permises) att[v] = if (v == choisie) 0 else (att[v] + 1).coerceAtMost(ATTENTE_MAX)
+        carnet(c).edit().putString("attente_$app", att.joinToString(",")).apply()
+        return choisie
+    }
 }

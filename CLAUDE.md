@@ -4,6 +4,10 @@ App Android de Will (GitHub : komekolabo). Elle joue une **animation plein écra
 de chaque app** (Claude, Google, Duolingo…), sur son Samsung Galaxy Z Flip6 (Android 16).
 Objectif : la publier sur le Google Play Store, avec une pub non invasive.
 
+> **⚠️ BRANCHE DE TRAVAIL : `version-store`.** C'est sur elle qu'on travaille (la version Store est la
+> priorité). Toujours partir de `version-store` et y envoyer les changements, **jamais directement sur
+> `main`** (le 09/11, le tirage équilibré a été poussé sur `main` par erreur, puis reporté ici).
+
 ## Qui est Will (à respecter)
 - **Débutant en code** : toujours expliquer ce que fait le code, en français simple.
   Les commentaires du code sont en français et pédagogiques (garder ce style).
@@ -61,7 +65,10 @@ Objectif : la publier sur le Google Play Store, avec une pub non invasive.
   vers ~2 s). Dans l'app, les 20 photos du mur sont FIXES (les petites animations de l'aperçu — vapeur,
   phare, feux d'artifice — n'ont pas été portées). Will a rejeté : « Pellicule », Filtres/île, Le fil,
   Mosaïque cœur, mur→arbre, tour de Babel ; il a validé Reels (swipes nets qui accélèrent) et le mur cosy.
-  Les variantes d'une app sont tirées au hasard ; on ajoute les nouvelles À LA FIN de la liste
+  Les variantes d'une app sont tirées au hasard, en TIRAGE ÉQUILIBRÉ (09/11, `Reglages.tirerVariante`) :
+  chaque variante a un compteur d'attente (carnet « attente_<app> »), poids = 1 + attente (max 6) ;
+  celle qui se joue repart à 0, les autres cochées +1 → la même ne retombe 2 fois de suite que ~6 % du
+  temps (20 % au hasard pur). L'aperçu des réglages ne touche pas aux compteurs. On ajoute les nouvelles À LA FIN de la liste
   (les réglages retiennent les variantes décochées par leur numéro).
   Chaque scène hérite de `Scene` et dessine **toute l'image à chaque instant** (pas d'état caché).
   Elles sont calibrées sur un écran « modèle » de 540 de large (k = largeur / 540).
