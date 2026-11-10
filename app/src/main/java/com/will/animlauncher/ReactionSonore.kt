@@ -630,6 +630,8 @@ class VueSonore(context: Context) : View(context) {
         // PALIER 1 : des petits Z
         sommeil += ((if (palier == 1) 1f else 0f) - sommeil) * min(1f, dt * 1.5f)
         if (sommeil > 0.01f) petitsZ(c, clairs[0])
+        // (PROVISOIRE) les mesures en chiffres, en bas de l'écran, pour régler les paliers : voir MesuresSon.kt
+        MesuresSon.dessiner(c, w / 2f, ht - 30f * d, d, presence)
 
         // … et on demande l'image suivante (sur un écran rapide : celle d'après, donc 60 images/s)
         if (ecranRapide) postOnAnimation(sauterUneImage) else postInvalidateOnAnimation()
