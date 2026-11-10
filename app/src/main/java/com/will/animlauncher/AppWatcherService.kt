@@ -24,3 +24,929 @@ import android.widget.FrameLayout
 // Le service qui surveille quelle app passe au premier plan,
 // et qui joue l'écran de chargement correspondant (voir Catalogue.kt).
 class AppWatcherService : AccessibilityService() {
+
+    private var derniereApp: String? = null
+    private var seanceEnCours: Rideau.Seance? = null   // l'animation qui joue en ce moment
+    private var appAnimee: String? = null      // l'app pour laquelle l'animation tourne
+    private var appApparue = false             // la fenêtre de cette app est-elle déjà arrivée ?
+    // LES APPS OUVERTES EN ARRIÈRE-PLAN : l'app -> la dernière fois qu'on l'a quittée.
+    // Une app y entre quand elle s'affiche ; elle en sort quand on appuie sur « Tout fermer »
+    // dans les apps récentes, ou quand on ne l'a plus vue depuis 30 min (Android l'a sans doute fermée).
+    private val dejaOuvertes = HashMap<String, Long>()
+
+    // Nom affiché sous l'icône -> nom technique de l'app (ex. "Claude" -> "com.anthropic.claude").
+    private var noms: Map<String, String> = emptyMap()
+    private var nomsCalculesA = 0L
+    // Dernière app lancée par un clic (pour ne pas rejouer l'animation quand sa fenêtre arrive).
+    private var appCliquee: String? = null
+    private var clicA = 0L
+    // Dernier appui (n'importe lequel) sur l'écran d'accueil, et en a-t-on déjà reçu ?
+    private var dernierClicAccueil = 0L
+    private var clicsRecus = false
+    // Dernier appui sur l'accueil qui n'était ni une icône connue ni un widget reconnu.
+    private var clicInconnuA = 0L
+    // L'app qu'on vient de quitter (retour à l'accueil) et quand.
+    private var appQuittee: String? = null
+    private var quitteeA = 0L
+    private val minuteur = Handler(Looper.getMainLooper())
+    // ANTI-REBOND : quand l'animation a été jouée pour une app, on note l'heure. Pendant 10 s,
+    // une nouvelle fenêtre de cette app ne la relance pas (certaines apps enchaînent plusieurs
+    // écrans en s'ouvrant, et l'écran d'accueil glisse parfois un signal entre deux).
+    // Un vrai nouvel appui sur l'icône, lui, relance toujours l'animation.
+    private val animeeA = HashMap<String, Long>()
+
+    private val ignorees = setOf(
+        "com.samsung.android.spay",
+        "com.samsung.android.honeyboard",
+        "com.samsung.android.app.spage"
+    )
+
+    // L'ÉCRAN D'ACCUEIL (le lanceur Samsung). Presque tout en dépend : les appuis sur les icônes, le retour
+    // sur l'accueil, les apps récentes, « Tout fermer »…
+    // CORRIGÉ LE 10/11 (après la mise à jour Android 17 du téléphone de Will) : on demandait juste « qui est
+    // l'accueil ? ». Mais si Android hésite (après une mise à jour, l'accueil par défaut peut être oublié),
+    // la réponse est la fenêtre « Choisir une application » (nom technique « android »), et l'app ne
+    // reconnaissait plus du tout l'accueil : plus de retour sur l'accueil, plus de « Tout fermer », donc
+    // toutes les apps restaient « ouvertes en arrière-plan » et les animations ne se lançaient plus.
+    // Maintenant : si la réponse n'est pas un vrai lanceur, on prend le lanceur Samsung s'il existe, sinon
+    // le premier lanceur installé (jamais « android », ni les Paramètres, ni nous-mêmes).
+    private val ecranAccueil: String? by lazy { trouverAccueil() }
+
+    private fun trouverAccueil(): String? {
+        val intention = Intent(Intent.ACTION_MAIN).addCategory(Intent.CATEGORY_HOME)
+        val pasUnLanceur = setOf("android", packageName, "com.android.settings")
+        val defaut = try {
+            packageManager.resolveActivity(intention, PackageManager.MATCH_DEFAULT_ONLY)?.activityInfo?.packageName
+        } catch (_: Exception) { null }
+        if (defaut != null && defaut !in pasUnLanceur) return defaut
+        val tous = try {
+            packageManager.queryIntentActivities(intention, 0).map { it.activityInfo.packageName }.filter { it !in pasUnLanceur }
+        } catch (_: Exception) { emptyList() }
+        return tous.firstOrNull { it == "com.sec.android.app.launcher" } ?: tous.firstOrNull() ?: defaut
+    }
+
+    // Pour le journal : les fenêtres qu'on ne suit pas (ni une app, ni l'accueil), notées UNE fois chacune.
+    // Si un jour l'accueil ou les apps récentes changent encore de nom, on le verra ici.
+    private val fenetresInconnues = HashSet<String>()
+
+    override fun onServiceConnected() {
+        actif = this
+        Journal.installerFilet(this)
+        noter("=== Service démarré (allumage ou réactivation) ===")
+        noter("  écran d'accueil reconnu : ${ecranAccueil ?: "AUCUN"}")
+        noms = calculerNoms()      // préparé à l'avance : le clic doit être traité instantanément
+        installerRideau()          // la fenêtre des animations, prête d'avance (voir Rideau.kt)
+        // on veut savoir quand l'écran s'éteint et se rallume (temps passé dans les apps, widget « top 3 »)
+        try {
+            val filtre = IntentFilter().apply { addAction(Intent.ACTION_SCREEN_OFF); addAction(Intent.ACTION_SCREEN_ON); addAction(Intent.ACTION_USER_PRESENT) }
+            if (Build.VERSION.SDK_INT >= 33) registerReceiver(ecouteEcran, filtre, Context.RECEIVER_NOT_EXPORTED)
+            else registerReceiver(ecouteEcran, filtre)
+        } catch (e: Exception) {
+            noter("ERREUR écoute de l'écran : ${e.message}")
+        }
+    }
+
+    // L'ÉCRAN S'ÉTEINT OU SE RALLUME. Éteint : on arrête de compter le temps de l'app en cours (voir Usage.kt)
+    // et l'animation du widget « top 3 » (voir WidgetTop.kt). Rallumé et déverrouillé : on reprend.
+    private val ecouteEcran = object : BroadcastReceiver() {
+        override fun onReceive(c: Context, intention: Intent) {
+            try {
+                if (intention.action == Intent.ACTION_SCREEN_OFF) {
+                    Usage.auPremierPlan(this@AppWatcherService, null)
+                    WidgetTop.pause()
+                } else {
+                    val app = derniereApp
+                    Usage.auPremierPlan(this@AppWatcherService, if (app == ecranAccueil) null else app)
+                    if (app == ecranAccueil) WidgetTop.surAccueil(this@AppWatcherService)
+                }
+            } catch (e: Exception) {
+                noter("ERREUR (rattrapée) écran : " + Journal.pile(e))
+            }
+        }
+    }
+
+    override fun onAccessibilityEvent(event: AccessibilityEvent) {
+        // Si quelque chose se passe mal pendant le traitement d'un signal, on l'écrit dans le
+        // journal au lieu de laisser planter le service (un service planté = plus aucune animation).
+        try {
+            when (event.eventType) {
+                AccessibilityEvent.TYPE_VIEW_CLICKED -> { diagnostic(event); clic(event) }
+                AccessibilityEvent.TYPE_WINDOW_STATE_CHANGED -> {
+                    // Depuis Android 17, une fermeture peut aussi être signalée ainsi (voir pendantRecents).
+                    if (dansRecents) pendantRecents(event)
+                    fenetre(event)
+                }
+                AccessibilityEvent.TYPE_ANNOUNCEMENT -> annonce(event)
+                // Ces trois signaux-là ne sont demandés QUE pendant la visite des apps récentes
+                // (voir signauxRecents) : ils servent à repérer une carte qu'on glisse vers le haut.
+                AccessibilityEvent.TYPE_WINDOW_CONTENT_CHANGED,
+                AccessibilityEvent.TYPE_VIEW_SCROLLED,
+                AccessibilityEvent.TYPE_WINDOWS_CHANGED -> pendantRecents(event)
+                else -> diagnostic(event)
+            }
+        } catch (e: Exception) {
+            noter("ERREUR (rattrapée) : " + Journal.pile(e))
+        }
+    }
+
+    // MOUCHARD DES DOSSIERS : pendant 5 s après un appui sur l'écran d'accueil (par exemple
+    // l'ouverture d'un dossier), on note dans le journal TOUS les signaux reçus, avec leur type
+    // et leur texte (12 lignes au plus). Ça permet de voir ce que le lanceur Samsung envoie
+    // quand on touche une icône À L'INTÉRIEUR d'un dossier.
+    private var diagLignes = 0
+    private fun diagnostic(event: AccessibilityEvent) {
+        if (SystemClock.uptimeMillis() - dernierClicAccueil > 5000 || diagLignes >= 12) return
+        // seulement les signaux de l'écran d'accueil (ou sans expéditeur) : on ne note jamais
+        // ce qui se passe à l'intérieur des autres apps
+        val expediteur = event.packageName?.toString()
+        if (expediteur != null && expediteur != ecranAccueil) return
+        val textes = event.text.map { it.toString() } + listOfNotNull(event.contentDescription?.toString())
+        if (textes.all { it.isBlank() }) return
+        diagLignes++
+        noter("  [signal] ${AccessibilityEvent.eventTypeToString(event.eventType)} " +
+            "de ${event.packageName ?: "(inconnu)"} « ${textes.joinToString(" / ")} »")
+    }
+
+    // 1) LE CLIC SUR L'ICÔNE. Le lanceur (l'écran d'accueil) nous dit sur quoi on a appuyé,
+    // AVANT que l'app ne s'ouvre. On retrouve l'app grâce au nom écrit sous l'icône,
+    // et l'animation démarre tout de suite : elle couvre l'ouverture de l'app.
+    private fun clic(event: AccessibilityEvent) {
+        // L'appui doit venir de l'écran d'accueil. Certains écrans (comme l'intérieur d'un dossier)
+        // envoient un appui SANS dire de quelle app il vient : on l'accepte si l'écran d'accueil
+        // est bien au premier plan.
+        val expediteur = event.packageName?.toString()
+        if (expediteur == null) {
+            if (derniereApp != ecranAccueil) return
+        } else if (expediteur != ecranAccueil) return
+        clicsRecus = true
+        if (SystemClock.uptimeMillis() - dernierClicAccueil > 5000) diagLignes = 0
+        dernierClicAccueil = SystemClock.uptimeMillis()
+        val textes = event.text.map { it.toString() } + listOfNotNull(event.contentDescription?.toString())
+        var app = trouverApp(textes)
+        var parWidget = false
+        if (app == null) {
+            // Pas une icône : c'est peut-être un WIDGET (voir appDuWidget).
+            app = appDuWidget(event)
+            parWidget = app != null
+        }
+        if (app == null) {
+            // « Tout fermer » dans les apps récentes : plus aucune app n'est ouverte en arrière-plan.
+            if (textes.any { toutFermer(it) }) {
+                dejaOuvertes.clear()
+                noter("« Tout fermer » : toutes les apps sont fermées")
+                return
+            }
+            // Un appui sur une CARTE des apps récentes (pas une icône) : c'est une reprise depuis
+            // l'arrière-plan. L'app s'affiche tout de suite, avant toute animation possible : on ne
+            // joue rien. (Avant, cet appui était pris pour un widget, et l'animation arrivait EN
+            // RETARD, par-dessus l'app déjà affichée.)
+            if (dansRecents) {
+                noter("appui dans les apps récentes « ${textes.joinToString(" / ")} » : reprise, pas d'animation")
+                return
+            }
+            clicInconnuA = dernierClicAccueil
+            noter("clic accueil « ${textes.joinToString(" / ")} » : pas une app connue")
+            return
+        }
+        if (app in ignorees) return
+        if (!Reglages.actif(this)) return
+        if (Catalogue.pour(app) == null) return
+        // Réglages de l'app : désactivée, durée 0 s, ou aucune variante cochée -> rien
+        val lancement = Catalogue.lancement(this, app)
+        if (lancement == null) { noter("clic -> $app : animation désactivée dans les réglages"); return }
+        // Le même appui signalé deux fois : l'animation tourne déjà pour cette app, on ne la recommence pas.
+        if (seanceEnCours != null && appAnimee == app) return
+        // Mode « seulement au démarrage » (général ou réglé pour cette app) : si l'app est encore
+        // ouverte en arrière-plan, on ne joue rien. Avant, on regardait si son écran de lancement
+        // apparaissait, mais Gmail ou YouTube en affichent un à chaque fois, même en arrière-plan.
+        // Un widget, lui, ouvre toujours l'app volontairement : l'animation est jouée dans tous les cas.
+        if (!parWidget && Reglages.seulementDemarrage(this, app) && enArrierePlan(app)) {
+            noter("clic sur « ${textes.firstOrNull() ?: "?"} » -> $app : déjà ouverte en arrière-plan, pas d'animation")
+            // …sauf si son écran de démarrage arrive juste après (voir fenetre) : elle était en fait fermée.
+            refuseeApp = app
+            refuseeA = SystemClock.uptimeMillis()
+            return
+        }
+        appCliquee = app
+        clicA = SystemClock.uptimeMillis()
+        afficher(lancement, app, dejaPrete = false)   // d'abord l'animation, le journal après
+        noter((if (parWidget) "clic sur un widget" else "clic sur « ${textes.firstOrNull() ?: "?"} »") + " -> $app : animation lancée")
+    }
+
+    // LES WIDGETS. Un widget est affiché par l'écran d'accueil, donc l'appui semble venir du
+    // lanceur, et son texte ("12:30", "Lecture"…) n'est pas le nom d'une app. Mais chaque élément
+    // d'un widget porte un identifiant qui commence par le nom technique de l'app qui l'a dessiné,
+    // par exemple "com.spotify.music:id/bouton_lecture". On regarde donc l'élément touché, puis
+    // ses parents (le cadre du widget), et on prend le premier identifiant qui vient d'une autre
+    // app que le lanceur. On ne lit rien d'autre de l'écran.
+    private fun appDuWidget(event: AccessibilityEvent): String? = try {
+        chercherDansWidget(event)
+    } catch (e: Exception) {
+        noter("ERREUR widget (rattrapée) : " + Journal.pile(e))
+        null
+    }
+
+    private fun chercherDansWidget(event: AccessibilityEvent): String? {
+        var noeud = try { event.source } catch (_: Exception) { null } ?: return null
+        val aVoir = ArrayDeque<android.view.accessibility.AccessibilityNodeInfo>()
+        // l'élément touché et ses parents…
+        for (niveau in 0 until 10) {
+            aVoir.add(noeud)
+            noeud = noeud.parent ?: break
+        }
+        // …puis les enfants directs de l'élément touché (si lui-même n'a pas d'identifiant)
+        val touche = aVoir.first()
+        for (i in 0 until minOf(touche.childCount, 20)) touche.getChild(i)?.let { aVoir.add(it) }
+        for (n in aVoir) {
+            val id = n.viewIdResourceName ?: continue
+            val pkg = id.substringBefore(":id/", "")
+            if (pkg.isEmpty() || pkg == ecranAccueil || pkg == "android" || pkg == packageName) continue
+            if (packageManager.getLaunchIntentForPackage(pkg) == null) continue
+            return pkg
+        }
+        return null
+    }
+
+    private fun trouverApp(textes: List<String>): String? {
+        chercher(textes)?.let { return it }
+        // Pas trouvé (un dossier, un widget… ou une app installée depuis) :
+        // on refait la liste, au plus une fois toutes les 30 secondes.
+        val maintenant = SystemClock.uptimeMillis()
+        if (maintenant - nomsCalculesA < 30_000) return null
+        noms = calculerNoms()
+        return chercher(textes)
+    }
+
+    private fun chercher(textes: List<String>): String? {
+        for (t in textes) {
+            val propre = t.trim()
+            noms[propre]?.let { return it }
+            // Samsung ajoute parfois des infos après une virgule ("Claude, 2 notifications")
+            noms[propre.substringBefore(',').trim()]?.let { return it }
+        }
+        return null
+    }
+
+    // Toutes les apps de l'écran d'accueil : nom affiché -> nom technique.
+    // Si deux apps ont le même nom (ex. deux « Wallet »), on garde celle qui a une animation.
+    private fun calculerNoms(): Map<String, String> {
+        val intention = Intent(Intent.ACTION_MAIN).addCategory(Intent.CATEGORY_LAUNCHER)
+        nomsCalculesA = SystemClock.uptimeMillis()
+        val resultat = HashMap<String, String>()
+        for (info in packageManager.queryIntentActivities(intention, 0)) {
+            val nom = info.loadLabel(packageManager).toString().trim()
+            val pkg = info.activityInfo.packageName
+            if (resultat[nom] == null || Catalogue.pour(pkg) != null) resultat[nom] = pkg
+        }
+        return resultat
+    }
+
+    // 2) LES CHANGEMENTS DE FENÊTRE : l'app qui passe au premier plan.
+    private fun fenetre(event: AccessibilityEvent) {
+        val app = event.packageName?.toString() ?: return
+        if (app == packageName || app in ignorees) return
+        val classe = event.className?.toString()?.substringAfterLast('.') ?: "?"
+
+        // L'APP EST-ELLE PRÊTE ? Dès que le vrai écran de l'app arrive (autre chose que
+        // l'écran de lancement FrameLayout), on lance la révélation. Si l'utilisateur part
+        // ailleurs après l'arrivée de l'app, on révèle aussi. Avant l'arrivée de l'app, on
+        // ignore les autres fenêtres (le lanceur bouge encore pendant le clic).
+        val estVraieApp = app == ecranAccueil ||
+            packageManager.getLaunchIntentForPackage(app) != null
+
+        // MESURE DU DÉMARRAGE (juste une mesure, elle ne change rien au comportement).
+        if (estVraieApp) mesurerDemarrage(app, classe, event.eventTime)
+
+        seanceEnCours?.let { vue ->
+            // RELAIS : certaines icônes ouvrent en fait une autre app (ex. Gemini s'ouvre
+            // dans l'app Google). Si une autre vraie app arrive avant celle attendue, on la suit.
+            if (!appApparue && app != appAnimee && app != ecranAccueil && estVraieApp) {
+                noter("  .. relais : $appAnimee -> $app")
+                appAnimee?.let { relais[it] = app }
+                appAnimee = app
+                animeeA[app] = SystemClock.uptimeMillis()
+            }
+            if (seanceEnCours === vue && app == appAnimee) {
+                appApparue = true
+                if (classe != "FrameLayout") {
+                    vue.signalerPret()
+                    noter("  .. app prête après ${SystemClock.uptimeMillis() - vue.creeeA} ms (écran $classe)")
+                }
+            } else if (appApparue) {
+                vue.signalerPret()
+            }
+        }
+
+        // LES APPS RÉCENTES : quand on les ouvre, on regarde régulièrement quelles apps y sont.
+        // Une app qui disparaît de la liste pendant la visite a été fermée (glissée vers le haut).
+        if (app == ecranAccueil && classe.contains("Recent")) {
+            // si on vient de quitter un dossier animé : pas de retour de l'étoile par-dessus les apps récentes
+            RetourEtoile.annuler()
+            debutRecents()
+        }
+        else if (dansRecents && ((app == ecranAccueil && classe == "Launcher") || (app != ecranAccueil && estVraieApp))) {
+            finRecents()
+            // On a touché une carte des apps récentes : l'app reprend depuis l'arrière-plan.
+            // Si elle affiche quand même son écran de démarrage, c'est PEUT-ÊTRE qu'elle le fait à
+            // chaque fois (comme Gmail ou YouTube)… ou simplement qu'Android l'avait fermée en
+            // douce pour libérer de la mémoire (elle redémarre alors vraiment).
+            // Pour ne pas confondre les deux, on ne compte que les reprises d'une app quittée il y a
+            // moins de 3 minutes (Android ne ferme presque jamais une app aussi vite), et il faut
+            // l'avoir vu 2 fois avant de le retenir. (Avant, une seule fois suffisait : Claude avait
+            // été retenu à tort, et son animation ne se lançait plus.)
+            val quitteeIlYa = dejaOuvertes[app]?.let { SystemClock.uptimeMillis() - it }
+            if (app != ecranAccueil && classe == "FrameLayout" && app !in splashToujours() &&
+                quitteeIlYa != null && quitteeIlYa < 3 * 60_000L) {
+                if (retenirSplash(app)) noter("  (appris : $app affiche son écran de démarrage même en reprise)")
+                else noter("  ($app affiche son écran de démarrage en reprise : 1re fois, on attend de le revoir)")
+            }
+        }
+
+        if (!estVraieApp) {
+            val cle = "$app / $classe"
+            if (fenetresInconnues.size < 40 && fenetresInconnues.add(cle)) noter("  (fenêtre non suivie : $cle)")
+            return
+        }
+
+        if (app == derniereApp) return
+        val precedente = derniereApp
+        derniereApp = app
+        // le temps passé dans chaque app (pour le top 3 des dossiers), et l'animation du widget « top 3 »,
+        // qui ne tourne que lorsqu'on est sur l'écran d'accueil
+        Usage.auPremierPlan(this, if (app == ecranAccueil) null else app)
+        if (app == ecranAccueil) WidgetTop.surAccueil(this) else WidgetTop.pause()
+        // l'app qu'on quitte : on note l'heure (elle reste ouverte en arrière-plan)
+        if (precedente != null && precedente != ecranAccueil) dejaOuvertes[precedente] = SystemClock.uptimeMillis()
+        val etaitOuverte = app != ecranAccueil && enArrierePlan(app)
+        if (app != ecranAccueil) dejaOuvertes[app] = SystemClock.uptimeMillis()
+        // on retient aussi l'heure à laquelle chaque app a été ouverte (pour le dossier animé : « 5m ago »)
+        if (app != ecranAccueil) noterOuverture(this, app)
+
+        // L'animation tourne déjà pour cette app (lancée au clic) : rien de plus à faire.
+        if ((seanceEnCours != null && appAnimee == app) ||
+            (app == appCliquee && SystemClock.uptimeMillis() - clicA < 6000)) {
+            noter("$app | écran $classe | animation déjà lancée au clic")
+            return
+        }
+
+        if (app == ecranAccueil) {
+            noter("$app | écran $classe")
+            // On est revenu sur l'accueil après avoir vu l'app cliquée : ce clic-là est terminé.
+            // (Sinon, rouvrir la même app dans les 6 s suivantes était pris pour « le même clic ».)
+            if (precedente == appCliquee) appCliquee = null
+            appQuittee = precedente
+            quitteeA = SystemClock.uptimeMillis()
+            return
+        }
+
+        // FrameLayout = écran de lancement = l'app DÉMARRE.
+        val demarrage = classe == "FrameLayout"
+        noter("$app | écran $classe | " + if (demarrage) "DÉMARRAGE" else "reprise")
+
+        if (!Reglages.actif(this)) return
+        val lancement = Catalogue.lancement(this, app) ?: return
+        if (precedente != ecranAccueil) return
+        // RATTRAPAGE : le clic vient d'être refusé (« déjà ouverte en arrière-plan »), mais l'app
+        // affiche son écran de démarrage moins de 300 ms après : elle avait en fait été fermée
+        // (par exemple d'un glissement dans les apps récentes que le relevé n'a pas vu).
+        // On lance donc l'animation, sauf pour les apps qui affichent cet écran à chaque fois.
+        if (demarrage && app == refuseeApp && SystemClock.uptimeMillis() - refuseeA < 300 && app !in splashToujours()) {
+            refuseeApp = null
+            noter("  .. écran de démarrage juste après le clic : l'app était fermée, animation lancée")
+            appCliquee = app
+            clicA = SystemClock.uptimeMillis()
+            afficher(lancement, app, dejaPrete = false)
+            return
+        }
+        if (demarrage && app == refuseeApp && SystemClock.uptimeMillis() - refuseeA < 300) {
+            refuseeApp = null
+            noter("  (écran de démarrage, mais $app l'affiche à chaque fois : impossible de savoir si elle était fermée)")
+        }
+        // Un appui sur l'accueil qui n'était pas une icône (sans doute un widget qu'on n'a pas su
+        // reconnaître) juste avant que l'app arrive : l'utilisateur l'a ouverte exprès -> animation,
+        // même si elle était déjà ouverte en arrière-plan.
+        val apresWidget = clicInconnuA == dernierClicAccueil && SystemClock.uptimeMillis() - clicInconnuA < 2500
+        if (apresWidget) noter("  (ouverte depuis un widget)")
+        if (Reglages.seulementDemarrage(this, app) && !apresWidget && (!demarrage || etaitOuverte)) return
+        // Une app peut faire apparaître une fenêtre sans qu'on l'ait ouverte (mini-lecteur
+        // de YouTube quand on la quitte, etc.). On n'anime donc que si on vient d'appuyer
+        // sur l'écran d'accueil (moins de 2 s). Si le téléphone ne nous signale jamais
+        // les appuis, on garde l'ancien comportement.
+        if (clicsRecus && SystemClock.uptimeMillis() - dernierClicAccueil > 2000) {
+            // SAUF pour certains WIDGETS (ex. celui de Strike), qui n'envoient aucun signal d'appui :
+            // si l'app DÉMARRE vraiment (écran de lancement) depuis l'accueil, on joue l'animation,
+            // à condition que ce ne soit pas l'app qu'on vient juste de quitter (mini-lecteur…).
+            val justeQuittee = app == appQuittee && SystemClock.uptimeMillis() - quitteeA < 1500
+            if (demarrage && !justeQuittee) {
+                noter("  (pas d'appui signalé, mais l'app démarre : sans doute un widget)")
+            } else {
+                noter("  (pas d'appui sur l'accueil juste avant : on ne lance rien)")
+                return
+            }
+        }
+        // Sans information d'appui : une fenêtre de l'app qu'on vient de quitter, dans les
+        // 5 secondes, est presque toujours un reste de sa fermeture (mini-lecteur…), pas une ouverture.
+        if (!clicsRecus && app == appQuittee && SystemClock.uptimeMillis() - quitteeA < 5000) {
+            noter("  (fenêtre de l'app qu'on vient de quitter : on ne lance rien)")
+            return
+        }
+
+        // Anti-rebond : cette app vient déjà d'avoir son animation (moins de 10 s) -> on ne la rejoue pas…
+        // SAUF si l'utilisateur est vraiment revenu sur l'écran d'accueil entre-temps : soit il y est
+        // resté plus de 0,7 s, soit il y a appuyé sur quelque chose (une icône, un dossier).
+        // (Le « faux » passage par l'accueil que l'anti-rebond doit filtrer, lui, dure une fraction de seconde.)
+        animeeA[app]?.let { avant ->
+            val maintenant = SystemClock.uptimeMillis()
+            val ecart = maintenant - avant
+            val resteSurAccueil = quitteeA > avant && maintenant - quitteeA > 700
+            val appuiDepuis = dernierClicAccueil > avant
+            if (ecart < 10_000 && !resteSurAccueil && !appuiDepuis) {
+                noter("  (animation déjà jouée il y a $ecart ms : on ne la relance pas)")
+                return
+            }
+        }
+
+        // Si c'est une simple reprise, l'app est déjà prête : version courte.
+        afficher(lancement, app, dejaPrete = !demarrage)
+        appApparue = true      // ici, la fenêtre de l'app est déjà là
+    }
+
+    // LE RIDEAU (voir Rideau.kt) : la fenêtre des animations, installée une fois pour toutes,
+    // transparente et invisible (alpha 0) quand elle ne sert pas.
+    private var rideau: Rideau? = null
+    private var cadreRideau: FrameLayout? = null
+    private var reglagesRideau: WindowManager.LayoutParams? = null
+
+    private fun installerRideau() {
+        if (rideau != null) return
+        val gestionnaire = getSystemService(Context.WINDOW_SERVICE) as WindowManager
+        val taille = tailleEcran()
+        val reglages = WindowManager.LayoutParams(
+            taille.x, taille.y,
+            WindowManager.LayoutParams.TYPE_ACCESSIBILITY_OVERLAY,
+            WindowManager.LayoutParams.FLAG_NOT_TOUCHABLE or
+                WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE or
+                WindowManager.LayoutParams.FLAG_LAYOUT_IN_SCREEN or
+                WindowManager.LayoutParams.FLAG_LAYOUT_NO_LIMITS or
+                WindowManager.LayoutParams.FLAG_HARDWARE_ACCELERATED,
+            PixelFormat.TRANSLUCENT
+        ).apply {
+            gravity = Gravity.TOP or Gravity.START
+            x = 0
+            y = 0
+            // Au tout début, alpha 1 (le rideau est transparent, donc invisible quand même) :
+            // Android ne crée la surface de dessin que si la fenêtre est « visible ». Une fois la
+            // surface prête, on passe à alpha 0 (voir plus bas) ; elle reste prête ensuite.
+            alpha = 1f
+            if (Build.VERSION.SDK_INT >= 30) {
+                layoutInDisplayCutoutMode =
+                    WindowManager.LayoutParams.LAYOUT_IN_DISPLAY_CUTOUT_MODE_ALWAYS
+                setFitInsetsTypes(0)
+            } else if (Build.VERSION.SDK_INT >= 28) {
+                layoutInDisplayCutoutMode =
+                    WindowManager.LayoutParams.LAYOUT_IN_DISPLAY_CUTOUT_MODE_SHORT_EDGES
+            }
+        }
+        // Le rideau est posé dans un CADRE (sans cadre, Android 16 pouvait planter :
+        // « requestTransparentRegion on a null object »).
+        val r = Rideau(this)
+        val cadre = FrameLayout(this)
+        cadre.addView(r, FrameLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT))
+        try {
+            gestionnaire.addView(cadre, reglages)
+            rideau = r
+            cadreRideau = cadre
+            reglagesRideau = reglages
+            minuteur.postDelayed({ if (seanceEnCours == null) montrerRideau(false) }, 2000)
+        } catch (e: Exception) {
+            noter("ERREUR installation du rideau : ${e.message}")
+        }
+    }
+
+    // Rend le rideau visible (1) ou invisible (0).
+    private fun montrerRideau(visible: Boolean) {
+        val cadre = cadreRideau ?: return
+        val reglages = reglagesRideau ?: return
+        val a = if (visible) 1f else 0f
+        if (reglages.alpha == a) return
+        reglages.alpha = a
+        try {
+            (getSystemService(Context.WINDOW_SERVICE) as WindowManager).updateViewLayout(cadre, reglages)
+        } catch (e: Exception) {
+            noter("ERREUR rideau : ${e.message}")
+        }
+    }
+
+    private fun afficher(lancement: Lancement, app: String, dejaPrete: Boolean) {
+        retirer("nouvelle animation", cacher = false)
+        installerRideau()
+        val r = rideau ?: return
+        ajusterTaille()
+        val seance = Rideau.Seance(lancement.scene, lancement.categorie, lancement.facteur) { fini ->
+            if (seanceEnCours === fini) retirer("fin normale")
+        }
+        seanceEnCours = seance
+        appAnimee = app
+        animeeA[app] = SystemClock.uptimeMillis()
+        appApparue = false
+        if (dejaPrete) seance.signalerPret()
+        r.jouer(seance)          // d'abord on lance le dessin…
+        montrerRideau(true)      // …puis on rend le rideau visible
+        if (!r.surfacePrete) noter("  (le rideau n'était pas encore prêt)")
+        // au cas où l'écran tournerait sans prévenir (ex. une app qui s'ouvre à l'horizontale)
+        for (delai in longArrayOf(300L, 700L, 1200L)) minuteur.postDelayed({ if (seanceEnCours === seance) ajusterTaille() }, delai)
+        // Filet de sécurité : attente max + révélation + une marge d'une seconde.
+        minuteur.postDelayed({
+            if (seanceEnCours === seance) retirer("filet de sécurité")
+        }, seance.dureeMax + 1000)
+    }
+
+    // Arrête l'animation en cours ; « cacher » = rendre le rideau invisible (non quand une autre suit).
+    private fun retirer(raison: String, cacher: Boolean = true) {
+        val seance = seanceEnCours ?: return
+        seance.arreter()
+        seanceEnCours = null
+        appAnimee = null
+        appApparue = false
+        if (cacher) montrerRideau(false)
+        val ms = SystemClock.uptimeMillis() - seance.creeeA
+        val premiere = if (seance.premiereImageA > 0) "1re image après ${seance.premiereImageA - seance.creeeA} ms"
+                       else "aucune image"
+        noter("  -> ${seance.images} images, $premiere, $ms ms, $raison")
+    }
+
+    // Une ligne dans le journal (voir Journal.kt), qui partira ensuite sur GitHub.
+    private fun noter(texte: String) {
+        Journal.noter(this, texte)
+        Journal.programmerEnvoi(this)
+    }
+
+    // L'ÉCRAN TOURNE (ex. Balatro, qui ne s'affiche qu'à l'horizontale) : l'animation avait été
+    // créée à la taille de l'écran vertical, elle ne couvrait plus que la moitié de l'écran.
+    // On la redimensionne à la nouvelle taille de l'écran.
+    override fun onConfigurationChanged(nouvelle: Configuration) {
+        super.onConfigurationChanged(nouvelle)
+        ajusterTaille()
+    }
+
+    private fun ajusterTaille() {
+        val cadre = cadreRideau ?: return
+        val reglages = reglagesRideau ?: return
+        val taille = tailleEcran()
+        if (reglages.width == taille.x && reglages.height == taille.y) return
+        reglages.width = taille.x
+        reglages.height = taille.y
+        try {
+            (getSystemService(Context.WINDOW_SERVICE) as WindowManager).updateViewLayout(cadre, reglages)
+            noter("  .. écran tourné : animation redimensionnée en ${taille.x} x ${taille.y}")
+        } catch (e: Exception) {
+            noter("ERREUR redimensionnement : ${e.message}")
+        }
+    }
+
+    // La VRAIE taille de l'écran, barres et encoche comprises (dans le sens actuel du téléphone).
+    private fun tailleEcran(): Point {
+        val ecran = (getSystemService(Context.DISPLAY_SERVICE) as DisplayManager)
+            .getDisplay(Display.DEFAULT_DISPLAY)
+        val taille = Point()
+        @Suppress("DEPRECATION") ecran.getRealSize(taille)
+        return taille
+    }
+
+    // ---------------- LA MESURE DU DÉMARRAGE ----------------
+    // Certaines apps (Instagram, Gmail, YouTube…) affichent leur écran de lancement à chaque
+    // ouverture, même en simple reprise : impossible alors de savoir si elles étaient fermées.
+    // Hypothèse à tester : un vrai démarrage met plus de temps, entre l'écran de lancement et le
+    // vrai écran de l'app, qu'une reprise. On chronomètre donc ce délai à chaque ouverture et on
+    // l'écrit dans le journal, avec ce qu'on croyait de l'app à ce moment-là.
+    private var mesureApp: String? = null    // l'app dont on chronomètre le démarrage
+    private var mesureA = 0L                 // l'heure où son écran de lancement est arrivé
+    private var mesureEtat = ""              // ce qu'on croyait d'elle à ce moment-là
+
+    // « heure » = l'heure à laquelle Android a émis le signal (plus précis que l'heure où
+    // on le traite, car le traitement peut avoir quelques millisecondes de retard).
+    private fun mesurerDemarrage(app: String, classe: String, heure: Long) {
+        // seulement les apps qui ont une animation : ça garde le journal court
+        if (app == ecranAccueil || Catalogue.pour(app) == null) return
+        if (classe == "FrameLayout") {
+            // l'écran de lancement arrive : on lance le chronomètre (une seule fois par ouverture)
+            if (mesureApp == app && heure - mesureA < 10_000) return
+            mesureApp = app
+            mesureA = heure
+            // à ce stade, la liste des apps ouvertes n'est pas encore mise à jour pour cette ouverture
+            mesureEtat = if (enArrierePlan(app)) "supposée ouverte" else "supposée fermée"
+        } else if (mesureApp == app) {
+            // le vrai écran de l'app arrive : on arrête le chronomètre
+            val delai = heure - mesureA
+            mesureApp = null
+            // au-delà de 5 s, ce n'est plus le même démarrage : on n'écrit rien
+            if (delai >= 0 && delai <= 5000) {
+                noter("  .. mesure : $app | lancement -> écran $classe en $delai ms ($mesureEtat)")
+            }
+        }
+    }
+
+    // ---------------- LE RATTRAPAGE ----------------
+    // Le dernier clic refusé parce que l'app semblait ouverte en arrière-plan.
+    private var refuseeApp: String? = null
+    private var refuseeA = 0L
+
+    // Les apps qui affichent leur écran de démarrage même quand elles reviennent de l'arrière-plan :
+    // pour elles, cet écran ne prouve pas qu'elles avaient été fermées. Gmail et YouTube au départ,
+    // puis celles qu'on découvre en les rouvrant depuis les apps récentes (gardées dans le carnet).
+    private val splashDeBase = setOf(
+        "com.google.android.gm", "com.google.android.youtube", "app.revanced.android.youtube"
+    )
+    // (La liste apprise s'appelle maintenant « splash_toujours_v2 » : l'ancienne, qui contenait des
+    // erreurs, est ainsi oubliée et tout est réappris proprement.)
+    private fun splashToujours(): Set<String> =
+        splashDeBase + (getSharedPreferences("apprentissage", Context.MODE_PRIVATE)
+            .getStringSet("splash_toujours_v2", emptySet()) ?: emptySet())
+    // Compte une observation ; renvoie true quand l'app vient d'être retenue (2e observation).
+    private fun retenirSplash(app: String): Boolean {
+        val carnet = getSharedPreferences("apprentissage", Context.MODE_PRIVATE)
+        val vu = carnet.getInt("splash_vu_$app", 0) + 1
+        if (vu < 2) {
+            carnet.edit().putInt("splash_vu_$app", vu).apply()
+            return false
+        }
+        val liste = (carnet.getStringSet("splash_toujours_v2", emptySet()) ?: emptySet()) + app
+        carnet.edit().putStringSet("splash_toujours_v2", liste.toSet()).remove("splash_vu_$app").apply()
+        return true
+    }
+
+    // ---------------- LES APPS RÉCENTES ----------------
+    private var dansRecents = false
+    private val vusRecents = HashSet<String>()      // toutes les apps vues pendant cette visite
+    private var dernierReleve: Set<String> = emptySet()
+
+    // LES ANNONCES DE FERMETURE. Quand on glisse une carte vers le haut dans les apps récentes,
+    // l'écran d'accueil Samsung « annonce » la fermeture pour les lecteurs d'écran :
+    // « application Instagram fermée », ou « Toutes les applications ont été fermées ».
+    // Une annonce arrive avec son texte, SANS avoir besoin de lire l'écran : ça marche donc aussi
+    // dans la version Store. On retire l'app de la liste des apps ouvertes : au prochain appui sur
+    // son icône, l'animation sera jouée. (Découvert le 09/11 grâce au journal.)
+    private fun annonce(event: AccessibilityEvent) {
+        val expediteur = event.packageName?.toString()
+        // ESPION (ajouté le 10/11, après Android 17) : on note TOUTES les annonces de l'accueil et de
+        // l'interface système (jamais celles des autres apps), même celles qu'on ne comprend pas.
+        // Depuis la mise à jour, plus aucune annonce « application X fermée » n'arrivait dans le
+        // journal : on veut voir si elles ont changé de texte ou d'expéditeur.
+        if (expediteur != null && expediteur != ecranAccueil && expediteur != "com.android.systemui") return
+        val texte = (event.text.map { it.toString() } + listOfNotNull(event.contentDescription?.toString()))
+            .joinToString(" ").trim()
+        if (texte.isEmpty()) return
+        if (!fermetureDansTexte(texte, "annonce") && espionLignes < 40) {
+            espionLignes++
+            noter("  [annonce] de ${expediteur ?: "(inconnu)"} « $texte »")
+        }
+    }
+
+    // Les mots qui veulent dire « fermé » (selon la langue et la version de Samsung).
+    private fun parleDeFermeture(bas: String): Boolean =
+        listOf("ferm", "closed", "dismiss", "supprim", "retir", "removed", "effac", "cleared").any { bas.contains(it) }
+
+    // Un texte qui annonce une fermeture (« application Instagram fermée », « Toutes les applications
+    // ont été fermées »…) : on retire l'app (ou toutes) de la liste des apps ouvertes.
+    // « origine » dit d'où vient le texte, pour le journal. Renvoie true si c'était bien une fermeture.
+    private fun fermetureDansTexte(texte: String, origine: String): Boolean {
+        val bas = texte.lowercase()
+        // ce n'est pas une annonce de fermeture : on l'ignore
+        if (!parleDeFermeture(bas)) return false
+        if (bas.contains("toutes les applications") || bas.startsWith("all apps") || bas.contains("all apps closed")) {
+            dejaOuvertes.clear()
+            noter("$origine « $texte » : toutes les apps sont fermées")
+            return true
+        }
+        // On cherche le nom d'une app dans le texte, en mot entier (pour qu'une app nommée « X »
+        // ne soit pas trouvée dans « eXemple »), et le plus long qui va (« Google Photos » plutôt que « Google »).
+        val nom = noms.keys.filter { n ->
+            n.isNotBlank() && Regex("(^|\\W)" + Regex.escape(n) + "(\\W|$)", RegexOption.IGNORE_CASE).containsMatchIn(texte)
+        }.maxByOrNull { it.length }
+        val app = nom?.let { noms[it] }
+        if (app == null) {
+            noter("$origine « $texte » : app non reconnue")
+            return true
+        }
+        dejaOuvertes.remove(app)
+        // Gemini s'ouvre dans l'app Google : si c'est l'app Google qui est fermée, Gemini l'est aussi
+        // (enArrierePlan regarde déjà l'app qui s'ouvre vraiment, rien d'autre à faire).
+        noter("$origine « $texte » : $app fermée")
+        return true
+    }
+
+    // ---------------- L'ESPION DES APPS RÉCENTES (Android 17) ----------------
+    // Après la mise à jour Android 17, l'écran des apps récentes ne disait plus rien quand on
+    // glisse une carte : l'app restait « ouverte » et l'animation ne se lançait plus (Claude,
+    // Gemini, YouTube…). Pendant la visite des apps récentes SEULEMENT, on demande donc à Android
+    // trois signaux de plus : « le contenu a changé », « la liste a défilé » et « les fenêtres ont
+    // changé ». Ils ne contiennent pas le contenu de l'écran (la version Store ne peut toujours pas
+    // le lire), seulement un éventuel petit texte et, pour une liste, son NOMBRE D'ÉLÉMENTS.
+    //  - un texte qui parle de fermeture -> on retire l'app, comme pour une annonce ;
+    //  - la liste des cartes qui perd des éléments jusqu'à 0 -> toutes les apps sont fermées ;
+    //  - tout le reste est noté dans le journal (40 lignes au plus par visite) pour comprendre
+    //    ce que Samsung envoie maintenant, et faire une vraie détection à la prochaine version.
+    private var espionLignes = 0
+    private val espionVus = HashSet<String>()
+    private val cartesMax = HashMap<String, Int>()   // pour chaque liste : le plus grand nombre de cartes vu
+
+    private fun pendantRecents(event: AccessibilityEvent) {
+        if (!dansRecents) return
+        val expediteur = event.packageName?.toString()
+        // seulement l'accueil (qui affiche les apps récentes) et l'interface système, jamais les autres apps
+        if (expediteur != null && expediteur != ecranAccueil && expediteur != "com.android.systemui") return
+        val textes = event.text.map { it.toString() } + listOfNotNull(event.contentDescription?.toString())
+        val texte = textes.joinToString(" ").trim()
+        if (texte.isNotEmpty() && fermetureDansTexte(texte, "signal récentes")) return
+        val classe = event.className?.toString()?.substringAfterLast('.') ?: "?"
+        val nb = event.itemCount
+        // LE NOMBRE DE CARTES. Une liste qui annonce moins d'éléments qu'avant : une carte a disparu.
+        if (nb >= 0 && classe != "?") {
+            val avant = cartesMax[classe]
+            if (avant == null || nb > avant) cartesMax[classe] = nb
+            else if (nb < avant) {
+                noter("  (récentes : la liste $classe passe de $avant à $nb élément(s))")
+                cartesMax[classe] = nb
+                if (nb == 0) {
+                    dejaOuvertes.clear()
+                    noter("  (récentes : plus aucune carte : toutes les apps sont fermées)")
+                }
+            }
+        }
+        if (espionLignes >= 40) return
+        val details = buildString {
+            append(AccessibilityEvent.eventTypeToString(event.eventType).removePrefix("TYPE_"))
+            append(" ").append(classe)
+            if (texte.isNotEmpty()) append(" « ").append(texte.take(80)).append(" »")
+            if (nb >= 0) append(" éléments=").append(nb)
+            if (event.fromIndex >= 0) append(" de ").append(event.fromIndex).append(" à ").append(event.toIndex)
+            if (event.eventType == AccessibilityEvent.TYPE_WINDOW_CONTENT_CHANGED ||
+                event.eventType == AccessibilityEvent.TYPE_WINDOW_STATE_CHANGED)
+                append(" changement=").append(event.contentChangeTypes)
+            if (event.eventType == AccessibilityEvent.TYPE_WINDOWS_CHANGED && Build.VERSION.SDK_INT >= 28)
+                append(" fenêtres=").append(event.windowChanges)
+        }
+        // le même signal qui se répète (ça arrive à chaque image d'un glissement) : noté une seule fois
+        if (!espionVus.add(details)) return
+        espionLignes++
+        noter("  [récentes] ${expediteur ?: "(inconnu)"} $details")
+    }
+
+    // Ajoute (oui = true) ou retire les trois signaux de l'espion. Ils ne sont demandés que pendant
+    // la visite des apps récentes, pour ne pas réveiller le service à chaque petit changement
+    // dans les autres apps (ce serait mauvais pour la batterie).
+    private fun signauxRecents(oui: Boolean) {
+        try {
+            val info = serviceInfo ?: return
+            val extra = AccessibilityEvent.TYPE_WINDOW_CONTENT_CHANGED or
+                AccessibilityEvent.TYPE_VIEW_SCROLLED or AccessibilityEvent.TYPE_WINDOWS_CHANGED
+            info.eventTypes = if (oui) info.eventTypes or extra else info.eventTypes and extra.inv()
+            serviceInfo = info
+        } catch (e: Exception) {
+            noter("ERREUR signaux des apps récentes : ${e.message}")
+        }
+    }
+
+    // Le bouton « Tout fermer » des apps récentes (ses noms possibles selon la version de Samsung et la langue).
+    private fun toutFermer(texte: String): Boolean = texte.trim().lowercase() in setOf(
+        "tout fermer", "fermer tout", "tout effacer", "effacer tout", "close all", "clear all")
+
+    private fun debutRecents() {
+        if (dansRecents) return
+        dansRecents = true
+        vusRecents.clear()
+        dernierReleve = emptySet()
+        espionLignes = 0
+        espionVus.clear()
+        cartesMax.clear()
+        signauxRecents(true)
+        // sécurité : si on ne voit jamais la sortie des apps récentes (écran éteint…), on arrête
+        // l'espion au bout d'une minute
+        minuteur.removeCallbacks(arretEspion)
+        minuteur.postDelayed(arretEspion, 60_000)
+        minuteur.postDelayed(object : Runnable {
+            override fun run() {
+                if (!dansRecents) return
+                releverRecents()
+                minuteur.postDelayed(this, 120)
+            }
+        }, 150)
+    }
+
+    // Lit les noms des apps affichées dans l'écran des apps récentes (rien d'autre).
+    private fun releverRecents() {
+        val racine = try { rootInActiveWindow } catch (_: Exception) { null } ?: return
+        if (racine.packageName?.toString() != ecranAccueil) return
+        val trouvees = HashSet<String>()
+        // Pour être sûr de lire l'écran des apps récentes (et pas l'écran d'accueil, qui affiche
+        // lui aussi des noms d'apps), on cherche son bouton « Tout fermer », ou le message
+        // « Aucune application récente » quand la liste est vide.
+        var boutonFermer = false
+        var listeVide = false
+        val pile = ArrayDeque<android.view.accessibility.AccessibilityNodeInfo>()
+        pile.add(racine)
+        var vus = 0
+        while (pile.isNotEmpty() && vus < 400) {
+            val n = pile.removeLast()
+            vus++
+            val textes = listOfNotNull(n.text?.toString(), n.contentDescription?.toString())
+            for (t in textes) {
+                val m = t.trim().lowercase()
+                if (toutFermer(m)) boutonFermer = true
+                if (m.contains("aucune application récente") || m.contains("no recent")) listeVide = true
+            }
+            if (textes.isNotEmpty()) chercher(textes)?.let { trouvees.add(it) }
+            for (i in 0 until n.childCount) n.getChild(i)?.let { pile.add(it) }
+        }
+        if (listeVide) trouvees.clear()
+        else if (!boutonFermer) return          // ce n'est pas (ou plus) l'écran des apps récentes
+        vusRecents.addAll(trouvees)
+        dernierReleve = trouvees
+    }
+
+    private val arretEspion = Runnable { if (dansRecents) finRecents() }
+
+    private fun finRecents() {
+        dansRecents = false
+        minuteur.removeCallbacks(arretEspion)
+        signauxRecents(false)
+        // les apps vues pendant la visite mais absentes du dernier relevé ont été fermées
+        val fermees = vusRecents - dernierReleve
+        for (app in fermees) dejaOuvertes.remove(app)
+        noter("  (apps récentes : ${vusRecents.size} app(s) vue(s)" +
+            (if (fermees.isNotEmpty()) ", fermée(s) : ${fermees.joinToString()})" else ", aucune fermée)"))
+        vusRecents.clear()
+    }
+
+    // L'app est-elle encore ouverte en arrière-plan ? (vue il y a moins de 30 min, sans « Tout fermer »)
+    // Pour les icônes qui ouvrent en fait une autre app (Gemini s'ouvre dans l'app Google), on regarde
+    // l'app qui s'ouvre vraiment. (Avant le 10/11, Gemini n'était jamais « ouverte » : animation à chaque fois.)
+    private fun enArrierePlan(app: String): Boolean {
+        val vue = dejaOuvertes[relais[app] ?: app] ?: return false
+        return SystemClock.uptimeMillis() - vue < 30 * 60_000L
+    }
+    private val relais = HashMap<String, String>()      // icône -> app qui s'ouvre vraiment (ex. Gemini -> Google)
+
+    // L'app est-elle encore ouverte en arrière-plan ? (pour le dossier animé : le petit point « Open »)
+    fun estOuverte(app: String): Boolean = enArrierePlan(app)
+
+    override fun onInterrupt() {}
+
+    override fun onDestroy() {
+        try { unregisterReceiver(ecouteEcran) } catch (_: Exception) {}
+        Usage.auPremierPlan(this, null)
+        WidgetTop.pause()
+        if (actif === this) actif = null
+        super.onDestroy()
+    }
+
+    // 3) UNE APP OUVERTE DEPUIS UN DOSSIER ANIMÉ (DossierActivity) : c'est notre propre écran, donc
+    // le lanceur ne nous envoie pas de « clic ». Le dossier nous prévient lui-même, juste avant
+    // d'ouvrir l'app, et on fait exactement comme pour un appui sur une icône de l'accueil.
+    fun depuisDossier(app: String) {
+        try {
+            // FILET (10/11) : le dossier animé est un widget de l'ÉCRAN D'ACCUEIL. Si on croit encore être dans
+            // une autre app, c'est que le retour sur l'accueil nous a échappé : on le rattrape ici (l'app d'avant
+            // passe en arrière-plan, et on est sur l'accueil).
+            val accueil = ecranAccueil
+            if (accueil != null && derniereApp != accueil) {
+                derniereApp?.let { if (it != packageName) dejaOuvertes[it] = SystemClock.uptimeMillis() }
+                appQuittee = derniereApp
+                quitteeA = SystemClock.uptimeMillis()
+                derniereApp = accueil
+            }
+            if (!Reglages.actif(this)) return
+            val lancement = Catalogue.lancement(this, app)
+            if (lancement == null) { noter("dossier -> $app : pas d'animation"); return }
+            if (Reglages.seulementDemarrage(this, app) && enArrierePlan(app)) {
+                noter("dossier -> $app : déjà ouverte en arrière-plan, pas d'animation")
+                refuseeApp = app       // (sauf si son écran de démarrage arrive juste après, voir fenetre)
+                refuseeA = SystemClock.uptimeMillis()
+                return
+            }
+            appCliquee = app
+            clicA = SystemClock.uptimeMillis()
+            dernierClicAccueil = clicA
+            afficher(lancement, app, dejaPrete = false)
+            noter("dossier -> $app : animation lancée")
+        } catch (e: Exception) {
+            noter("ERREUR dossier (rattrapée) : " + Journal.pile(e))
+        }
+    }
+
+    companion object {
+        // Le service en marche (null s'il est éteint) : le dossier animé l'utilise pour lancer l'animation.
+        var actif: AppWatcherService? = null
+
+        // L'HEURE DE LA DERNIÈRE OUVERTURE de chaque app (heure réelle, en millisecondes), gardée dans le
+        // carnet « ouvertures » : elle survit au redémarrage du téléphone. 0 = jamais vue s'ouvrir.
+        private const val OUVERTURES = "ouvertures"
+        fun noterOuverture(c: Context, app: String) {
+            c.getSharedPreferences(OUVERTURES, Context.MODE_PRIVATE).edit().putLong(app, System.currentTimeMillis()).apply()
+        }
+        fun derniereOuverture(c: Context, app: String): Long =
+            c.getSharedPreferences(OUVERTURES, Context.MODE_PRIVATE).getLong(app, 0L)
+        const val CARNET = Journal.CARNET
+        const val CLE_LISTE = Journal.CLE_LISTE
+    }
+}
