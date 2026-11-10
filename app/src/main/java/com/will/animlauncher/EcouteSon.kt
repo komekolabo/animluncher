@@ -92,12 +92,14 @@ object EcouteSon {
     // Ce qui les distingue des morceaux moyens, ce sont les BASSES (moyens : plein 45-49 aussi, mais basses ~25-40).
     // Le téléphone lit des basses plus faibles qu'une simulation sur ordinateur (environ x 0,7) : ne se fier
     // qu'aux chiffres du téléphone. Les paliers 1 à 3 n'ont pas encore été vérifiés sur le téléphone.
-    val SEUILS = floatArrayOf(0.13f, 0.42f, 0.52f, 0.62f)
+    // (11/11 : la frontière bleu / vert est descendue de 0,42 à 0,34, Will trouvait le bleu trop fréquent.)
+    val SEUILS = floatArrayOf(0.13f, 0.34f, 0.52f, 0.62f)
     @Volatile var palier = 3
         private set
     @Volatile var energieVue = 0                   // pour le diagnostic : l'énergie du moment x 100
         private set
     private var energie = 0f
+    private var rapide = 0f                        // l'énergie à peine lissée (0,25 s), avant le lissage qui suit
     private var habitude = 0f                      // l'énergie « habituelle » de ce morceau (moyenne lente, ~25 s)
     @Volatile private var creteVive = -1f          // à quel point le son est « plein » en ce moment (-1 = inconnu)
     private var onde = ByteArray(0)                // la forme du son (réutilisée : aucune mémoire gaspillée)
@@ -178,7 +180,7 @@ object EcouteSon {
             mesureOk = try { v.setMeasurementMode(Visualizer.MEASUREMENT_MODE_PEAK_RMS) == Visualizer.SUCCESS } catch (_: Throwable) { false }
             refVolume = 0.0001f; basGrave = 0f; depuisCoup = 1f; coup = 0f; coupVif = 0f
             valeur.fill(0f); spectre.fill(0f); memCoup.fill(0f); for (m in memSpectre) m.fill(0f)
-            palier = 3; energieVue = 0; energie = 0f; habitude = 0f; creteVive = -1f; duree = 0f; muet = 0f; depuisPalier = 0f
+            palier = 3; energieVue = 0; energie = 0f; rapide = 0f; habitude = 0f; creteVive = -1f; duree = 0f; muet = 0f; depuisPalier = 0f
             pleinLisse = 0f; bassesLisses = 0f; cadenceCoups = 0f; cadenceSecs = 0f; claqueAvant = 0f; depuisSortie = 99f
             v.setEnabled(true)
             visu = v
@@ -319,13 +321,19 @@ object EcouteSon {
     // Les BASSES pèsent donc très lourd : les mesures faites sur le téléphone de Will ont montré que c'est
     // elles qui distinguent une phonk ou un dubstep (basses 45 à 70 %) d'un morceau moyen (25 à 40 %), alors
     // que le « plein » est presque le même (40 à 48). Exemples : plein 45 et basses 55 -> 0,45 x 1,61 = 0,72 ;
-    // plein 45 et basses 27 -> 0,45 x 0,99 = 0,45. L'énergie est lissée sur ~2 s : un seul coup ne change rien.
+    // plein 45 et basses 27 -> 0,45 x 0,99 = 0,45.
+    // LA RÉACTIVITÉ (11/11, Will : « des fois 2-3 secondes de retard »). Avant, l'énergie était lissée sur 2 s
+    // et un palier durait au moins 1,5 s : sûr, mais lent. Maintenant, en deux temps :
+    //   1) un tout petit lissage (0,25 s) qui gomme seulement le tremblement d'une mesure à l'autre ;
+    //   2) l'énergie MONTE vite (0,4 s) et REDESCEND plus doucement (1,2 s) : on voit tout de suite un drop
+    //      arriver, mais la couleur ne retombe pas au moindre petit creux.
+    // De même un palier peut monter après 0,5 s, mais il attend 1,2 s avant de redescendre.
     // LE CONTRASTE : on retient aussi l'énergie « habituelle » du morceau (moyenne sur ~25 s). Quand la musique
     // monte nettement au-dessus de son habitude (un drop après une intro calme), on ajoute la moitié de l'écart :
     // c'est ce saut qu'on ressent, plus que le niveau lui-même.
-    // Ensuite on regarde entre quelles frontières (SEUILS) le résultat tombe. Pour éviter que ça clignote quand
-    // il est pile sur une frontière : il faut la dépasser un peu (0,02) et un palier dure au moins 1,5 s.
-    // Les 2,5 premières secondes d'un morceau, on reste sur le palier du milieu, le temps d'avoir une mesure sûre.
+    // Ensuite on regarde entre quelles frontières (SEUILS) le résultat tombe ; pour éviter que ça clignote quand
+    // il est pile sur une frontière, il faut la dépasser un peu (0,02).
+    // La première seconde et demie d'un morceau, on reste sur le palier du milieu, le temps d'avoir une mesure sûre.
     private fun situer(partMesuree: Float, dt: Float) {
         var plein = creteVive
         if (plein < 0f) return
@@ -344,18 +352,22 @@ object EcouteSon {
         bassesVues = (bassesLisses * 100f).toInt()
         val brute = plein * (0.4f + 2.2f * partBasses)
         duree += dt; depuisPalier += dt
-        energie = if (energie <= 0f) brute
-                  else energie + (brute - energie) * (1f - exp(-dt / (if (duree < 2.5f) 0.4f else 2f)))
-        if (duree < 2.5f) habitude = energie
+        if (energie <= 0f) { rapide = brute; energie = brute }
+        rapide += (brute - rapide) * (1f - exp(-dt / 0.25f))
+        energie += (rapide - energie) * (1f - exp(-dt / (if (rapide > energie) 0.4f else 1.2f)))
+        if (duree < 1.5f) habitude = energie
         else habitude += (energie - habitude) * (1f - exp(-dt / 25f))
         val ressentie = energie + 0.5f * max(0f, energie - habitude)
         energieVue = (ressentie * 100f).toInt()
         var naturel = 1                                // le palier où tombe l'énergie, sans précaution
         for (seuil in SEUILS) if (ressentie > seuil) naturel++
-        if (duree < 2.5f) { palier = 3; depuisPalier = 1.5f; return }
-        if (depuisPalier < 1.5f || naturel == palier) return
-        if (naturel > palier && ressentie > SEUILS[palier - 1] + 0.02f) { palier = naturel; depuisPalier = 0f }
-        else if (naturel < palier && ressentie < SEUILS[palier - 2] - 0.02f) { palier = naturel; depuisPalier = 0f }
+        if (duree < 1.5f) { palier = 3; depuisPalier = 1.5f; return }
+        if (naturel == palier) return
+        if (naturel > palier) {
+            if (depuisPalier >= 0.5f && ressentie > SEUILS[palier - 1] + 0.02f) { palier = naturel; depuisPalier = 0f }
+        } else if (depuisPalier >= 1.2f && ressentie < SEUILS[palier - 2] - 0.02f) {
+            palier = naturel; depuisPalier = 0f
+        }
     }
 
     private fun niveau(valeur: Float, reference: Float, seuil: Float): Float =
