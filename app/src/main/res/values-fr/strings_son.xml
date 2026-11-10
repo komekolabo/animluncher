@@ -10,12 +10,15 @@
     <string name="son_expl_micro">Android va demander l’accès au micro : c’est obligatoire pour lire le niveau du son.</string>
     <string name="son_service">Active d’abord AnimLauncher dans les réglages d’accessibilité : l’effet en a besoin pour s’afficher.</string>
     <string name="son_couleurs">Couleurs</string>
-    <string name="son_ecoute">Écoute</string>
-    <string name="son_ecoute_desc">Le temps de capter le morceau</string>
     <string name="son_calme">Calme</string>
     <string name="son_calme_desc">Quand la musique respire</string>
+    <string name="son_moyen">Moyen</string>
+    <string name="son_moyen_desc">Quand ça groove</string>
     <string name="son_fort">Quand ça envoie</string>
     <string name="son_fort_desc">Quand la basse prend le contrôle</string>
+    <string name="son_palier1">Très lent</string>
+    <string name="son_palier5">Très fort</string>
+    <string name="son_extremes">Très lent : des petits Z. Très fort : des confettis.</string>
     <string name="son_roue_aide">Glisse la poignée, l’écran suit en direct</string>
     <string name="son_defaut">Par défaut</string>
     <string name="son_activer">Activer</string>
@@ -37,5 +40,5 @@
     <string name="son_diag_ecoute_arret">Écoute du son : arrêtée</string>
     <string name="son_diag_dessine">Bords dessinés : %1$s</string>
     <string name="son_diag_niveaux">Niveaux : graves %1$d %% · mélodie %2$d %% · aigus %3$d %%</string>
-    <string name="son_diag_moment">Moment : %1$s (%2$d %%)</string>
+    <string name="son_diag_moment">Palier : %1$s (énergie %2$d)</string>
 </resources>

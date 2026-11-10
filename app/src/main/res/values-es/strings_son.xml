@@ -10,12 +10,15 @@
     <string name="son_expl_micro">Android pedirá acceso al micrófono: es obligatorio para leer el nivel del sonido.</string>
     <string name="son_service">Activa primero AnimLauncher en los ajustes de accesibilidad: el efecto lo necesita para mostrarse.</string>
     <string name="son_couleurs">Colores</string>
-    <string name="son_ecoute">Escucha</string>
-    <string name="son_ecoute_desc">Mientras capta el tema</string>
     <string name="son_calme">Calma</string>
     <string name="son_calme_desc">Cuando la música respira</string>
+    <string name="son_moyen">Medio</string>
+    <string name="son_moyen_desc">Cuando hay ritmo</string>
     <string name="son_fort">Cuando lo peta</string>
     <string name="son_fort_desc">Cuando el bajo toma el control</string>
+    <string name="son_palier1">Muy lento</string>
+    <string name="son_palier5">Muy intenso</string>
+    <string name="son_extremes">Muy lento: pequeñas Z. Muy intenso: confeti.</string>
     <string name="son_roue_aide">Desliza el tirador, la pantalla sigue en directo</string>
     <string name="son_defaut">Por defecto</string>
     <string name="son_activer">Activar</string>

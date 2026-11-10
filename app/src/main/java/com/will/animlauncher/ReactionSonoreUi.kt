@@ -91,9 +91,11 @@ object FenetreSon {
     const val DEMANDE = 4107            // le numéro de notre question « micro » (pour reconnaître la réponse)
     private var ouverte: Dialog? = null
 
-    // les 3 couleurs du tour lumineux (dans le même ordre que ReactionSonore : 0 = écoute, 1 = calme, 2 = quand ça envoie)
-    private val NOMS = intArrayOf(R.string.son_ecoute, R.string.son_calme, R.string.son_fort)
-    private val DESCRIPTIONS = intArrayOf(R.string.son_ecoute_desc, R.string.son_calme_desc, R.string.son_fort_desc)
+    // les 3 couleurs du tour lumineux (dans le même ordre que ReactionSonore : 0 = calme, 1 = moyen, 2 = quand ça envoie)
+    private val NOMS = intArrayOf(R.string.son_calme, R.string.son_moyen, R.string.son_fort)
+    private val DESCRIPTIONS = intArrayOf(R.string.son_calme_desc, R.string.son_moyen_desc, R.string.son_fort_desc)
+    // le nom des 5 paliers (pour le diagnostic), du plus lent au plus fort
+    private val PALIERS = intArrayOf(R.string.son_palier1, R.string.son_calme, R.string.son_moyen, R.string.son_fort, R.string.son_palier5)
 
     // Vrai tant que la fenêtre est affichée (l'accueil ne fait pas défiler ses cartes pendant ce temps).
     fun estOuverte(): Boolean = ouverte?.isShowing == true
@@ -151,15 +153,14 @@ object FenetreSon {
         if (BuildConfig.STORE) ligne(a.getString(R.string.son_expl_internet), Style.MUET)     // vrai seulement en version Store
         ligne(a.getString(R.string.son_expl_video), Style.MUET, haut = 10f)
 
-        // LES TROIS COULEURS (10/11) : une pendant que l'app écoute le début du morceau, une pour les moments
-        // calmes, une pour quand ça envoie.
+        // LES TROIS COULEURS (10/11) : calme, moyen, quand ça envoie. L'app choisit toute seule selon la musique.
         // Chaque ligne montre son dégradé et sa pastille. Un appui sur une ligne ouvre la ROUE des couleurs
         // juste en dessous (un 2e appui la referme). Pendant qu'on tourne la roue, le tour de l'écran prend
         // cette couleur en direct (si le mode est allumé), même sans musique.
         colonne.addView(Style.titreCarte(a, a.getString(R.string.son_couleurs)).apply { setPadding(0, px(16f), 0, px(6f)) },
             LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT))
         ReactionSonore.lireCouleurs(a)
-        var choisie = -1                                  // la ligne ouverte : -1 = aucune, 0 = écoute, 1 = calme, 2 = ça envoie
+        var choisie = -1                                  // la ligne ouverte : -1 = aucune, 0 = calme, 1 = moyen, 2 = ça envoie
         val lignes = ArrayList<View>()
         val degrades = ArrayList<View>()
         val pastilles = ArrayList<View>()
@@ -223,6 +224,8 @@ object FenetreSon {
             colonne.addView(ligneCouleur, LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT).apply { topMargin = px(6f) })
         }
         colonne.addView(reglage, LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT))
+        // les deux paliers extrêmes n'ont pas de couleur à eux : on dit ce qu'ils ajoutent
+        ligne(a.getString(R.string.son_extremes), Style.MUET, haut = 8f)
         // la roue tourne : on change la couleur de la ligne ouverte (« fini » = le doigt est levé : on enregistre)
         roue.quandChange = { teinte, fini ->
             if (choisie >= 0) {
@@ -300,8 +303,8 @@ object FenetreSon {
             l(EcouteSon.enMarche, ecoute),
             l(ReactionSonore.dessine, a.getString(R.string.son_diag_dessine, if (ReactionSonore.dessine) oui else non)),
             a.getString(R.string.son_diag_niveaux, (EcouteSon.grave * 100).toInt(), (EcouteSon.medium * 100).toInt(), (EcouteSon.aigu * 100).toInt()),
-            // écoute, calme ou « ça envoie » ; le % = l'avancée de l'écoute, puis le niveau du moment comparé à l'habituel
-            a.getString(R.string.son_diag_moment, a.getString(NOMS[EcouteSon.moment.coerceIn(0, 2)]), EcouteSon.elanMoment)
+            // le palier du moment (1 à 5) et l'énergie mesurée (les frontières sont à 30, 44, 63 et 80)
+            a.getString(R.string.son_diag_moment, a.getString(PALIERS[(EcouteSon.palier - 1).coerceIn(0, 4)]), EcouteSon.energieVue)
         ).joinToString("\n")
     }
 
