@@ -33,14 +33,12 @@ import android.view.WindowManager
 import kotlin.math.PI
 import kotlin.math.abs
 import kotlin.math.atan2
-import kotlin.math.hypot
 import kotlin.math.cos
 import kotlin.math.exp
 import kotlin.math.max
 import kotlin.math.min
 import kotlin.math.sin
 import java.nio.ByteBuffer
-import java.util.Random
 
 // LA RÉACTION SONORE : les bords de l'écran bougent au rythme de la musique du téléphone,
 // PARTOUT (écran d'accueil, autres apps), même quand AnimLauncher est fermé.
@@ -68,7 +66,7 @@ import java.util.Random
 //       2 calme      -> couleur « calme » (bleu)
 //       3 moyen      -> couleur « moyen » (vert)
 //       4 ça envoie  -> couleur « ça envoie » (rouge-orangé)
-//       5 très fort  -> couleur « ça envoie » + des confettis à chaque coup de basse
+//       5 très fort  -> couleur « ça envoie » + des confettis calés sur la musique (Confettis.kt)
 //     Dans chaque couleur, le dégradé du bas vers le haut de l'écran est gardé.
 //
 // Le choix (allumé ou non, les trois couleurs) est rangé dans un carnet à part, « son ».
@@ -234,7 +232,6 @@ class VueSonore(context: Context) : View(context) {
     private val d = resources.displayMetrics.density          // 1 dp = d pixels
     private val audio = context.getSystemService(Context.AUDIO_SERVICE) as AudioManager
     private val minuteur = Handler(Looper.getMainLooper())
-    private val hasard = Random()
 
     // ---------- l'état ----------
     private var jouer = false            // faut-il dessiner en ce moment ?
@@ -254,7 +251,7 @@ class VueSonore(context: Context) : View(context) {
     private var versionVue = -1          // la version des couleurs pour laquelle nos dégradés sont faits
     private val poids = floatArrayOf(0f, 1f, 0f)     // la part de chaque couleur dans l'image (glisse en ~0,25 s)
     private val clairs = IntArray(3)     // le presque-blanc de chaque couleur (éclats des aigus, petits Z)
-    private val vives = Array(3) { IntArray(4) }     // les 4 couleurs de chaque palette (pour les confettis)
+    private val vives = Array(3) { IntArray(4) }     // les 4 couleurs de chaque palette (pour les confettis, voir Confettis.kt)
 
     // ---------- les pinceaux, créés une seule fois ----------
     private val ajout = PorterDuffXfermode(PorterDuff.Mode.ADD)     // la lumière s'ADDITIONNE (comme de vraies lampes)
@@ -323,18 +320,6 @@ class VueSonore(context: Context) : View(context) {
     private val cheminBande = Path()             // celui du milieu de la bande
     private var w = 0f
     private var ht = 0f
-
-    // ---------- LES CONFETTIS (palier 5) : 72 places, réutilisées ----------
-    private val NC = 72
-    private val cfX = FloatArray(NC)
-    private val cfY = FloatArray(NC)
-    private val cfVx = FloatArray(NC)            // la vitesse (pixels par seconde)
-    private val cfVy = FloatArray(NC)
-    private val cfVie = FloatArray(NC)           // les secondes qu'il lui reste (0 = place libre)
-    private val cfTour = FloatArray(NC)          // son angle, et sa vitesse de rotation
-    private val cfVrille = FloatArray(NC)
-    private val cfTaille = FloatArray(NC)
-    private val cfCouleur = IntArray(NC)
 
     override fun onSizeChanged(largeur: Int, hauteur: Int, ancienneL: Int, ancienneH: Int) {
         w = largeur.toFloat(); ht = hauteur.toFloat()
@@ -624,9 +609,9 @@ class VueSonore(context: Context) : View(context) {
             eclat(c, ptX[s], ptY[s], 4.5f, a * onde * onde, clair)
         }
 
-        // PALIER 5 : à chaque coup de basse, une poignée de confettis part du bord
-        if (tombe && palier == 5) lancerConfettis()
-        confettis(c, dt)
+        // PALIER 5 : des confettis calés sur la musique (coups de basse et sons secs), voir Confettis.kt
+        if (palier == 5) Confettis.suivre(tombe, arrive, ptX, ptY, intensites, vives[2], w, ht, d)
+        Confettis.dessiner(c, dt, d, presence)
         // PALIER 1 : des petits Z
         sommeil += ((if (palier == 1) 1f else 0f) - sommeil) * min(1f, dt * 1.5f)
         if (sommeil > 0.01f) petitsZ(c, clairs[0])
@@ -714,57 +699,6 @@ class VueSonore(context: Context) : View(context) {
         couche(c, cheminLigne, 1.2f * d, SweepGradient(cx, cy, cLigne, positions), 1f)
         couche(c, cheminLigne, 0.6f * d, SweepGradient(cx, cy, cCoeur, positions), 1f)
         ruban.shader = null
-    }
-
-    // ================= LES CONFETTIS (palier 5) =================
-    // Une poignée de 14 petits papiers part d'un endroit du bord, vers l'intérieur de l'écran.
-    // Ils restent petits et près du bord (le tour est affiché par-dessus toutes les apps), et s'effacent en ~1 s.
-    private fun lancerConfettis() {
-        val depart = hasard.nextInt(M)
-        var poses = 0
-        var i = 0
-        while (i < NC && poses < 14) {
-            if (cfVie[i] <= 0f) {
-                val k = (depart + hasard.nextInt(25) - 12 + M) % M
-                cfX[i] = ptX[k]; cfY[i] = ptY[k]
-                // la direction : vers le centre de l'écran, avec un peu de hasard
-                val vx = w / 2f - ptX[k]
-                val vy = ht / 2f - ptY[k]
-                val longueur = max(hypot(vx, vy), 1f)
-                val elan = (90f + 130f * hasard.nextFloat()) * d
-                cfVx[i] = (vx / longueur + (hasard.nextFloat() - 0.5f) * 1.4f) * elan
-                cfVy[i] = (vy / longueur + (hasard.nextFloat() - 0.5f) * 1.4f) * elan
-                cfVie[i] = 0.7f + 0.4f * hasard.nextFloat()
-                cfTour[i] = 360f * hasard.nextFloat()
-                cfVrille[i] = (hasard.nextFloat() - 0.5f) * 900f
-                cfTaille[i] = (2f + 1.5f * hasard.nextFloat()) * d
-                cfCouleur[i] = vives[2][hasard.nextInt(4)]
-                poses++
-            }
-            i++
-        }
-    }
-
-    // Fait avancer et dessine les confettis encore en vie.
-    private fun confettis(c: Canvas, dt: Float) {
-        val frein = exp(-dt * 2.2f)                  // l'air les ralentit
-        for (i in 0 until NC) {
-            if (cfVie[i] <= 0f) continue
-            cfVie[i] -= dt
-            cfVx[i] *= frein
-            cfVy[i] = cfVy[i] * frein + 60f * d * dt  // … et ils retombent un peu
-            cfX[i] += cfVx[i] * dt
-            cfY[i] += cfVy[i] * dt
-            cfTour[i] += cfVrille[i] * dt
-            if (cfVie[i] <= 0f) continue
-            plein.color = cfCouleur[i]
-            plein.alpha = opacite(min(1f, cfVie[i] / 0.3f) * 0.85f)      // il s'efface sur ses 0,3 dernières secondes
-            val taille = cfTaille[i]
-            c.save()
-            c.rotate(cfTour[i], cfX[i], cfY[i])
-            c.drawRect(cfX[i] - taille, cfY[i] - taille / 2f, cfX[i] + taille, cfY[i] + taille / 2f, plein)
-            c.restore()
-        }
     }
 
     // ================= LES PETITS Z (palier 1) =================
