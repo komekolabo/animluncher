@@ -114,57 +114,44 @@ Objectif : la publier sur le Google Play Store, avec une pub non invasive.
   ou « 5m ago » (carnet « ouvertures », `noterOuverture` dans `fenetre()`). Appui sur une app = ouverture IMMÉDIATE
   (dès 0,4 s). Geste « accueil » : l'écran du dossier disparaît sans pouvoir dessiner -> `onPause` demande au
   service de dessiner le retour de l'étoile dans une fenêtre d'accessibilité temporaire (`RetourEtoile.kt`).
-- RÉACTION SONORE (10/11) : les bords de l'écran réagissent à la musique du téléphone, PARTOUT (hors de l'app aussi).
-  `EcouteSon.kt` = l'outil Android `Visualizer(0)` (niveau du son en direct, rien d'enregistré ; exige les
-  permissions RECORD_AUDIO + MODIFY_AUDIO_SETTINGS, ajoutées au manifest commun) -> 5 valeurs 0..1 : grave, medium,
-  aigu, hauteur (note dominante), claque (son sec). `ReactionSonore.kt` = carnet « son » (actif, style) + `VueSonore`,
-  une fenêtre d'accessibilité transparente et non touchable posée par le service (c'est `Rideau.onAttachedToWindow`
-  qui appelle `ReactionSonore.demarrer` : pas besoin de toucher à AppWatcherService). Elle ne dessine que si
-  `AudioManager.isMusicActive`, et s'efface en plein écran (barre d'état cachée = vidéo / jeu) et en paysage.
-  UN SEUL DESSIN depuis le 10/11 (Aurore, Cordes, Verre liquide retirés) : le PRISME en TOUR COMPLET de l'écran
-  (bas compris, suit l'arrondi des coins via `RoundedCorner`), ligne à 5 dp du bord ; la BANDE entre la ligne et
-  le bord se colore selon le son à chaque endroit (vers le blanc quand c'est fort), + halo qui déborde vers
-  l'intérieur. « Piano » : graves en bas (vague qui monte des deux côtés), mélodie sur les côtés, aigus en haut.
-  2 palettes (carnet « son », clé « style ») : 0 = CHAUDE (braise -> orange -> or), 1 = FROIDE (violet -> bleu ->
-  turquoise). La fenêtre fait la taille RÉELLE de l'écran (`getRealSize` + `setFitInsetsTypes(0)`, comme le rideau).
-  Aperçu validé : /home/claude/apercu/prisme2.py (prisme_tour_complet.mp4).
-  PLEIN ÉCRAN : notre fenêtre est au-dessus de la barre d'état et n'en reçoit pas les infos -> 1re version
-  croyait toujours être en plein écran et ne dessinait jamais (corrigé : repli sur `currentWindowMetrics`,
-  sinon « pas plein écran »). La fenêtre du rond affiche un DIAGNOSTIC en direct (✓/✗) quand le mode est allumé.
-  `ReactionSonoreUi.kt` = `BoutonSon` (rond en bas à droite de l'accueil) + `FenetreSon` (feuille du bas :
-  explication « rien n'est enregistré », choix de la palette, diagnostic, Activer -> question micro d'Android).
-  Textes dans `res/values*/strings_son.xml` (6 langues). Aperçus : /home/claude/apercu/premium.py (avec musique).
-  Testé par Will le 10/11 : la ligne s'affiche (après la correction du plein écran). Reste à confirmer : la
-  réaction quand l'app est en arrière-plan, et la disparition en vidéo plein écran.
-  Play Store : la permission micro devra être justifiée dans la fiche (option éteinte de base, écran d'explication).
-  V3 DU SOIR (10/11, validée sur aperçus `reel.py` et `refrain.py`) — REMPLACE ce qui est dit plus haut sur les
-  palettes et la ligne : (1) la ligne reste DROITE (la ligne poussée par le spectre faisait des bosses, « moins
-  beau ») ; (2) la lumière suit les ATTAQUES, plus le niveau : `EcouteSon.attaques` (40 tranches : montée du
-  moment comparée à la montée moyenne sur 1,5 s, retombe en 0,22 s) et `EcouteSon.frappe` (pareil pour les
-  basses, 0,25 s) ; intensité d'un segment = 0,03 + 0,85·frappe + 0,65·attaque -> presque noir entre les coups.
-  Les mesures identiques (Android en redonne) sont ignorées pour ces calculs ; (3) COULEUR AUTOMATIQUE :
-  `EcouteSon.fort` (fonction `moment()`) = puissance (somme du spectre + 3 x basses, lissée 0,35 s / 1 s)
-  comparée au sommet de la dernière minute ; > 62 % -> « ça envoie », < 38 % -> calme ; en plus il faut avoir
-  entendu un passage nettement plus calme (sommet > 1,6 x creux), sinon un début de morceau serait pris pour un
-  refrain. Fondu de 0,25 s dans `VueSonore` (`melangeFort`) ; (4) 2 COULEURS réglables (carnet « son » :
-  `teinte_calme` 215 = bleu, `teinte_fort` 6 = rouge-orangé ; `ReactionSonore.palette()` en tire 4 couleurs) :
-  fenêtre du rond -> lignes « Calme » / « Quand ça envoie » -> `RoueTeinte` (roue maison ; pendant le réglage
-  `ReactionSonore.montrer()` allume le tour dans cette couleur même sans musique). Les anciennes palettes
-  chaude/froide (clé « style ») n'existent plus. Le diagnostic affiche « Moment : calme/ça envoie (xx %) ».
-  PAS ENCORE TESTÉ sur le téléphone : les seuils (62/38, 1,6) et la sensibilité des attaques ont été réglés sur
-  le son propre d'une vidéo, pas sur les mesures 8 bits du Visualizer -> à ajuster selon le retour de Will.
-  V4 (10/11, 21h30, envoyée SANS aperçu à la demande de Will) — CORRIGE la V3 : (1) Will préfère l'accompagnement
-  d'avant : l'intensité redevient le NIVEAU du spectre (0,85·spectre + 0,30·coup), `attaques`/`frappe` sont encore
-  calculés mais plus utilisés ; la ligne reste droite ; (2) « petits rectangles » visibles -> 360 segments au lieu
-  de 180 + lissage (1/4, 1/2, 1/4 deux fois) ; le halo reste dessiné par paires (180) pour ne pas alourdir ;
-  (3) 3 COULEURS : `EcouteSon.moment` 0 = ÉCOUTE (8 premières secondes, vert 135), 1 = calme, 2 = ça envoie ;
-  carnet « son » : `teinte_ecoute`, `teinte_calme`, `teinte_fort`. Protocole dans `EcouteSon.situer()` : repères
-  « habituels » qui bougent (descendent en 8 s, montent en 30 s, 90 s pendant un « ça envoie »), 3 indices qui
-  votent (niveau > 1,35 x, basses > 1,5 x, cadence > 1,3 x ; 2 sur 3 ; sortie à 1,15 / 1,2 / 1,1), couleur tenue
-  au moins 2 s, signature du drop (creux bref puis coup de basse fort -> rouge immédiat), silence > 1 s -> retour
-  à l'écoute. Rien de tout ça n'a été testé sur le téléphone ni même en aperçu : seuils à régler avec Will
-  (le diagnostic affiche « Moment : … (xx %) » = niveau / habituel).
-  Idées batterie proposées, sans réponse : pause écran éteint, arrêt en économie d'énergie, mode 30 images/s.
+- RÉACTION SONORE (10/11, état au soir après 5 versions) : le tour de l'écran réagit à la musique du téléphone,
+  PARTOUT (hors de l'app aussi). Option éteinte de base, allumée depuis le rond en bas à droite de l'accueil.
+  * `EcouteSon.kt` = l'outil Android `Visualizer(0)` (rien d'enregistré ; permissions RECORD_AUDIO +
+    MODIFY_AUDIO_SETTINGS dans le manifest commun). Un fil « son » demande une mesure toutes les 16 ms
+    (`getFft` + `getWaveForm`). Il publie : `spectre` (40 tranches 40 Hz -> 12 kHz, chacune comparée à son
+    maximum récent), `coup` (coup de basse, retombe en 0,15 s), grave/medium/aigu (pour le rond et le
+    diagnostic), et `palier` (1 à 5). `retardMs` = 180 quand un appareil Bluetooth est branché.
+  * LES 5 PALIERS (idée de Will, échelle FIXE, la même pour tous les morceaux) : énergie = « crête » (force
+    moyenne / pic de la forme du son sur une capture : ~0,3 pour un son creux, ~0,7 pour une basse saturée ;
+    indépendant du volume) x (1 + 0,8 x la part des basses au-dessus de 50 %), lissée sur 2 s.
+    Frontières `SEUILS` = 0,30 / 0,445 / 0,63 / 0,80, calées sur 4 extraits de Will (lent 0,39 ; moyens 0,50 et
+    0,56 ; rapide 0,70 ; simulation /home/claude/video/p/mes4.py). Les paliers 1 et 5 n'ont AUCUN extrait de
+    référence : seuils devinés. Hystérésis 0,02, un palier dure au moins 1,5 s, palier 3 pendant les 2,5
+    premières secondes d'un morceau. Le diagnostic affiche « Palier : nom (énergie xx) » pour recaler.
+  * `ReactionSonore.kt` = carnet « son » (actif, `teinte_calme` 215, `teinte_ecoute` 135 = la couleur « moyen »,
+    `teinte_fort` 6) + `VueSonore` : fenêtre d'accessibilité transparente, non touchable, taille RÉELLE de
+    l'écran, posée via `Rideau.onAttachedToWindow` -> `ReactionSonore.demarrer`. Elle ne dessine que si
+    `AudioManager.isMusicActive`, s'efface en plein écran et en paysage. PIÈGE : la fenêtre est au-dessus de la
+    barre d'état et n'en reçoit pas les infos -> repli sur `currentWindowMetrics`, sinon « pas plein écran ».
+  * LE DESSIN (« Prisme ») : une ligne à 5 dp du bord qui fait le tour complet, la bande entre ligne et bord
+    colorée selon le son, un halo vers l'intérieur. Égaliseur enroulé : graves en bas, aigus en haut, dégradé
+    de couleur du bas vers le haut. Intensité = 0,85 x spectre + 0,30 x coup (Will a préféré ça à un essai
+    piloté par les « attaques », retiré). RUBAN CONTINU : chaque couche est UN `drawPath` (rectangle arrondi)
+    peint avec un `SweepGradient` centré sur l'écran (240 repères, 4 dégradés recréés à chaque image) ; le halo
+    = 7 traits de largeurs décroissantes. NE PAS revenir à des morceaux dessinés un par un : Will voyait et
+    comptait les jointures (180 puis 360 segments, lumière additive), quel que soit leur nombre.
+    Couleur : paliers 1-2 = calme (bleu), 3 = moyen (vert), 4-5 = ça envoie (rouge-orangé), fondu 0,25 s.
+    Palier 1 : trois petits « Z » qui montent du bord gauche. Palier 5 : 14 confettis par coup de basse.
+    Sur un écran > 90 Hz on ne dessine qu'une image sur deux.
+  * `ReactionSonoreUi.kt` = `BoutonSon` (le rond) + `FenetreSon` (feuille du bas, fermable en glissant :
+    explication « rien n'est enregistré », 3 lignes de couleur avec `RoueTeinte`, diagnostic ✓/✗ en direct,
+    Activer -> question micro d'Android). Pendant le réglage d'une couleur, `ReactionSonore.montrer()` allume
+    le tour dans cette couleur même sans musique. Textes : `res/values*/strings_son.xml` (6 langues).
+  * PAS ENCORE VU PAR WILL (envoyé sans aperçu le 10/11 à 22h30) : le ruban continu, les paliers, les Z et les
+    confettis. À vérifier avec lui : fluidité (7 traits larges + 4 dégradés par image), luminosité du halo
+    (il la veut « entre les deux »), justesse des paliers. Idées batterie proposées, sans réponse : pause
+    écran éteint, arrêt en économie d'énergie, mode 30 images/s. Aperçus Python : /home/claude/apercu
+    (prisme2.py, reel.py, refrain.py). Play Store : la permission micro devra être justifiée dans la fiche.
   Will aimait aussi le style « Souffle » (les cartes de l'accueil qui respirent sur les basses) : pas encore codé.
 - `Reglages.kt` : kill switch, « seulement au démarrage », réglages par app (durée, variantes).
 - `MainActivity.kt` : écran principal (logo animé, interrupteurs, écran d'explication Store).
