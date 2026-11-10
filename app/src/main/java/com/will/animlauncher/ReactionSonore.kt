@@ -51,10 +51,14 @@ import java.nio.ByteBuffer
 //     une fine ligne lumineuse qui fait le TOUR COMPLET de l'écran, à 5 dp du bord. La bande entre la
 //     ligne et le bord se remplit de couleur selon le son, et la lumière déborde un peu vers l'intérieur.
 //     C'est un ÉGALISEUR enroulé autour de l'écran : chaque point du tour suit SA tranche de son (graves en
-//     bas, aigus en haut, voir « spectre » dans EcouteSon.kt), et la ligne s'écarte du bord là où ça joue.
-//   - 2 palettes au choix : CHAUDE (braise -> orange -> or) et FROIDE (violet -> bleu -> turquoise).
+//     bas, aigus en haut). Depuis le 10/11 au soir la ligne reste DROITE (la ligne qui s'écartait du bord
+//     faisait des bosses : Will a trouvé ça moins beau) et c'est la LUMIÈRE qui joue la musique : chaque endroit
+//     s'allume quand SA tranche de son vient d'arriver (« attaques » dans EcouteSon.kt), puis retombe.
+//   - 2 COULEURS, choisies par Will dans la fenêtre du rond : une pour les moments CALMES, une pour quand
+//     ÇA ENVOIE (refrain, drop). L'app passe de l'une à l'autre toute seule (« fort » dans EcouteSon.kt), en
+//     fondu d'un quart de seconde. (Remplace les 2 palettes « chaude / froide » d'avant.)
 //
-// Le choix (allumé ou non, quelle palette) est rangé dans un carnet à part, « son ».
+// Le choix (allumé ou non, les deux couleurs) est rangé dans un carnet à part, « son ».
 //
 // ALLÈGEMENT (10/11, Will : les barres lumineuses faisaient ramer le téléphone). Le coupable : le « flou »
 // (BlurMaskFilter). À CHAQUE image, le téléphone devait recalculer 90 grands traits flous, pixel par pixel.
@@ -65,7 +69,10 @@ import java.nio.ByteBuffer
 // lueur, et deux fois moins de travail.
 object ReactionSonore {
     private const val CARNET = "son"
-    const val STYLES = 2          // 0 = chaud, 1 = froid
+    // LES DEUX COULEURS. Une couleur = une « teinte » : un angle de 0 à 360 sur la roue des couleurs
+    // (0 = rouge, 120 = vert, 240 = bleu). L'app en tire toute seule un dégradé de 4 couleurs (voir palette()).
+    const val TEINTE_CALME = 215f     // bleu
+    const val TEINTE_FORT = 6f        // rouge-orangé
 
     private fun carnet(c: Context) = c.applicationContext.getSharedPreferences(CARNET, Context.MODE_PRIVATE)
 
@@ -75,12 +82,46 @@ object ReactionSonore {
         synchroniser(c)
     }
 
-    @Volatile var style = 0          // la palette en cours (0 = chaude, 1 = froide), lue à chaque image
+    @Volatile var teinteCalme = TEINTE_CALME
         private set
-    fun lireStyle(c: Context): Int = carnet(c).getInt("style", 0).coerceIn(0, STYLES - 1).also { style = it }
-    fun definirStyle(c: Context, numero: Int) {
-        style = numero.coerceIn(0, STYLES - 1)
-        carnet(c).edit().putInt("style", style).apply()
+    @Volatile var teinteFort = TEINTE_FORT
+        private set
+    // Augmente de 1 à chaque changement de couleur : le dessin sait ainsi qu'il doit refaire ses dégradés.
+    @Volatile var versionCouleurs = 0
+        private set
+
+    fun lireCouleurs(c: Context) {
+        teinteCalme = carnet(c).getFloat("teinte_calme", TEINTE_CALME)
+        teinteFort = carnet(c).getFloat("teinte_fort", TEINTE_FORT)
+        versionCouleurs++
+    }
+
+    // Change une des deux couleurs (fort = true : celle de « quand ça envoie »). Le dessin suit tout de suite.
+    // « garder » = l'écrire aussi dans le carnet (on ne le fait qu'au lâcher du doigt, pas à chaque millimètre).
+    fun definirTeinte(c: Context, fort: Boolean, teinte: Float, garder: Boolean) {
+        val t = ((teinte % 360f) + 360f) % 360f
+        if (fort) teinteFort = t else teinteCalme = t
+        versionCouleurs++
+        if (garder) carnet(c).edit().putFloat(if (fort) "teinte_fort" else "teinte_calme", t).apply()
+    }
+
+    // LE DÉGRADÉ tiré d'une teinte : 4 couleurs, du grave (bas de l'écran) à l'aigu (haut).
+    // On tourne un peu autour de la teinte choisie (-28°, pile dessus, +30°), puis un presque-blanc pour les aigus.
+    // La couleur de « ça envoie » est un peu plus vive (saturation 0,82 au lieu de 0,75).
+    fun palette(teinte: Float, fort: Boolean): IntArray {
+        val vif = if (fort) 0.82f else 0.75f
+        fun couleur(angle: Float, saturation: Float) =
+            Color.HSVToColor(floatArrayOf(((angle % 360f) + 360f) % 360f, saturation.coerceIn(0f, 1f), 1f))
+        return intArrayOf(couleur(teinte - 28f, vif), couleur(teinte, vif * 0.92f), couleur(teinte + 30f, vif * 0.8f), couleur(teinte + 30f, 0.18f))
+    }
+
+    // L'APERÇU pendant qu'on choisit une couleur dans la fenêtre du rond : -1 = non, 0 = on montre la couleur
+    // « calme », 1 = celle de « ça envoie ». Le tour s'allume alors même sans musique, pour voir ce qu'on règle.
+    @Volatile var apercu = -1
+        private set
+    fun montrer(mode: Int) {
+        apercu = mode
+        vue?.reveiller()
     }
 
     // A-t-on le droit d'écouter ? (la permission « micro », exigée par Android pour lire le niveau du son)
@@ -115,7 +156,7 @@ object ReactionSonore {
 
     // Met la fenêtre en accord avec les réglages : posée si le mode est allumé (et permis), retirée sinon.
     fun synchroniser(c: Context) {
-        lireStyle(c)
+        lireCouleurs(c)
         val s = service
         if (s != null && actif(c) && permission(c)) {
             if (vue == null) poser(s)
@@ -201,11 +242,10 @@ class VueSonore(context: Context) : View(context) {
     private var a = 0f                   // les aigus (pour les petits éclats du haut)
     private var coup = 0f                // le coup de basse du moment
 
-    // ---------- les 2 PALETTES : 4 couleurs, du grave (bas de l'écran) à l'aigu (haut) ----------
-    private val PALETTES = arrayOf(
-        intArrayOf(Color.rgb(255, 96, 64), Color.rgb(255, 150, 72), Color.rgb(255, 200, 120), Color.rgb(255, 232, 205)),   // chaude : braise -> orange -> or -> blanc chaud
-        intArrayOf(Color.rgb(132, 110, 255), Color.rgb(84, 156, 255), Color.rgb(104, 216, 222), Color.rgb(214, 236, 255))  // froide : violet -> bleu -> turquoise -> glace
-    )
+    // ---------- les 2 COULEURS (calme / ça envoie) et le fondu entre elles ----------
+    private var versionVue = -1          // la version des couleurs pour laquelle nos dégradés sont faits
+    private var melangeFort = 0f         // 0 = couleur calme … 1 = couleur « ça envoie » (glisse en ~0,25 s)
+    private val clairs = IntArray(2)     // le presque-blanc de chaque couleur (pour les éclats des aigus)
 
     // ---------- les pinceaux, créés une seule fois ----------
     private val ajout = PorterDuffXfermode(PorterDuff.Mode.ADD)     // la lumière s'ADDITIONNE (comme de vraies lampes)
@@ -238,7 +278,7 @@ class VueSonore(context: Context) : View(context) {
         if (al <= 0) return
         tampon.color = couleur; tampon.alpha = al
         c.save()
-        c.translate(px[s], py[s])
+        c.translate(lx[s], ly[s])
         c.rotate(angle[s])                           // on tourne la feuille pour que le segment soit « à plat »
         zone.set(0f, -demiLargeur, longueur[s], demiLargeur)
         c.drawBitmap(tache, tranche, zone, tampon)
@@ -263,13 +303,10 @@ class VueSonore(context: Context) : View(context) {
     private val ly = FloatArray(N + 1)
     private val bx = FloatArray(N + 1)           // le milieu de la bande (à mi-chemin entre la ligne et le bord)
     private val by = FloatArray(N + 1)
-    private val couleurs = Array(2) { IntArray(N) }      // la couleur de chaque segment, pour chaque palette
+    private val couleurs = Array(2) { IntArray(N) }      // la couleur de chaque segment : [0] = calme, [1] = ça envoie
+    private val courant = IntArray(N)                     // la couleur de chaque segment pour CETTE image (le mélange des deux)
     private val freq = FloatArray(N)                      // où est le segment sur le « piano » : 0 = bas (grave) … 1 = haut (aigu)
     private val intensites = FloatArray(N)
-    private val nX = FloatArray(N + 1)                    // en chaque point, la direction « vers l'intérieur de l'écran »
-    private val nY = FloatArray(N + 1)
-    private val px = FloatArray(N + 1)                    // la ligne de CETTE image (elle vibre sur les coups de basse)
-    private val py = FloatArray(N + 1)
     private val angle = FloatArray(N)                     // la direction de chaque segment (en degrés) et sa longueur
     private val longueur = FloatArray(N)
     private var w = 0f
@@ -286,15 +323,24 @@ class VueSonore(context: Context) : View(context) {
             val s = k.toFloat() / N
             pointDuTour(s, marge, coin).let { lx[k] = it[0]; ly[k] = it[1] }
             pointDuTour(s, marge / 2f, coin).let { bx[k] = it[0]; by[k] = it[1] }
-            // la bande est entre le bord et la ligne : « de la bande vers la ligne » = vers l'intérieur
-            val l = max(hypot(lx[k] - bx[k], ly[k] - by[k]), 0.001f)
-            nX[k] = (lx[k] - bx[k]) / l; nY[k] = (ly[k] - by[k]) / l
         }
         for (k in 0 until N) {
             angle[k] = Math.toDegrees(atan2((ly[k + 1] - ly[k]).toDouble(), (lx[k + 1] - lx[k]).toDouble())).toFloat()
             longueur[k] = hypot(lx[k + 1] - lx[k], ly[k + 1] - ly[k])
             freq[k] = 1f - abs(2f * (k + 0.5f) / N - 1f)
-            for (p in 0..1) couleurs[p][k] = teinte(PALETTES[p], freq[k])
+        }
+        versionVue = -1                              // (les dégradés seront refaits à la prochaine image)
+    }
+
+    // Refait les dégradés des deux couleurs, seulement si Will vient d'en changer une.
+    private fun recolorer() {
+        val version = ReactionSonore.versionCouleurs
+        if (version == versionVue) return
+        versionVue = version
+        for (p in 0..1) {
+            val pal = ReactionSonore.palette(if (p == 1) ReactionSonore.teinteFort else ReactionSonore.teinteCalme, p == 1)
+            for (k in 0 until N) couleurs[p][k] = teinte(pal, freq[k])
+            clairs[p] = pal[3]
         }
     }
 
@@ -395,6 +441,9 @@ class VueSonore(context: Context) : View(context) {
         return pleinEcranAncien
     }
 
+    // Appelé par la fenêtre du rond quand on commence / finit de choisir une couleur : on réagit tout de suite.
+    fun reveiller() = verifier()
+
     private fun verifier() {
         val paysage = resources.configuration.orientation == Configuration.ORIENTATION_LANDSCAPE
         val musique = try { audio.isMusicActive } catch (_: Exception) { false }
@@ -407,7 +456,8 @@ class VueSonore(context: Context) : View(context) {
         EcouteSon.retardMs = if (bluetooth) 180 else 0
         val plein = pleinEcran()
         silences = if (musique) 0 else silences + 1
-        val voulu = !paysage && !plein && silences < 3              // 3 s sans musique : on arrête
+        // 3 s sans musique : on arrête (sauf pendant l'aperçu d'une couleur : là on montre le tour même en silence)
+        val voulu = !paysage && !plein && (silences < 3 || ReactionSonore.apercu >= 0)
         // pour le diagnostic, et une ligne dans le journal quand quelque chose change
         if (musique != ReactionSonore.musique || plein != ReactionSonore.pleinEcran) {
             AnimApp.noter("son : musique ${if (musique) "oui" else "non"}, plein écran ${if (plein) "oui" else "non"} (${ReactionSonore.sourcePleinEcran})")
@@ -462,39 +512,44 @@ class VueSonore(context: Context) : View(context) {
             return
         }
 
-        // les aigus (pour les petits éclats du haut) : la moyenne des 6 tranches les plus aiguës
-        val sp = EcouteSon.spectre
-        var haut = 0f
-        for (b in EcouteSon.BANDES - 6 until EcouteSon.BANDES) haut += sp[b]
-        a = haut / 6f
-        // le coup de basse : on prend le plus fort entre celui qui arrive et le nôtre qui retombe
-        coup = max(EcouteSon.coup, coup * exp(-dt / 0.15f))
+        // LA COULEUR DU MOMENT : calme ou « ça envoie » ? (pendant l'aperçu d'une couleur, c'est celle qu'on règle.)
+        // On ne saute pas d'une couleur à l'autre : « melangeFort » glisse de 0 à 1 en un quart de seconde.
+        recolorer()
+        val montre = ReactionSonore.apercu
+        val cible = if (montre >= 0) montre.toFloat() else if (EcouteSon.fort) 1f else 0f
+        melangeFort += (cible - melangeFort) * (1f - exp(-dt / 0.25f))
+        for (k in 0 until N) courant[k] = melange(couleurs[0][k], couleurs[1][k], melangeFort)
 
-        prisme(c, couleurs[ReactionSonore.style.coerceIn(0, 1)], PALETTES[ReactionSonore.style.coerceIn(0, 1)][3])
+        // les aigus (pour les petits éclats du haut) : la moyenne des 6 tranches les plus aiguës
+        val at = EcouteSon.attaques
+        var haut = 0f
+        for (b in EcouteSon.BANDES - 6 until EcouteSon.BANDES) haut += at[b]
+        a = haut / 6f
+        // le coup de basse : on prend le plus fort entre celui qui arrive et le nôtre qui retombe (en ~0,25 s)
+        coup = max(EcouteSon.frappe, coup * exp(-dt / 0.25f))
+
+        prisme(c, courant, melange(clairs[0], clairs[1], melangeFort))
         // … et on demande l'image suivante (sur un écran rapide : celle d'après, donc 60 images/s)
         if (ecranRapide) postOnAnimation(sauterUneImage) else postInvalidateOnAnimation()
     }
 
     // ================= LE PRISME, TOUR COMPLET =================
     private fun prisme(c: Canvas, coul: IntArray, eclatCouleur: Int) {
-        // 1) LA FORCE de chaque segment = la force de SA tranche de son (10/11 au soir : le vrai spectre).
+        // 1) LA FORCE de chaque segment (10/11 au soir : les ATTAQUES, plus le niveau).
         //    Le tour est un égaliseur : très graves en bas, de plus en plus aigu en montant, pareil à gauche et à
-        //    droite. Aucun retard, aucun hasard : une note qu'on entend allume et pousse TOUJOURS le même endroit.
-        //    Et la LIGNE s'écarte du bord (jusqu'à 9 dp) là où le son est fort : on voit la musique se dessiner.
-        val sp = EcouteSon.spectre
+        //    droite. Un endroit s'allume quand SA tranche de son vient d'arriver, puis retombe en ~0,2 s.
+        //    Entre deux coups il ne reste qu'un fil très discret (3 %) : c'est ce noir qui fait sentir le rythme.
+        //    Et à chaque coup de basse, tout le tour bat (surtout en bas).
+        val at = EcouteSon.attaques
         val fin = EcouteSon.BANDES - 1
-        for (k in 0..N) {
-            val f = 1f - abs(2f * k / N - 1f)                    // 0 = en bas (grave) … 1 = en haut (aigu)
+        // (pendant l'aperçu d'une couleur : une lumière moyenne qui respire, pour bien voir la couleur sans musique)
+        val demo = if (ReactionSonore.apercu >= 0) 0.42f + 0.10f * sin(t * 2.2f) else 0f
+        for (k in 0 until N) {
+            val f = freq[k]                                      // 0 = en bas (grave) … 1 = en haut (aigu)
             val pos = f * fin
             val b = pos.toInt().coerceIn(0, fin - 1)
-            val v = sp[b] + (sp[b + 1] - sp[b]) * (pos - b)      // (entre deux tranches : on glisse de l'une à l'autre)
-            // un petit tremblement en plus sur les coups de basse (2 dp), surtout en bas
-            val kk = min(k, N - k)
-            val pousse = v * 9f * d + coup * (1f - 0.6f * f) * 2f * d * sin(kk * 0.7f - t * 75f)
-            px[k] = lx[k] + nX[k] * pousse
-            py[k] = ly[k] + nY[k] * pousse
-            // la lumière : surtout la tranche, plus un battement de tout le tour sur les coups de basse
-            if (k < N) intensites[k] = min(1f, 0.85f * v + 0.30f * coup * (1f - 0.5f * f))
+            val v = at[b] + (at[b + 1] - at[b]) * (pos - b)      // (entre deux tranches : on glisse de l'une à l'autre)
+            intensites[k] = max(demo, min(1f, 0.03f + 0.85f * coup * (1f - 0.35f * f) + 0.65f * v))
         }
 
         // 2) LA BANDE entre la ligne et le bord : chaque morceau prend la couleur de sa place,
@@ -503,7 +558,7 @@ class VueSonore(context: Context) : View(context) {
         for (k in 0 until N) {
             val i = intensites[k]
             bande.color = melange(coul[k], Color.WHITE, 0.35f * i * i)
-            bande.alpha = opacite(0.10f + 0.80f * i)
+            bande.alpha = opacite(0.06f + 0.84f * i)
             c.drawLine(bx[k], by[k], bx[k + 1], by[k + 1], bande)
         }
 
@@ -517,7 +572,7 @@ class VueSonore(context: Context) : View(context) {
                 val base = 0.14f + 0.86f * i
                 // (le halo GROSSIT sur les coups de basse : c'est le « débordement » qui bat)
                 // (luminosité réglée « entre les deux versions », à la demande de Will)
-                tamponner(c, (px[s] + px[s + 1]) / 2f, (py[s] + py[s + 1]) / 2f, (24f + 6f * i + 7f * coup) * d, coul[s], 0.48f * base * (0.2f + 0.4f * i + 0.12f * coup))
+                tamponner(c, (lx[s] + lx[s + 1]) / 2f, (ly[s] + ly[s + 1]) / 2f, (24f + 6f * i + 7f * coup) * d, coul[s], 0.48f * base * (0.2f + 0.4f * i + 0.12f * coup))
                 etirer(c, s, (7f + i) * d, coul[s], 0.70f * base * (0.30f + 0.65f * i))
             }
         }
@@ -527,10 +582,10 @@ class VueSonore(context: Context) : View(context) {
             val i = intensites[s]
             trait.color = coul[s]
             trait.strokeWidth = (1f + 2.2f * i) * d; trait.alpha = opacite(0.14f + 0.86f * i)
-            c.drawLine(px[s], py[s], px[s + 1], py[s + 1], trait)
+            c.drawLine(lx[s], ly[s], lx[s + 1], ly[s + 1], trait)
             if (i > 0.45f) {
                 trait.color = Color.WHITE; trait.strokeWidth = 0.5f * d; trait.alpha = opacite((i - 0.45f) * 0.8f)
-                c.drawLine(px[s], py[s], px[s + 1], py[s + 1], trait)
+                c.drawLine(lx[s], ly[s], lx[s + 1], ly[s + 1], trait)
             }
         }
 
@@ -538,7 +593,7 @@ class VueSonore(context: Context) : View(context) {
         if (a > 0.03f) for (j in 0..8) {
             val s = (N * (0.40f + 0.20f * ((j * 0.37f + 0.11f) % 1f))).toInt()
             val onde = max(0f, sin(t * 2.3f + j * 5f))
-            eclat(c, px[s], py[s], 4.5f, a * onde * onde, eclatCouleur)
+            eclat(c, lx[s], ly[s], 4.5f, a * onde * onde, eclatCouleur)
         }
     }
 }

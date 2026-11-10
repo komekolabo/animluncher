@@ -9,6 +9,8 @@ import android.graphics.BlurMaskFilter
 import android.graphics.Canvas
 import android.graphics.Color
 import android.graphics.Paint
+import android.graphics.SweepGradient
+import android.graphics.drawable.GradientDrawable
 import android.graphics.drawable.ColorDrawable
 import android.view.MotionEvent
 import android.view.VelocityTracker
@@ -28,6 +30,9 @@ import android.widget.TextView
 import android.widget.Toast
 import kotlin.math.PI
 import kotlin.math.abs
+import kotlin.math.atan2
+import kotlin.math.cos
+import kotlin.math.hypot
 import kotlin.math.min
 import kotlin.math.sin
 
@@ -86,9 +91,9 @@ object FenetreSon {
     const val DEMANDE = 4107            // le numéro de notre question « micro » (pour reconnaître la réponse)
     private var ouverte: Dialog? = null
 
-    // les 2 palettes du Prisme (dans le même ordre que ReactionSonore : 0 = chaude, 1 = froide)
-    private val NOMS = intArrayOf(R.string.son_style_chaud, R.string.son_style_froid)
-    private val DESCRIPTIONS = intArrayOf(R.string.son_desc_chaud, R.string.son_desc_froid)
+    // les 2 couleurs du tour lumineux (dans le même ordre que ReactionSonore : 0 = calme, 1 = quand ça envoie)
+    private val NOMS = intArrayOf(R.string.son_calme, R.string.son_fort)
+    private val DESCRIPTIONS = intArrayOf(R.string.son_calme_desc, R.string.son_fort_desc)
 
     // Vrai tant que la fenêtre est affichée (l'accueil ne fait pas défiler ses cartes pendant ce temps).
     fun estOuverte(): Boolean = ouverte?.isShowing == true
@@ -98,7 +103,8 @@ object FenetreSon {
         ouverte?.dismiss()
         val dialogue = Dialog(a)
         dialogue.requestWindowFeature(Window.FEATURE_NO_TITLE)
-        dialogue.setOnDismissListener { if (ouverte === dialogue) ouverte = null }   // (remplacé par le diagnostic s'il y en a un)
+        // à la fermeture : on arrête l'aperçu des couleurs (remplacé plus bas par le diagnostic s'il y en a un)
+        dialogue.setOnDismissListener { ReactionSonore.montrer(-1); if (ouverte === dialogue) ouverte = null }
         dialogue.setContentView(FeuilleGlissante(a, contenu(a, dialogue),
             fermer = {
                 dialogue.window?.setWindowAnimations(0)     // déjà sortie par le bas : pas de 2e animation de fermeture
@@ -120,6 +126,7 @@ object FenetreSon {
     private fun contenu(a: Activity, dialogue: Dialog): ScrollView {
         fun px(v: Float) = Style.px(a, v)
         val allume = ReactionSonore.actif(a) && ReactionSonore.permission(a)
+        val defilant = ScrollView(a)          // (sur un petit écran, le tout peut défiler)
         val colonne = LinearLayout(a).apply {
             orientation = LinearLayout.VERTICAL
             gravity = Gravity.CENTER_HORIZONTAL
@@ -144,36 +151,94 @@ object FenetreSon {
         if (BuildConfig.STORE) ligne(a.getString(R.string.son_expl_internet), Style.MUET)     // vrai seulement en version Store
         ligne(a.getString(R.string.son_expl_video), Style.MUET, haut = 10f)
 
-        // le choix de la palette : 2 lignes, un point blanc devant celle qui est choisie
-        colonne.addView(Style.titreCarte(a, a.getString(R.string.son_style)).apply { setPadding(0, px(16f), 0, px(6f)) },
+        // LES DEUX COULEURS (10/11) : une pour les moments calmes, une pour quand ça envoie.
+        // Chaque ligne montre son dégradé et sa pastille. Un appui sur une ligne ouvre la ROUE des couleurs
+        // juste en dessous (un 2e appui la referme). Pendant qu'on tourne la roue, le tour de l'écran prend
+        // cette couleur en direct (si le mode est allumé), même sans musique.
+        colonne.addView(Style.titreCarte(a, a.getString(R.string.son_couleurs)).apply { setPadding(0, px(16f), 0, px(6f)) },
             LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT))
-        val points = ArrayList<View>()
-        fun majPoints() {
-            for ((i, point) in points.withIndex()) {
-                point.background = if (i == ReactionSonore.style) Style.arrondi(a, Style.TEXTE, 6f)
-                                   else Style.arrondi(a, Color.TRANSPARENT, 6f, Color.rgb(90, 90, 98))
+        ReactionSonore.lireCouleurs(a)
+        var choisie = -1                                  // la ligne ouverte : -1 = aucune, 0 = calme, 1 = ça envoie
+        val lignes = ArrayList<View>()
+        val degrades = ArrayList<View>()
+        val pastilles = ArrayList<View>()
+        val roue = RoueTeinte(a)
+        val parDefaut = Style.texte(a, a.getString(R.string.son_defaut), 14f, Style.DOUX, gras = true).apply {
+            gravity = Gravity.CENTER
+            setPadding(px(18f), px(10f), px(18f), px(4f))
+        }
+        // la roue, sa phrase d'aide et « Par défaut » : cachés tant qu'aucune ligne n'est ouverte
+        val reglage = LinearLayout(a).apply {
+            orientation = LinearLayout.VERTICAL
+            gravity = Gravity.CENTER_HORIZONTAL
+            visibility = View.GONE
+            addView(roue, LinearLayout.LayoutParams(px(210f), px(210f)).apply { topMargin = px(12f) })
+            addView(Style.texte(a, a.getString(R.string.son_roue_aide), 12.5f, Style.MUET).apply { gravity = Gravity.CENTER },
+                LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT).apply { topMargin = px(6f) })
+            addView(parDefaut, LinearLayout.LayoutParams(ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT))
+        }
+        fun teinteDe(i: Int) = if (i == 1) ReactionSonore.teinteFort else ReactionSonore.teinteCalme
+        // remet à jour les dégradés, les pastilles et le contour de la ligne ouverte
+        fun majCouleurs() {
+            for (i in 0..1) {
+                val pal = ReactionSonore.palette(teinteDe(i), i == 1)
+                degrades[i].background = GradientDrawable(GradientDrawable.Orientation.LEFT_RIGHT, intArrayOf(pal[0], pal[1], pal[2])).apply {
+                    cornerRadius = px(7f).toFloat()
+                }
+                pastilles[i].background = Style.arrondi(a, pal[1], 11f)
+                lignes[i].background = Style.arrondi(a, Color.argb(14, 255, 255, 255), 14f,
+                    if (i == choisie) Color.rgb(120, 200, 210) else Style.BORD)
             }
         }
-        ReactionSonore.lireStyle(a)
-        for (i in 0 until ReactionSonore.STYLES) {
-            val point = View(a)
-            points.add(point)
-            colonne.addView(LinearLayout(a).apply {
+        for (i in 0..1) {
+            val degrade = View(a)
+            val pastille = View(a)
+            degrades.add(degrade)
+            pastilles.add(pastille)
+            val ligneCouleur = LinearLayout(a).apply {
                 orientation = LinearLayout.HORIZONTAL
                 gravity = Gravity.CENTER_VERTICAL
-                background = Style.arrondi(a, Color.argb(14, 255, 255, 255), 14f, Style.BORD)
                 setPadding(px(14f), px(9f), px(14f), px(9f))
-                addView(point, LinearLayout.LayoutParams(px(12f), px(12f)).apply { rightMargin = px(12f) })
                 addView(LinearLayout(a).apply {
                     orientation = LinearLayout.VERTICAL
                     addView(Style.texte(a, a.getString(NOMS[i]), 15f, Style.TEXTE, gras = true))
                     addView(Style.texte(a, a.getString(DESCRIPTIONS[i]), 12.5f, Style.MUET))
                 }, LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f))
+                addView(degrade, LinearLayout.LayoutParams(px(44f), px(14f)).apply { leftMargin = px(10f) })
+                addView(pastille, LinearLayout.LayoutParams(px(22f), px(22f)).apply { leftMargin = px(10f) })
                 isClickable = true
-                setOnClickListener { ReactionSonore.definirStyle(a, i); majPoints() }     // change tout de suite, même en musique
-            }, LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT).apply { topMargin = px(6f) })
+                setOnClickListener {
+                    choisie = if (choisie == i) -1 else i
+                    reglage.visibility = if (choisie >= 0) View.VISIBLE else View.GONE
+                    if (choisie >= 0) {
+                        roue.placer(teinteDe(choisie), choisie == 1)
+                        // on fait défiler la fenêtre pour que la roue soit bien visible
+                        defilant.post { defilant.smoothScrollTo(0, lignes[0].top - px(30f)) }
+                    }
+                    ReactionSonore.montrer(choisie)           // le tour de l'écran montre la couleur qu'on règle
+                    majCouleurs()
+                }
+            }
+            lignes.add(ligneCouleur)
+            colonne.addView(ligneCouleur, LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT).apply { topMargin = px(6f) })
         }
-        majPoints()
+        colonne.addView(reglage, LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT))
+        // la roue tourne : on change la couleur de la ligne ouverte (« fini » = le doigt est levé : on enregistre)
+        roue.quandChange = { teinte, fini ->
+            if (choisie >= 0) {
+                ReactionSonore.definirTeinte(a, choisie == 1, teinte, fini)
+                majCouleurs()
+            }
+        }
+        parDefaut.setOnClickListener {
+            if (choisie >= 0) {
+                val origine = if (choisie == 1) ReactionSonore.TEINTE_FORT else ReactionSonore.TEINTE_CALME
+                ReactionSonore.definirTeinte(a, choisie == 1, origine, true)
+                roue.placer(origine, choisie == 1)
+                majCouleurs()
+            }
+        }
+        majCouleurs()
 
         // le DIAGNOSTIC (quand le mode est allumé) : ce que l'app voit vraiment, mis à jour 2 fois par seconde.
         // Sert à comprendre pourquoi les bords n'apparaissent pas (à envoyer à Claude si besoin).
@@ -193,7 +258,7 @@ object FenetreSon {
                 }
             }
             minuteur.post(maj)
-            dialogue.setOnDismissListener { minuteur.removeCallbacks(maj); if (ouverte === dialogue) ouverte = null }
+            dialogue.setOnDismissListener { minuteur.removeCallbacks(maj); ReactionSonore.montrer(-1); if (ouverte === dialogue) ouverte = null }
         }
 
         // les avertissements, seulement quand ils servent
@@ -212,8 +277,8 @@ object FenetreSon {
             setOnClickListener { dialogue.dismiss() }
         }, LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT))
 
-        // (sur un petit écran, le tout peut défiler)
-        return ScrollView(a).apply { addView(colonne) }
+        defilant.addView(colonne)
+        return defilant
     }
 
     // Le texte du diagnostic : une ligne par vérification, ✓ si c'est bon, ✗ sinon.
@@ -234,7 +299,9 @@ object FenetreSon {
             l(!ReactionSonore.pleinEcran, a.getString(R.string.son_diag_plein, if (ReactionSonore.pleinEcran) oui else non, ReactionSonore.sourcePleinEcran)),
             l(EcouteSon.enMarche, ecoute),
             l(ReactionSonore.dessine, a.getString(R.string.son_diag_dessine, if (ReactionSonore.dessine) oui else non)),
-            a.getString(R.string.son_diag_niveaux, (EcouteSon.grave * 100).toInt(), (EcouteSon.medium * 100).toInt(), (EcouteSon.aigu * 100).toInt())
+            a.getString(R.string.son_diag_niveaux, (EcouteSon.grave * 100).toInt(), (EcouteSon.medium * 100).toInt(), (EcouteSon.aigu * 100).toInt()),
+            // calme ou « ça envoie », et la puissance du moment en % du plus fort de la dernière minute
+            a.getString(R.string.son_diag_moment, a.getString(if (EcouteSon.fort) R.string.son_fort else R.string.son_calme), EcouteSon.elanMoment)
         ).joinToString("\n")
     }
 
@@ -255,6 +322,85 @@ object FenetreSon {
         ReactionSonore.definirActif(a, true)
         ouverte?.dismiss()
         Toast.makeText(a, a.getString(R.string.son_active), Toast.LENGTH_SHORT).show()
+    }
+}
+
+// LA ROUE DES COULEURS (10/11) : un anneau arc-en-ciel avec une poignée qu'on fait glisser.
+// L'endroit de la poignée sur l'anneau = la « teinte », un angle de 0 à 360 (0 = rouge, à droite ; on tourne
+// dans le sens des aiguilles d'une montre : jaune, vert, bleu, violet…). Le disque du milieu montre la couleur choisie.
+class RoueTeinte(context: Context) : View(context) {
+    private val d = resources.displayMetrics.density
+    private val p = Paint(Paint.ANTI_ALIAS_FLAG)
+    private var arcEnCiel: SweepGradient? = null
+    private var teinte = 0f
+    private var fort = false                       // quelle couleur on règle (pour montrer la même nuance que le tour)
+    private var prise = false                      // vrai pendant que le doigt tient la poignée
+
+    // Appelé à chaque mouvement : (la teinte, vrai si le doigt vient de se lever).
+    var quandChange: ((Float, Boolean) -> Unit)? = null
+
+    // Met la poignée sur une teinte (quand on ouvre la roue, ou « Par défaut »).
+    fun placer(nouvelle: Float, pourFort: Boolean) {
+        teinte = nouvelle; fort = pourFort
+        invalidate()
+    }
+
+    private fun rayon(): Float = min(width, height) / 2f - 16f * d      // le rayon du milieu de l'anneau
+
+    override fun onSizeChanged(largeur: Int, hauteur: Int, ancienneL: Int, ancienneH: Int) {
+        // 13 couleurs, une tous les 30° (la 13e = la 1re : la boucle est bouclée)
+        val tour = IntArray(13) { Color.HSVToColor(floatArrayOf((it * 30) % 360f, 0.85f, 1f)) }
+        arcEnCiel = SweepGradient(largeur / 2f, hauteur / 2f, tour, null)
+    }
+
+    override fun onDraw(c: Canvas) {
+        val cx = width / 2f
+        val cy = height / 2f
+        val r = rayon()
+        val epaisseur = 22f * d
+        val couleur = ReactionSonore.palette(teinte, fort)[1]
+        // l'anneau
+        p.style = Paint.Style.STROKE; p.strokeWidth = epaisseur; p.shader = arcEnCiel
+        c.drawCircle(cx, cy, r, p)
+        p.shader = null
+        // le disque du milieu : la couleur choisie
+        p.style = Paint.Style.FILL; p.color = couleur
+        c.drawCircle(cx, cy, r * 0.42f, p)
+        // la poignée : un rond de la couleur choisie, cerclé de blanc
+        val angle = Math.toRadians(teinte.toDouble()).toFloat()
+        val x = cx + r * cos(angle)
+        val y = cy + r * sin(angle)
+        c.drawCircle(x, y, epaisseur * 0.5f, p)
+        p.style = Paint.Style.STROKE; p.strokeWidth = 3f * d; p.color = Color.WHITE
+        c.drawCircle(x, y, epaisseur * 0.5f, p)
+    }
+
+    override fun onTouchEvent(ev: MotionEvent): Boolean {
+        val dx = ev.x - width / 2f
+        val dy = ev.y - height / 2f
+        when (ev.actionMasked) {
+            MotionEvent.ACTION_DOWN -> {
+                // il faut toucher l'anneau (pas le milieu) ; sinon on laisse la fenêtre défiler normalement
+                if (hypot(dx, dy) < rayon() * 0.55f) return false
+                prise = true
+                // « ne m'interrompez pas » : sans ça, glisser vers le bas sur la roue fermerait la fenêtre
+                parent?.requestDisallowInterceptTouchEvent(true)
+                tourner(dx, dy, false)
+            }
+            MotionEvent.ACTION_MOVE -> if (prise) tourner(dx, dy, false)
+            MotionEvent.ACTION_UP, MotionEvent.ACTION_CANCEL -> if (prise) {
+                prise = false
+                quandChange?.invoke(teinte, true)
+            }
+        }
+        return true
+    }
+
+    // La teinte = l'angle du doigt autour du centre (atan2 donne -180..180 : on le ramène entre 0 et 360).
+    private fun tourner(dx: Float, dy: Float, fini: Boolean) {
+        teinte = ((Math.toDegrees(atan2(dy, dx).toDouble()).toFloat()) + 360f) % 360f
+        quandChange?.invoke(teinte, fini)
+        invalidate()
     }
 }
 

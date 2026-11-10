@@ -9,11 +9,13 @@
     <string name="son_expl_video">L’effet se cache tout seul pendant les vidéos et les jeux en plein écran, et ne tourne que quand de la musique joue.</string>
     <string name="son_expl_micro">Android va demander l’accès au micro : c’est obligatoire pour lire le niveau du son.</string>
     <string name="son_service">Active d’abord AnimLauncher dans les réglages d’accessibilité : l’effet en a besoin pour s’afficher.</string>
-    <string name="son_style">Style</string>
-    <string name="son_style_chaud">Chaud</string>
-    <string name="son_desc_chaud">Braise, orange et or, du bas vers le haut</string>
-    <string name="son_style_froid">Froid</string>
-    <string name="son_desc_froid">Violet, bleu et turquoise, du bas vers le haut</string>
+    <string name="son_couleurs">Couleurs</string>
+    <string name="son_calme">Calme</string>
+    <string name="son_calme_desc">Quand la musique respire</string>
+    <string name="son_fort">Quand ça envoie</string>
+    <string name="son_fort_desc">Quand la basse prend le contrôle</string>
+    <string name="son_roue_aide">Glisse la poignée, l’écran suit en direct</string>
+    <string name="son_defaut">Par défaut</string>
     <string name="son_activer">Activer</string>
     <string name="son_desactiver">Désactiver</string>
     <string name="son_plus_tard">Plus tard</string>
@@ -33,4 +35,5 @@
     <string name="son_diag_ecoute_arret">Écoute du son : arrêtée</string>
     <string name="son_diag_dessine">Bords dessinés : %1$s</string>
     <string name="son_diag_niveaux">Niveaux : graves %1$d %% · mélodie %2$d %% · aigus %3$d %%</string>
+    <string name="son_diag_moment">Moment : %1$s (%2$d %%)</string>
 </resources>

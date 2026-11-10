@@ -44,6 +44,16 @@ import kotlin.math.pow
 //  7) Écouteurs Bluetooth : le son met ~0,2 s à arriver aux oreilles, alors que nous le « voyons » tout de suite.
 //     « retardMs » permet de RETARDER ce qu'on publie d'autant, pour que l'image et le son tombent ensemble.
 //
+// LES ATTAQUES ET LE « ÇA ENVOIE » (10/11 au soir, après comparaison d'une vidéo de Will avec sa musique) :
+//  8) Le dessin suivait le NIVEAU du son : sur une musique pleine, tout restait allumé et on ne sentait pas le
+//     rythme. Maintenant on publie aussi les ATTAQUES (« attaques », 40 tranches) : une tranche ne s'allume que
+//     quand elle vient de MONTER nettement plus que d'habitude (une note, un coup qui ARRIVE), puis elle retombe
+//     en ~0,2 s. Entre deux coups il fait presque noir : c'est ce contraste qui donne le rythme.
+//     « frappe » fait pareil pour le coup de basse (retombe en ~0,25 s, assez long pour être bien vu).
+//  9) « fort » : vrai quand la musique S'EMBALLE (refrain, drop). Voir « moment() » plus bas : on compare la
+//     puissance du moment (volume + basses, lissée) au plus fort de la dernière minute. Au-dessus de 62 % on
+//     passe en « ça envoie », en dessous de 38 % on revient au calme (l'écart évite que ça clignote).
+//
 // Ce fichier range ces nombres dans 6 valeurs simples, de 0 à 1, que les dessins viennent lire :
 //   coup    : un coup de basse vient de tomber (saute à 1, retombe vite)
 //   grave   : la grosse caisse, la basse            (43 à 170 Hz)
@@ -78,6 +88,30 @@ object EcouteSon {
     private val memCoup = FloatArray(MEMOIRE)
     private var rangMem = 0
     private var coupVif = 0f                       // le coup « en direct » (avant le retard)
+
+    // LES ATTAQUES (point 8) : 40 tranches de 0 à 1. Une tranche saute vers 1 quand son son vient d'arriver, puis retombe.
+    val attaques = FloatArray(BANDES)
+    @Volatile var frappe = 0f                      // le coup de basse, version « attaque » (saute à 1, retombe en ~0,25 s)
+        private set
+    private val elans = FloatArray(BANDES)         // les attaques « en direct » (avant le retard)
+    private val avant = FloatArray(BANDES)         // la force de chaque tranche à la mesure d'avant
+    private val moyMontee = FloatArray(BANDES)     // de combien chaque tranche monte « d'habitude » (moyenne sur 1,5 s)
+    private val memAttaques = Array(MEMOIRE) { FloatArray(BANDES) }
+    private val memFrappe = FloatArray(MEMOIRE)
+    private var frappeVive = 0f
+    private var avantGrave = 0f
+    private var moyFrappe = 0f
+    private var ancienne = ByteArray(0)            // la mesure d'avant (Android redonne parfois deux fois la même)
+
+    // LE « ÇA ENVOIE » (point 9)
+    @Volatile var fort = false                     // vrai = la musique s'emballe (refrain, drop)
+        private set
+    @Volatile var elanMoment = 0                   // pour le diagnostic : la puissance du moment, en % du plus fort récent
+        private set
+    private var puissance = 0f                     // la puissance du moment, lissée
+    private var sommet = 0f                        // le plus fort de la dernière minute
+    private var creux = -1f                        // le plus calme entendu récemment (-1 = pas encore connu)
+    private var duree = 0f                         // depuis combien de secondes le son joue sans silence
 
     // le vrai volume du moment (voir le point 3 en haut)
     private var mesureOk = false
@@ -124,6 +158,9 @@ object EcouteSon {
             mesureOk = try { v.setMeasurementMode(Visualizer.MEASUREMENT_MODE_PEAK_RMS) == Visualizer.SUCCESS } catch (_: Throwable) { false }
             refVolume = 0.0001f; basGrave = 0f; depuisCoup = 1f; coup = 0f; coupVif = 0f
             valeur.fill(0f); spectre.fill(0f); memCoup.fill(0f); for (m in memSpectre) m.fill(0f)
+            elans.fill(0f); attaques.fill(0f); avant.fill(0f); moyMontee.fill(0f); memFrappe.fill(0f); for (m in memAttaques) m.fill(0f)
+            frappe = 0f; frappeVive = 0f; avantGrave = 0f; moyFrappe = 0f; ancienne = ByteArray(0)
+            fort = false; elanMoment = 0; puissance = 0f; sommet = 0f; creux = -1f; duree = 0f
             v.setEnabled(true)
             visu = v
             ratees = 0; moyGrave = 0f; derniereMesure = 0L
@@ -153,7 +190,7 @@ object EcouteSon {
             t?.quitSafely()
         }
         if (p == null || !p.post(eteindre)) eteindre.run()
-        grave = 0f; medium = 0f; aigu = 0f; claque = 0f; coup = 0f
+        grave = 0f; medium = 0f; aigu = 0f; claque = 0f; coup = 0f; frappe = 0f; fort = false
     }
 
     // UNE MESURE (dans le fil « son »), puis rendez-vous dans 16 ms.
@@ -214,11 +251,34 @@ object EcouteSon {
     private fun publier() {
         System.arraycopy(valeur, 0, memSpectre[rangMem], 0, BANDES)
         memCoup[rangMem] = coupVif
+        System.arraycopy(elans, 0, memAttaques[rangMem], 0, BANDES)
+        memFrappe[rangMem] = frappeVive
         val recul = (retardMs / PAS.toInt()).coerceIn(0, MEMOIRE - 1)
         val j = (rangMem - recul + MEMOIRE) % MEMOIRE
         System.arraycopy(memSpectre[j], 0, spectre, 0, BANDES)
         coup = memCoup[j]
+        System.arraycopy(memAttaques[j], 0, attaques, 0, BANDES)
+        frappe = memFrappe[j]
         rangMem = (rangMem + 1) % MEMOIRE
+    }
+
+    // CALME OU « ÇA ENVOIE » ? (point 9). « p » = la puissance brute de cette mesure (0 pendant un silence).
+    //  - « puissance » suit p en douceur : elle monte en ~0,35 s et redescend en ~1 s (un seul coup ne suffit pas).
+    //  - « sommet » = le plus fort de la dernière minute : c'est « à fond » pour CE morceau, à CE volume.
+    //  - « creux » = le plus calme entendu récemment. Tant qu'on n'a pas entendu un passage nettement plus calme
+    //    que le sommet, on reste en « calme » : sinon un morceau qui commence doucement serait pris pour un refrain
+    //    (au début, le plus fort entendu… c'est forcément ce qu'on entend).
+    private fun moment(p: Float, dt: Float) {
+        puissance += (p - puissance) * (1f - exp(-dt / (if (p > puissance) 0.35f else 1f)))
+        sommet = max(sommet * exp(-dt / 60f), puissance)
+        if (p <= 0f) duree = 0f else duree += dt
+        if (sommet < 0.001f) { fort = false; elanMoment = 0; return }
+        // le creux : connu après 2 s de son ; il descend tout de suite, et remonte très lentement (en ~1 minute)
+        if (duree > 2f) creux = if (creux < 0f) puissance else min(creux + (sommet - creux) * (1f - exp(-dt / 60f)), puissance)
+        val r = puissance / sommet
+        elanMoment = (r * 100f).toInt()
+        if (!fort && r > 0.62f && creux >= 0f && sommet > 1.6f * creux) fort = true
+        if (fort && r < 0.38f) fort = false
     }
 
     private fun niveau(valeur: Float, reference: Float, seuil: Float): Float =
@@ -240,16 +300,35 @@ object EcouteSon {
         val sec = bande(fft, hzParCase, 2000f, 5000f) * vol
         depuisCoup += dt
         coupVif *= exp(-dt / 0.15f)                    // le coup retombe tout seul
+        frappeVive *= exp(-dt / 0.25f)
+        val retombee = exp(-dt / 0.22f)                // les attaques retombent en ~0,2 s
+        // Est-ce une NOUVELLE mesure ? (on en demande 60 par seconde, mais Android n'en fabrique parfois que ~40 :
+        // il redonne alors la même. Une mesure identique ne doit pas compter comme « rien n'a monté ».)
+        val neuve = !java.util.Arrays.equals(fft, ancienne)
+        if (neuve) {
+            if (ancienne.size != fft.size) ancienne = ByteArray(fft.size)
+            System.arraycopy(fft, 0, ancienne, 0, fft.size)
+        }
 
         if (g + m + a < 1.5f) {                        // silence : tout retombe
             grave = 0f; medium = 0f; aigu = 0f; claque = 0f; ancienSec = sec; moyGrave = 0f; basGrave = 0f
-            valeur.fill(0f); publier()
+            valeur.fill(0f); elans.fill(0f); avant.fill(0f); avantGrave = 0f
+            moment(0f, dt)
+            publier()
             return
         }
         // LE SPECTRE : la force de chacune des 40 tranches.
         val nb = fft.size / 2
         if (forces.size != nb) forces = FloatArray(nb)
-        for (k in 1 until nb) forces[k] = hypot(fft[2 * k].toFloat(), fft[2 * k + 1].toFloat()) * vol
+        var total = 0f                                 // la puissance : toutes les fréquences…
+        var basses = 0f                                // … et les basses (30 à 180 Hz), qui compteront triple
+        val finBasses = (180f / hzParCase).toInt().coerceIn(1, nb - 1)
+        for (k in 1 until nb) {
+            forces[k] = hypot(fft[2 * k].toFloat(), fft[2 * k + 1].toFloat()) * vol
+            total += forces[k]
+            if (k <= finBasses) basses += forces[k]
+        }
+        moment(total + 3f * basses, dt)
         val oubli = exp(-dt / 8f)
         var refMax = 1.5f
         for (b in 0 until BANDES) {
@@ -277,6 +356,19 @@ object EcouteSon {
             val cible = ((n - 0.3f) / 0.7f).coerceIn(0f, 1f).pow(1.3f)
             // monte tout de suite, retombe vite (~0,09 s) : c'est ce qui donne l'impression de « coller » au son
             valeur[b] = if (cible > valeur[b]) cible else valeur[b] + (cible - valeur[b]) * (1f - exp(-dt / 0.09f))
+            // L'ATTAQUE de la tranche (point 8) : de combien elle vient de MONTER, comparé à ses montées habituelles.
+            elans[b] *= retombee
+            if (neuve) {
+                val plancher = max(refBande[b], 0.2f * refMax)
+                val montee = max(0f, bruts[b] - avant[b])
+                avant[b] = bruts[b]
+                moyMontee[b] += (montee - moyMontee[b]) * (1f - exp(-dt / 1.5f))
+                // une attaque = une montée au moins 2 à 3 fois plus forte que d'habitude, dans une tranche qui s'entend
+                // (le « 0.03 x plancher » évite de prendre le petit bruit de fond d'une tranche muette pour une note)
+                var attaque = (montee / (moyMontee[b] * 4f + 0.03f * plancher) - 0.6f).coerceIn(0f, 1f)
+                if (bruts[b] < 0.25f * plancher) attaque = 0f
+                elans[b] = max(elans[b], attaque)
+            }
         }
         // la référence descend très lentement, et remonte tout de suite si le son est plus fort
         val baisse = exp(-0.06f * dt)                  // (même vitesse qu'avant : -6 % par seconde)
@@ -295,6 +387,13 @@ object EcouteSon {
         if (elan > 0.35f && depuisCoup > 0.11f) {
             coupVif = max(coupVif, 0.55f + 0.45f * elan)
             depuisCoup = 0f
+        }
+        // LA FRAPPE : le même coup de basse, mais mesuré comme une attaque (comparé aux montées habituelles des basses)
+        if (neuve) {
+            val montee = max(0f, g - avantGrave)
+            avantGrave = g
+            moyFrappe += (montee - moyFrappe) * (1f - exp(-dt / 1.5f))
+            frappeVive = max(frappeVive, (montee / (moyFrappe * 5f + 0.03f * refGrave) - 0.7f).coerceIn(0f, 1f))
         }
         medium = niveau(m, refMedium, 0.20f)
         aigu = niveau(a, refAigu, 0.25f)
