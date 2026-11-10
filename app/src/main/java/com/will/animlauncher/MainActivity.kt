@@ -5,8 +5,6 @@ import android.content.Intent
 import android.graphics.Color
 import android.graphics.drawable.GradientDrawable
 import android.os.Bundle
-import android.os.Handler
-import android.os.Looper
 import android.provider.Settings
 import android.view.Gravity
 import android.view.View
@@ -28,8 +26,8 @@ import android.widget.Toast
 //  │ │ │     (animation)      │ │ │   1. Animations d'apps  2. Logos animés  3. Fonds d'écran
 //  │ │ │ Titre                │ │ │   La carte du centre est bien CENTRÉE ; on voit dépasser la 3 à gauche
 //  │ │ │ chiffre           (→)│ │ │   et la 2 à droite. Un appui N'IMPORTE OÙ sur la carte ouvre sa partie.
-//  │ │ │                      │ │ │   Toutes les 5 s, le manège passe tout seul à la carte de droite
-//  │─┘ └──────────────────────┘ └─│   (règles du défilement automatique : voir « LE DÉFILEMENT AUTOMATIQUE »).
+//  │ │ │  ━━━━━━━───────────  │ │ │   Une fine barre se remplit en 5 s, puis le manège passe tout seul
+//  │─┘ └──────────────────────┘ └─│   à la carte de droite (règles : voir Manege.kt).
 //  │          ━  •  •             │   les points (on peut appuyer dessus)
 //  │   ( Animations ON  [●] )     │   l'interrupteur général (le kill switch)
 //  └──────────────────────────────┘
@@ -40,21 +38,12 @@ import android.widget.Toast
 // dans la langue du téléphone (fichiers res/values*/strings.xml : un dossier par langue).
 class MainActivity : Activity() {
 
-    companion object {
-        const val DELAI_AUTO = 5000L        // le temps passé sur une carte avant le défilement automatique (en ms)
-    }
-
     private var dp = 1f
     private fun px(v: Float): Int = (v * dp).toInt()
 
     // le manège des cartes (voir Manege.kt) et les points en dessous
     private lateinit var manege: Manege
     private val points = ArrayList<View>()
-
-    // le défilement automatique
-    private val minuteur = Handler(Looper.getMainLooper())
-    private var autoArrete = false          // vrai dès qu'on est revenu en arrière : plus de défilement auto
-    private var doigtSurCartes = false      // vrai tant que le doigt touche le manège
 
     // ce qui change quand on revient sur l'écran
     private lateinit var demo: DemoAnimations      // la démo en boucle de la carte 1 (voir DemoAccueil.kt)
@@ -107,18 +96,9 @@ class MainActivity : Activity() {
             ajouter(carteLogos(), largeurCarte)
             ajouter(carteFonds(), largeurCarte)
         }
-        manege.ecoute = object : Manege.Ecoute {
-            override fun carteAffichee(page: Int) = majPoints()
-            override fun doigtPose() {
-                doigtSurCartes = true
-                minuteur.removeCallbacks(defilementAuto)        // pas de défilement auto sous le doigt
-            }
-            override fun doigtLeve(sens: Int) {
-                doigtSurCartes = false
-                if (sens < 0) autoArrete = true                 // on est revenu en arrière : on arrête le défilement auto
-                relancerMinuteur()                              // sinon, on repart pour 5 s pleines
-            }
-        }
+        manege.carteAffichee = { majPoints() }
+        // Le défilement automatique attend tant que le menu ou la fenêtre de la réaction sonore est ouvert.
+        manege.peutDefiler = { tiroir.visibility != View.VISIBLE && !FenetreSon.estOuverte() }
 
         // ---------- 3. le bas : avertissement, points, interrupteur général ----------
         alerte = Style.texte(this, getString(R.string.detection_coupee), 13f, Style.AMBRE).apply {
@@ -135,7 +115,7 @@ class MainActivity : Activity() {
             rangeePoints.addView(FrameLayout(this).apply {
                 contentDescription = noms[i]
                 isClickable = true
-                setOnClickListener { montrerCarte(i) }
+                setOnClickListener { manege.montrer(i) }
                 addView(point, FrameLayout.LayoutParams(px(6f), px(6f), Gravity.CENTER))
             }, LinearLayout.LayoutParams(px(32f), px(32f)))
         }
@@ -221,13 +201,13 @@ class MainActivity : Activity() {
             else resources.getQuantityString(R.plurals.apps_trouvees, avecAnimation.size, avecAnimation.size)
         // la démo joue les animations de 5 de CES apps-là (voir DemoAccueil.kt)
         demo.choisir(if (jouables.isNotEmpty()) jouables else avecAnimation)
-        relancerMinuteur()
+        manege.enAvant = true                  // le défilement automatique repart (5 s pleines)
     }
 
-    // L'écran passe en arrière-plan (ou une autre page de l'app s'ouvre par-dessus) : on met le minuteur en pause.
+    // L'écran passe en arrière-plan (ou une autre page de l'app s'ouvre par-dessus) : le défilement se met en pause.
     override fun onPause() {
         super.onPause()
-        minuteur.removeCallbacks(defilementAuto)
+        manege.enAvant = false
     }
 
     // Android appelle ceci quand l'utilisateur QUITTE l'app lui-même (bouton accueil, apps récentes),
@@ -235,23 +215,7 @@ class MainActivity : Activity() {
     // défilement automatique a le droit de revenir (choix de Will : revenir à l'écran d'accueil suffit).
     override fun onUserLeaveHint() {
         super.onUserLeaveHint()
-        autoArrete = false
-    }
-
-    // ================= LE DÉFILEMENT AUTOMATIQUE =================
-    // Toutes les 5 s, le manège passe à la carte de droite (1 → 2 → 3 → 1…). Les règles :
-    //  - glisser vers la carte SUIVANTE (ou appuyer sur un point plus loin) : ça continue, les 5 s repartent de zéro ;
-    //  - revenir à la carte PRÉCÉDENTE : le défilement auto s'arrête jusqu'à ce qu'on quitte l'app ;
-    //  - jamais pendant que le doigt est posé, que le menu ou la fenêtre de la réaction sonore est ouvert.
-
-    private val defilementAuto = Runnable {
-        if (!doigtSurCartes && tiroir.visibility != View.VISIBLE && !FenetreSon.estOuverte()) manege.suivante()
-        relancerMinuteur()
-    }
-
-    private fun relancerMinuteur() {
-        minuteur.removeCallbacks(defilementAuto)
-        if (!autoArrete) minuteur.postDelayed(defilementAuto, DELAI_AUTO)
+        manege.autoArrete = false
     }
 
     // ================= LES CARTES =================
@@ -374,13 +338,8 @@ class MainActivity : Activity() {
     }
 
     // ================= LES POINTS =================
-
-    // Appui sur un point : le manège va sur cette carte par le chemin le plus court.
-    // Si c'est un retour en arrière, le défilement automatique s'arrête (même règle qu'au doigt).
-    private fun montrerCarte(p: Int) {
-        if (manege.montrer(p) < 0) autoArrete = true
-        relancerMinuteur()
-    }
+    // (un appui sur un point appelle manege.montrer : le manège y va par le chemin le plus court ;
+    //  si c'est un retour en arrière, le défilement automatique s'arrête, comme au doigt)
 
     // Le point de la carte affichée est un petit trait blanc ; les autres, des points gris.
     private fun majPoints() {
