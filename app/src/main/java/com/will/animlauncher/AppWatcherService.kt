@@ -345,6 +345,18 @@ class AppWatcherService : AccessibilityService() {
             debutRecents()
         }
         else if (dansRecents && ((app == ecranAccueil && classe == "Launcher") || (app != ecranAccueil && estVraieApp))) {
+            // LA DERNIÈRE CARTE (journal 0.206) : quand on ferme la seule carte qui reste, la liste ne
+            // donne pas son nouveau nombre (0) : Samsung ferme directement les apps récentes et revient
+            // sur l'accueil. Donc : le nom d'une carte vu juste avant (moins de 1,5 s), puis retour sur
+            // l'ACCUEIL = cette carte a été fermée. (Si on touche la carte pour reprendre l'app, on arrive
+            // dans l'app, pas sur l'accueil : elle n'est pas comptée comme fermée.)
+            val derniere = carteTouchee
+            if (app == ecranAccueil && classe == "Launcher" && derniere != null &&
+                SystemClock.uptimeMillis() - carteToucheeA < 1500) {
+                carteTouchee = null
+                fermerApp(derniere)
+                noter("dernière carte glissée dans les apps récentes : $derniere fermée")
+            }
             finRecents()
             // On a touché une carte des apps récentes : l'app reprend depuis l'arrière-plan.
             // Si elle affiche quand même son écran de démarrage, c'est PEUT-ÊTRE qu'elle le fait à
