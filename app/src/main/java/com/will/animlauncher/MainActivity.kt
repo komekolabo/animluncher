@@ -26,9 +26,10 @@ import android.widget.Toast
 //  │ │ │     (animation)      │ │ │   1. Animations d'apps  2. Logos animés  3. Fonds d'écran
 //  │ │ │ Titre                │ │ │   La carte du centre est bien CENTRÉE ; on voit dépasser la 3 à gauche
 //  │ │ │ chiffre           (→)│ │ │   et la 2 à droite. Un appui N'IMPORTE OÙ sur la carte ouvre sa partie.
-//  │ │ │  ━━━━━━━───────────  │ │ │   Une fine barre se remplit en 5 s, puis le manège passe tout seul
-//  │─┘ └──────────────────────┘ └─│   à la carte de droite (règles : voir Manege.kt).
-//  │          ━  •  •             │   les points (on peut appuyer dessus)
+//  │ │ │                      │ │ │   Toutes les 5 s, le manège passe tout seul à la carte de droite
+//  │─┘ └──────────────────────┘ └─│   (règles : voir Manege.kt).
+//  │          ━  •  •             │   les points (on peut appuyer dessus) ; le trait de la carte affichée
+//  │                              │   se remplit de blanc pendant les 5 s (le minuteur, voir PointManege)
 //  │   ( Animations ON  [●] )     │   l'interrupteur général (le kill switch)
 //  └──────────────────────────────┘
 //
@@ -109,15 +110,14 @@ class MainActivity : Activity() {
         val rangeePoints = LinearLayout(this).apply { orientation = LinearLayout.HORIZONTAL; gravity = Gravity.CENTER }
         val noms = listOf(getString(R.string.carte_apps), getString(R.string.carte_logos), getString(R.string.carte_fonds))
         for (i in 0..2) {
-            val point = View(this)
-            points.add(point)
-            // chaque point est dans une zone de 32 dp, plus facile à toucher qu'un point de 6 dp
-            rangeePoints.addView(FrameLayout(this).apply {
+            // chaque point se dessine lui-même au centre d'une case de 32 dp (plus facile à toucher qu'un point de 6 dp)
+            val point = PointManege(this, manege, i).apply {
                 contentDescription = noms[i]
                 isClickable = true
                 setOnClickListener { manege.montrer(i) }
-                addView(point, FrameLayout.LayoutParams(px(6f), px(6f), Gravity.CENTER))
-            }, LinearLayout.LayoutParams(px(32f), px(32f)))
+            }
+            points.add(point)
+            rangeePoints.addView(point, LinearLayout.LayoutParams(px(32f), px(32f)))
         }
         etat = Style.texte(this, "", 14f, Style.TEXTE, gras = true)
         interrupteur = Style.interrupteur(this).apply {
@@ -341,13 +341,10 @@ class MainActivity : Activity() {
     // (un appui sur un point appelle manege.montrer : le manège y va par le chemin le plus court ;
     //  si c'est un retour en arrière, le défilement automatique s'arrête, comme au doigt)
 
-    // Le point de la carte affichée est un petit trait blanc ; les autres, des points gris.
+    // La carte affichée a changé : chaque point se redessine (celui de la nouvelle carte s'allonge
+    // en trait, l'ancien redevient un rond ; voir PointManege dans Manege.kt).
     private fun majPoints() {
-        for ((i, point) in points.withIndex()) {
-            val actif = i == manege.page
-            point.layoutParams = point.layoutParams.apply { width = px(if (actif) 22f else 6f) }
-            point.background = Style.arrondi(this, if (actif) Style.TEXTE else Color.rgb(63, 63, 70), 3f)
-        }
+        for (point in points) point.invalidate()
     }
 
     // ================= L'INTERRUPTEUR GÉNÉRAL =================

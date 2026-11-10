@@ -5,6 +5,8 @@ import android.content.Context
 import android.graphics.Canvas
 import android.graphics.Color
 import android.graphics.Paint
+import android.graphics.Path
+import android.graphics.RectF
 import android.os.SystemClock
 import android.view.Gravity
 import android.view.MotionEvent
@@ -22,7 +24,9 @@ import kotlin.math.sign
 //
 //        carte 3 │      carte 1       │ carte 2
 //         (bord) │   (au centre)      │ (bord)
-//                │  ━━━━━━──────────  │            ← la barre du temps restant avant la carte suivante
+//
+//                     ━━━━──   •   •                ← sous les cartes, le trait de la carte affichée
+//                                                     se remplit de blanc : c'est le temps avant la suivante
 //
 // Les cartes tournent EN BOUCLE, comme un manège : 1 → 2 → 3 → 1…
 //  - Le doigt glisse vers la GAUCHE  → la carte de droite arrive (1 → 2).
@@ -42,13 +46,13 @@ import kotlin.math.sign
 // s'assombrit (65 %). Celle qui arrive grandit et s'éclaire en même temps : effet de profondeur.
 // Le mouvement suit une courbe « rapide au départ, très douce à l'arrivée ».
 //
-// LE DÉFILEMENT AUTOMATIQUE est géré ICI (pour que la barre et le changement de carte soient
-// parfaitement synchronisés) : toutes les DELAI ms, on passe à la carte de droite. Les règles :
+// LE DÉFILEMENT AUTOMATIQUE est géré ICI (pour que le trait qui se remplit et le changement de carte
+// soient parfaitement synchronisés) : toutes les DELAI ms, on passe à la carte de droite. Les règles :
 //  - le compteur ne tourne pas sous le doigt, pendant un glissement, ni quand « peutDefiler » dit non
 //    (menu ou fenêtre ouverts : c'est l'accueil qui décide) ;
 //  - tout changement de carte remet le compteur à zéro (5 s pleines sur la nouvelle carte) ;
-//  - revenir à la carte PRÉCÉDENTE met « autoArrete » à vrai : plus de défilement ni de barre,
-//    jusqu'à ce que l'accueil le remette à faux (quand on quitte l'app).
+//  - revenir à la carte PRÉCÉDENTE met « autoArrete » à vrai : plus de défilement (le trait redevient
+//    tout blanc), jusqu'à ce que l'accueil le remette à faux (quand on quitte l'app).
 class Manege(context: Context, private val pas: Int) : FrameLayout(context) {
     // (pas = largeur d'une carte + l'écart entre deux cartes, en pixels)
 
@@ -62,7 +66,7 @@ class Manege(context: Context, private val pas: Int) : FrameLayout(context) {
     var carteAffichee: ((Int) -> Unit)? = null
     // L'accueil dit si le défilement a le droit d'avancer en ce moment (menu fermé, fenêtre du son fermée…).
     var peutDefiler: () -> Boolean = { true }
-    // Vrai quand on est revenu en arrière : défilement automatique (et barre) arrêtés.
+    // Vrai quand on est revenu en arrière : défilement automatique arrêté.
     var autoArrete = false
     // Vrai quand l'écran est visible (l'accueil le met à faux quand on passe à une autre page).
     var enAvant = false
@@ -83,11 +87,13 @@ class Manege(context: Context, private val pas: Int) : FrameLayout(context) {
     private var glisse = false
     private var doigt = false                 // vrai tant que le doigt touche le manège
 
-    // le compteur du défilement automatique et la barre
+    // le compteur du défilement automatique
     private var ecoule = 0L                   // le temps déjà passé sur la carte du centre (ms)
     private var dernierInstant = 0L           // l'heure de l'image précédente (pour savoir combien de temps a passé)
-    private var opaciteBarre = 0f             // la barre apparaît / disparaît en fondu (0 → 1)
-    private val pinceau = Paint(Paint.ANTI_ALIAS_FLAG).apply { strokeCap = Paint.Cap.ROUND; style = Paint.Style.STROKE }
+
+    // Où en est le compteur, de 0 (la carte vient d'arriver) à 1 (la suivante arrive).
+    // Défilement arrêté → 1 : le trait des points reste tout blanc, comme avant.
+    val avancement: Float get() = if (autoArrete) 1f else (ecoule.toFloat() / DELAI).coerceIn(0f, 1f)
 
     // la courbe du mouvement : démarre franchement, puis se pose tout en douceur
     private val courbe = PathInterpolator(0.2f, 0f, 0f, 1f)
@@ -160,50 +166,21 @@ class Manege(context: Context, private val pas: Int) : FrameLayout(context) {
         glisserVers(Math.round(position) + ecart.toFloat(), 550)
     }
 
-    // ---------- LA BARRE DU TEMPS (et le compteur du défilement automatique) ----------
-    // Dessinée PAR-DESSUS les cartes, en bas de la carte du centre. Elle se remplit de gauche à
-    // droite pendant les 5 s ; quand elle est pleine, la carte suivante arrive.
+    // ---------- LE COMPTEUR DU DÉFILEMENT AUTOMATIQUE ----------
+    // On le fait avancer à chaque image dessinée (« dispatchDraw » = le moment où le manège dessine
+    // ses cartes) : comme ça il est réglé sur l'écran, et le trait des points avance au même rythme.
     override fun dispatchDraw(c: Canvas) {
-        super.dispatchDraw(c)                                 // d'abord les cartes
+        super.dispatchDraw(c)                                 // les cartes
         if (cartes.isEmpty()) return
-
-        // 1. le temps qui passe (seulement si rien ne l'empêche)
         val maintenant = SystemClock.uptimeMillis()
+        // le temps ne compte que si rien ne l'empêche
         val compte = enAvant && !autoArrete && !doigt && !enMouvement && peutDefiler()
         if (compte && dernierInstant != 0L) ecoule += min(maintenant - dernierInstant, 100L)   // (100 : pas de grand saut après une pause)
         dernierInstant = if (enAvant) maintenant else 0L
         if (compte && ecoule >= DELAI) suivante()
-
-        // 2. la barre apparaît en fondu, et disparaît pour de bon si le défilement est arrêté
-        val cibleOpacite = if (autoArrete) 0f else 1f
-        opaciteBarre += (cibleOpacite - opaciteBarre) * 0.12f
-
-        // 3. on la dessine sous la carte du centre, en suivant sa place et sa taille (même pendant un glissement)
-        val carte = cartes[page]
-        val ecart = abs(position - Math.round(position))     // 0 = carte posée, 0,5 = pile entre deux
-        val visibilite = opaciteBarre * (1f - ecart * 2.5f).coerceIn(0f, 1f)   // elle s'efface pendant le mouvement
-        if (visibilite > 0.01f && carte.width > 0) {
-            val s = carte.scaleX
-            val centreX = carte.left + carte.width / 2f + carte.translationX
-            val bas = carte.top + carte.height / 2f + carte.height * s / 2f
-            val demi = (carte.width / 2f - 26f * dp) * s
-            val y = bas - 9f * dp
-            pinceau.strokeWidth = 2.5f * dp
-            // le rail (très discret)
-            pinceau.color = Color.WHITE
-            pinceau.alpha = (visibilite * 26).toInt()
-            c.drawLine(centreX - demi, y, centreX + demi, y, pinceau)
-            // la partie remplie (douce, pas éblouissante)
-            val avance = (ecoule.toFloat() / DELAI).coerceIn(0f, 1f)
-            if (avance > 0f) {
-                pinceau.alpha = (visibilite * 170).toInt()
-                c.drawLine(centreX - demi, y, centreX - demi + 2f * demi * avance, y, pinceau)
-            }
-        }
-
-        // image suivante, tant que l'écran est visible et que la barre peut encore bouger
-        // (même en pause : il faut bien remarquer le moment où le menu se referme)
-        if (enAvant && (!autoArrete || opaciteBarre > 0.01f)) postInvalidateOnAnimation()
+        // image suivante tant que l'écran est visible (même en pause : il faut remarquer le moment
+        // où le menu se referme pour repartir)
+        if (enAvant && !autoArrete) postInvalidateOnAnimation()
     }
 
     // ---------- LE DOIGT ----------
@@ -277,7 +254,7 @@ class Manege(context: Context, private val pas: Int) : FrameLayout(context) {
         glisse = false
         doigt = false
         oublierVitesse()
-        invalidate()                                      // (la barre repart)
+        invalidate()                                      // (le compteur repart)
     }
 
     private fun suivreVitesse(ev: MotionEvent) {
@@ -291,5 +268,55 @@ class Manege(context: Context, private val pas: Int) : FrameLayout(context) {
     override fun onDetachedFromWindow() {
         animation?.cancel()
         super.onDetachedFromWindow()
+    }
+}
+
+// UN POINT SOUS LES CARTES (10/11). Les points d'avant étaient de simples ronds ; celui de la carte
+// affichée devient un petit trait (pilule) qui sert aussi de MINUTEUR :
+//
+//      ━━━━━━──────   la partie blanche avance de gauche à droite pendant les 5 s,
+//                     puis la carte suivante arrive et c'est son point qui devient le trait.
+//
+// Si le défilement automatique est arrêté (retour en arrière), le trait reste tout blanc.
+// Le point se dessine lui-même au centre de sa case ; il s'allonge / se raccourcit en douceur.
+class PointManege(context: Context, private val manege: Manege, private val numero: Int) : View(context) {
+    private val dp = resources.displayMetrics.density
+    private val gris = Color.rgb(63, 63, 70)
+    private val p = Paint(Paint.ANTI_ALIAS_FLAG)
+    private val forme = RectF()
+    private val contour = Path()
+    private var largeur = 6f * dp              // la largeur actuelle (6 dp = rond, 22 dp = trait)
+    private var blanc = 0f                     // la part blanche affichée (0 → 1), lissée pour ne pas sauter
+
+    override fun onDraw(c: Canvas) {
+        val actif = manege.page == numero
+        val cible = (if (actif) 22f else 6f) * dp
+        largeur += (cible - largeur) * 0.22f                       // il s'allonge / se raccourcit en douceur
+        if (abs(cible - largeur) < 0.3f) largeur = cible
+        val h = 6f * dp
+        forme.set(width / 2f - largeur / 2f, height / 2f - h / 2f, width / 2f + largeur / 2f, height / 2f + h / 2f)
+
+        // le fond gris (la forme entière)
+        p.color = gris
+        c.drawRoundRect(forme, h / 2f, h / 2f, p)
+
+        // la partie blanche : seulement sur le point de la carte affichée
+        val cibleBlanc = if (actif) manege.avancement else 0f
+        // (en remplissage, elle suit exactement le compteur ; quand elle doit se vider ou devenir
+        //  toute blanche d'un coup, elle glisse en douceur)
+        blanc = if (actif && !manege.autoArrete && cibleBlanc >= blanc) cibleBlanc else blanc + (cibleBlanc - blanc) * 0.18f
+        if (blanc > 0.005f) {
+            contour.reset()
+            contour.addRoundRect(forme, h / 2f, h / 2f, Path.Direction.CW)
+            c.save()
+            c.clipPath(contour)                                      // on ne déborde pas de la pilule
+            p.color = Style.TEXTE
+            c.drawRect(forme.left, forme.top, forme.left + forme.width() * blanc, forme.bottom, p)
+            c.restore()
+        }
+
+        // image suivante, tant qu'il y a quelque chose qui bouge
+        val bouge = abs(cible - largeur) > 0f || abs(cibleBlanc - blanc) > 0.005f || (actif && !manege.autoArrete)
+        if (bouge && isShown) postInvalidateOnAnimation()
     }
 }
