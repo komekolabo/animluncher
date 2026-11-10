@@ -137,6 +137,23 @@ Objectif : la publier sur le Google Play Store, avec une pub non invasive.
   Testé par Will le 10/11 : la ligne s'affiche (après la correction du plein écran). Reste à confirmer : la
   réaction quand l'app est en arrière-plan, et la disparition en vidéo plein écran.
   Play Store : la permission micro devra être justifiée dans la fiche (option éteinte de base, écran d'explication).
+  V3 DU SOIR (10/11, validée sur aperçus `reel.py` et `refrain.py`) — REMPLACE ce qui est dit plus haut sur les
+  palettes et la ligne : (1) la ligne reste DROITE (la ligne poussée par le spectre faisait des bosses, « moins
+  beau ») ; (2) la lumière suit les ATTAQUES, plus le niveau : `EcouteSon.attaques` (40 tranches : montée du
+  moment comparée à la montée moyenne sur 1,5 s, retombe en 0,22 s) et `EcouteSon.frappe` (pareil pour les
+  basses, 0,25 s) ; intensité d'un segment = 0,03 + 0,85·frappe + 0,65·attaque -> presque noir entre les coups.
+  Les mesures identiques (Android en redonne) sont ignorées pour ces calculs ; (3) COULEUR AUTOMATIQUE :
+  `EcouteSon.fort` (fonction `moment()`) = puissance (somme du spectre + 3 x basses, lissée 0,35 s / 1 s)
+  comparée au sommet de la dernière minute ; > 62 % -> « ça envoie », < 38 % -> calme ; en plus il faut avoir
+  entendu un passage nettement plus calme (sommet > 1,6 x creux), sinon un début de morceau serait pris pour un
+  refrain. Fondu de 0,25 s dans `VueSonore` (`melangeFort`) ; (4) 2 COULEURS réglables (carnet « son » :
+  `teinte_calme` 215 = bleu, `teinte_fort` 6 = rouge-orangé ; `ReactionSonore.palette()` en tire 4 couleurs) :
+  fenêtre du rond -> lignes « Calme » / « Quand ça envoie » -> `RoueTeinte` (roue maison ; pendant le réglage
+  `ReactionSonore.montrer()` allume le tour dans cette couleur même sans musique). Les anciennes palettes
+  chaude/froide (clé « style ») n'existent plus. Le diagnostic affiche « Moment : calme/ça envoie (xx %) ».
+  PAS ENCORE TESTÉ sur le téléphone : les seuils (62/38, 1,6) et la sensibilité des attaques ont été réglés sur
+  le son propre d'une vidéo, pas sur les mesures 8 bits du Visualizer -> à ajuster selon le retour de Will.
+  Idées batterie proposées, sans réponse : pause écran éteint, arrêt en économie d'énergie, mode 30 images/s.
   Will aimait aussi le style « Souffle » (les cartes de l'accueil qui respirent sur les basses) : pas encore codé.
 - `Reglages.kt` : kill switch, « seulement au démarrage », réglages par app (durée, variantes).
 - `MainActivity.kt` : écran principal (logo animé, interrupteurs, écran d'explication Store).
