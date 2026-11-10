@@ -728,9 +728,7 @@ class AppWatcherService : AccessibilityService() {
             noter("$origine « $texte » : app non reconnue")
             return true
         }
-        dejaOuvertes.remove(app)
-        // Gemini s'ouvre dans l'app Google : si c'est l'app Google qui est fermée, Gemini l'est aussi
-        // (enArrierePlan regarde déjà l'app qui s'ouvre vraiment, rien d'autre à faire).
+        fermerApp(app)
         noter("$origine « $texte » : $app fermée")
         return true
     }
@@ -749,6 +747,14 @@ class AppWatcherService : AccessibilityService() {
     private var espionLignes = 0
     private val espionVus = HashSet<String>()
     private val cartesMax = HashMap<String, Int>()   // pour chaque liste : le plus grand nombre de cartes vu
+    // LA CARTE QU'ON EST EN TRAIN DE GLISSER (trouvé le 10/11 grâce au journal 0.205).
+    // Sur Android 17, fermer une carte envoie, dans l'ordre :
+    //   1) « contenu modifié » d'un ViewGroup qui porte le NOM de l'app (« Claude »),
+    //   2) moins d'une demi-seconde après, la liste des cartes qui perd un élément (9 -> 8).
+    // On retient donc le nom vu en 1), et si 2) arrive juste après, c'est cette app qui a été fermée.
+    // (Quand on regarde juste les cartes sans rien fermer, le nombre de cartes ne baisse pas : rien ne se passe.)
+    private var carteTouchee: String? = null
+    private var carteToucheeA = 0L
 
     private fun pendantRecents(event: AccessibilityEvent) {
         if (!dansRecents) return
@@ -760,6 +766,13 @@ class AppWatcherService : AccessibilityService() {
         if (texte.isNotEmpty() && fermetureDansTexte(texte, "signal récentes")) return
         val classe = event.className?.toString()?.substringAfterLast('.') ?: "?"
         val nb = event.itemCount
+        // 1) un « contenu modifié » qui porte le nom d'une app : c'est la carte qu'on touche
+        if (event.eventType == AccessibilityEvent.TYPE_WINDOW_CONTENT_CHANGED && texte.isNotEmpty()) {
+            chercher(listOf(texte))?.let {
+                carteTouchee = it
+                carteToucheeA = SystemClock.uptimeMillis()
+            }
+        }
         // LE NOMBRE DE CARTES. Une liste qui annonce moins d'éléments qu'avant : une carte a disparu.
         if (nb >= 0 && classe != "?") {
             val avant = cartesMax[classe]
@@ -767,6 +780,14 @@ class AppWatcherService : AccessibilityService() {
             else if (nb < avant) {
                 noter("  (récentes : la liste $classe passe de $avant à $nb élément(s))")
                 cartesMax[classe] = nb
+                // 2) la liste a perdu une carte juste après qu'on a touché celle d'une app (moins de 1,5 s) :
+                // c'est elle qu'on vient de fermer -> au prochain appui sur son icône, l'animation sera jouée.
+                val fermee = carteTouchee
+                if (fermee != null && SystemClock.uptimeMillis() - carteToucheeA < 1500) {
+                    carteTouchee = null
+                    fermerApp(fermee)
+                    noter("carte glissée dans les apps récentes : $fermee fermée")
+                }
                 if (nb == 0) {
                     dejaOuvertes.clear()
                     noter("  (récentes : plus aucune carte : toutes les apps sont fermées)")
@@ -819,6 +840,7 @@ class AppWatcherService : AccessibilityService() {
         espionLignes = 0
         espionVus.clear()
         cartesMax.clear()
+        carteTouchee = null
         signauxRecents(true)
         // sécurité : si on ne voit jamais la sortie des apps récentes (écran éteint…), on arrête
         // l'espion au bout d'une minute
@@ -886,6 +908,14 @@ class AppWatcherService : AccessibilityService() {
         return SystemClock.uptimeMillis() - vue < 30 * 60_000L
     }
     private val relais = HashMap<String, String>()      // icône -> app qui s'ouvre vraiment (ex. Gemini -> Google)
+
+    // Une app vient d'être fermée : on la retire des apps ouvertes. Gemini s'ouvre dans l'app Google :
+    // si la carte fermée s'appelle « Gemini », on retire aussi l'app Google qu'elle utilise (et si c'est
+    // la carte « Google », enArrierePlan(Gemini) regarde déjà l'app Google : rien de plus à faire).
+    private fun fermerApp(app: String) {
+        dejaOuvertes.remove(app)
+        relais[app]?.let { dejaOuvertes.remove(it) }
+    }
 
     // L'app est-elle encore ouverte en arrière-plan ? (pour le dossier animé : le petit point « Open »)
     fun estOuverte(app: String): Boolean = enArrierePlan(app)
