@@ -5,32 +5,31 @@ import android.content.Intent
 import android.graphics.Color
 import android.graphics.drawable.GradientDrawable
 import android.os.Bundle
+import android.os.Handler
+import android.os.Looper
 import android.provider.Settings
 import android.view.Gravity
-import android.view.MotionEvent
 import android.view.View
 import android.view.ViewGroup
 import android.view.ViewOutlineProvider
 import android.view.animation.DecelerateInterpolator
 import android.widget.FrameLayout
-import android.widget.HorizontalScrollView
 import android.widget.LinearLayout
 import android.widget.Switch
 import android.widget.TextView
 import android.widget.Toast
-import kotlin.math.floor
 
 // L'ÉCRAN D'ACCUEIL (refonte « piste C », validée par Will le 09/11 sur le canevas Design).
 //
 //  ┌──────────────────────────────┐
 //  │ ≡        AnimLauncher       ⚙ │   en-tête : menu (tiroir à gauche) · titre · réglages
-//  │ ┌──────────────────────┐ ┌─ │
-//  │ │ 01                   │ │   │   3 GRANDES CARTES qu'on fait glisser du doigt :
-//  │ │     (animation)      │ │   │   1. Animations d'apps  2. Logos animés  3. Fonds d'écran
-//  │ │ Titre                │ │   │   Chacune : numéro, animation, titre, phrase, chiffre.
-//  │ │ chiffre           (→)│ │   │   Un appui N'IMPORTE OÙ sur la carte ouvre sa partie.
-//  │ │                      │ │   │   Le bord de la carte suivante dépasse : on comprend qu'on peut glisser.
-//  │ └──────────────────────┘ └─ │
+//  │─┐ ┌──────────────────────┐ ┌─│
+//  │ │ │ 01                   │ │ │   3 GRANDES CARTES qui tournent EN BOUCLE (voir Manege.kt) :
+//  │ │ │     (animation)      │ │ │   1. Animations d'apps  2. Logos animés  3. Fonds d'écran
+//  │ │ │ Titre                │ │ │   La carte du centre est bien CENTRÉE ; on voit dépasser la 3 à gauche
+//  │ │ │ chiffre           (→)│ │ │   et la 2 à droite. Un appui N'IMPORTE OÙ sur la carte ouvre sa partie.
+//  │ │ │                      │ │ │   Toutes les 5 s, le manège passe tout seul à la carte de droite
+//  │─┘ └──────────────────────┘ └─│   (règles du défilement automatique : voir « LE DÉFILEMENT AUTOMATIQUE »).
 //  │          ━  •  •             │   les points (on peut appuyer dessus)
 //  │   ( Animations ON  [●] )     │   l'interrupteur général (le kill switch)
 //  └──────────────────────────────┘
@@ -41,15 +40,21 @@ import kotlin.math.floor
 // dans la langue du téléphone (fichiers res/values*/strings.xml : un dossier par langue).
 class MainActivity : Activity() {
 
+    companion object {
+        const val DELAI_AUTO = 5000L        // le temps passé sur une carte avant le défilement automatique (en ms)
+    }
+
     private var dp = 1f
     private fun px(v: Float): Int = (v * dp).toInt()
 
-    // le rail des cartes et où on en est
-    private lateinit var defileur: HorizontalScrollView
-    private var pas = 0                     // largeur d'une carte + l'écart, en pixels
-    private var page = 0                    // la carte affichée (0, 1 ou 2)
-    private var direction = 0               // le dernier sens du glissement (+1 vers la droite, -1 vers la gauche)
+    // le manège des cartes (voir Manege.kt) et les points en dessous
+    private lateinit var manege: Manege
     private val points = ArrayList<View>()
+
+    // le défilement automatique
+    private val minuteur = Handler(Looper.getMainLooper())
+    private var autoArrete = false          // vrai dès qu'on est revenu en arrière : plus de défilement auto
+    private var doigtSurCartes = false      // vrai tant que le doigt touche le manège
 
     // ce qui change quand on revient sur l'écran
     private lateinit var demo: DemoAnimations      // la démo en boucle de la carte 1 (voir DemoAccueil.kt)
@@ -71,11 +76,11 @@ class MainActivity : Activity() {
         Style.fenetreNoire(this)
         noterPositionIcone(intent)
 
-        // La taille des cartes : l'écran moins 72 dp (20 dp de marge à gauche, et 52 dp à droite
-        // pour qu'on voie dépasser le bord de la carte suivante).
-        val largeurCarte = resources.displayMetrics.widthPixels - px(72f)
+        // La taille des cartes : l'écran moins 40 dp de CHAQUE côté → la carte est bien centrée.
+        // Avec 12 dp d'écart entre deux cartes, on voit dépasser 28 dp de la voisine de chaque côté.
+        val largeurCarte = resources.displayMetrics.widthPixels - px(80f)
         val ecart = px(12f)
-        pas = largeurCarte + ecart
+        val pas = largeurCarte + ecart
 
         // ---------- 1. l'en-tête ----------
         val entete = LinearLayout(this).apply {
@@ -95,39 +100,24 @@ class MainActivity : Activity() {
             setOnClickListener { ouvrir(ReglagesActivity::class.java) }
         }, LinearLayout.LayoutParams(px(48f), px(48f)))
 
-        // ---------- 2. les 3 cartes, dans un rail qui défile à l'horizontale ----------
-        val rangee = LinearLayout(this).apply {
-            orientation = LinearLayout.HORIZONTAL
-            setPadding(px(20f), px(6f), px(20f), 0)
+        // ---------- 2. les 3 cartes, dans le manège qui tourne en boucle ----------
+        manege = Manege(this, pas).apply {
+            setPadding(0, px(6f), 0, 0)
+            ajouter(carteApps(), largeurCarte)
+            ajouter(carteLogos(), largeurCarte)
+            ajouter(carteFonds(), largeurCarte)
         }
-        for ((i, carte) in listOf(carteApps(), carteLogos(), carteFonds()).withIndex()) {
-            rangee.addView(carte, LinearLayout.LayoutParams(largeurCarte, ViewGroup.LayoutParams.MATCH_PARENT).apply {
-                if (i > 0) leftMargin = ecart
-            })
-        }
-        defileur = HorizontalScrollView(this).apply {
-            isHorizontalScrollBarEnabled = false
-            overScrollMode = View.OVER_SCROLL_NEVER
-            addView(rangee, FrameLayout.LayoutParams(ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.MATCH_PARENT))
-        }
-        // Pendant le glissement : on retient le sens, et on met les points à jour.
-        defileur.setOnScrollChangeListener { _, x, _, ancienX, _ ->
-            if (x != ancienX) direction = if (x > ancienX) 1 else -1
-            val p = Math.round(x.toFloat() / pas).coerceIn(0, 2)
-            if (p != page) { page = p; majPoints() }
-        }
-        // Quand le doigt se lève : la carte « s'aimante » (comme les pages d'un téléphone).
-        // Il suffit d'avoir glissé de 15 % d'une carte dans un sens pour passer à la suivante.
-        defileur.setOnTouchListener { _, ev ->
-            if (ev.actionMasked == MotionEvent.ACTION_UP || ev.actionMasked == MotionEvent.ACTION_CANCEL) {
-                val position = defileur.scrollX.toFloat() / pas
-                val avant = floor(position).toInt()
-                val reste = position - avant
-                val cible = if (direction > 0) (if (reste > 0.15f) avant + 1 else avant)
-                            else (if (reste < 0.85f) avant else avant + 1)
-                defileur.post { allerA(cible) }
+        manege.ecoute = object : Manege.Ecoute {
+            override fun carteAffichee(page: Int) = majPoints()
+            override fun doigtPose() {
+                doigtSurCartes = true
+                minuteur.removeCallbacks(defilementAuto)        // pas de défilement auto sous le doigt
             }
-            false        // false = on laisse le rail faire son travail normal en plus
+            override fun doigtLeve(sens: Int) {
+                doigtSurCartes = false
+                if (sens < 0) autoArrete = true                 // on est revenu en arrière : on arrête le défilement auto
+                relancerMinuteur()                              // sinon, on repart pour 5 s pleines
+            }
         }
 
         // ---------- 3. le bas : avertissement, points, interrupteur général ----------
@@ -145,7 +135,7 @@ class MainActivity : Activity() {
             rangeePoints.addView(FrameLayout(this).apply {
                 contentDescription = noms[i]
                 isClickable = true
-                setOnClickListener { allerA(i) }
+                setOnClickListener { montrerCarte(i) }
                 addView(point, FrameLayout.LayoutParams(px(6f), px(6f), Gravity.CENTER))
             }, LinearLayout.LayoutParams(px(32f), px(32f)))
         }
@@ -175,7 +165,7 @@ class MainActivity : Activity() {
             orientation = LinearLayout.VERTICAL
             setBackgroundColor(Style.NOIR)
             addView(entete, LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, px(64f)))
-            addView(defileur, LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, 0, 1f))
+            addView(manege, LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, 0, 1f))
             addView(bas)
         }
 
@@ -231,6 +221,37 @@ class MainActivity : Activity() {
             else resources.getQuantityString(R.plurals.apps_trouvees, avecAnimation.size, avecAnimation.size)
         // la démo joue les animations de 5 de CES apps-là (voir DemoAccueil.kt)
         demo.choisir(if (jouables.isNotEmpty()) jouables else avecAnimation)
+        relancerMinuteur()
+    }
+
+    // L'écran passe en arrière-plan (ou une autre page de l'app s'ouvre par-dessus) : on met le minuteur en pause.
+    override fun onPause() {
+        super.onPause()
+        minuteur.removeCallbacks(defilementAuto)
+    }
+
+    // Android appelle ceci quand l'utilisateur QUITTE l'app lui-même (bouton accueil, apps récentes),
+    // mais PAS quand on ouvre une autre page d'AnimLauncher. C'est exactement le moment où le
+    // défilement automatique a le droit de revenir (choix de Will : revenir à l'écran d'accueil suffit).
+    override fun onUserLeaveHint() {
+        super.onUserLeaveHint()
+        autoArrete = false
+    }
+
+    // ================= LE DÉFILEMENT AUTOMATIQUE =================
+    // Toutes les 5 s, le manège passe à la carte de droite (1 → 2 → 3 → 1…). Les règles :
+    //  - glisser vers la carte SUIVANTE (ou appuyer sur un point plus loin) : ça continue, les 5 s repartent de zéro ;
+    //  - revenir à la carte PRÉCÉDENTE : le défilement auto s'arrête jusqu'à ce qu'on quitte l'app ;
+    //  - jamais pendant que le doigt est posé, que le menu ou la fenêtre de la réaction sonore est ouvert.
+
+    private val defilementAuto = Runnable {
+        if (!doigtSurCartes && tiroir.visibility != View.VISIBLE && !FenetreSon.estOuverte()) manege.suivante()
+        relancerMinuteur()
+    }
+
+    private fun relancerMinuteur() {
+        minuteur.removeCallbacks(defilementAuto)
+        if (!autoArrete) minuteur.postDelayed(defilementAuto, DELAI_AUTO)
     }
 
     // ================= LES CARTES =================
@@ -352,18 +373,19 @@ class MainActivity : Activity() {
         }
     }
 
-    // ================= LE RAIL ET LES POINTS =================
+    // ================= LES POINTS =================
 
-    private fun allerA(p: Int) {
-        page = p.coerceIn(0, 2)
-        defileur.smoothScrollTo(page * pas, 0)
-        majPoints()
+    // Appui sur un point : le manège va sur cette carte par le chemin le plus court.
+    // Si c'est un retour en arrière, le défilement automatique s'arrête (même règle qu'au doigt).
+    private fun montrerCarte(p: Int) {
+        if (manege.montrer(p) < 0) autoArrete = true
+        relancerMinuteur()
     }
 
     // Le point de la carte affichée est un petit trait blanc ; les autres, des points gris.
     private fun majPoints() {
         for ((i, point) in points.withIndex()) {
-            val actif = i == page
+            val actif = i == manege.page
             point.layoutParams = point.layoutParams.apply { width = px(if (actif) 22f else 6f) }
             point.background = Style.arrondi(this, if (actif) Style.TEXTE else Color.rgb(63, 63, 70), 3f)
         }

@@ -10,6 +10,11 @@ import android.graphics.Canvas
 import android.graphics.Color
 import android.graphics.Paint
 import android.graphics.drawable.ColorDrawable
+import android.view.MotionEvent
+import android.view.VelocityTracker
+import android.view.ViewConfiguration
+import android.view.animation.DecelerateInterpolator
+import android.widget.FrameLayout
 import android.os.Handler
 import android.os.Looper
 import android.os.SystemClock
@@ -85,13 +90,22 @@ object FenetreSon {
     private val NOMS = intArrayOf(R.string.son_style_chaud, R.string.son_style_froid)
     private val DESCRIPTIONS = intArrayOf(R.string.son_desc_chaud, R.string.son_desc_froid)
 
-    // Ouvre la fenêtre : elle monte du bas de l'écran.
+    // Vrai tant que la fenêtre est affichée (l'accueil ne fait pas défiler ses cartes pendant ce temps).
+    fun estOuverte(): Boolean = ouverte?.isShowing == true
+
+    // Ouvre la fenêtre : elle monte du bas de l'écran. On peut la refermer en la faisant glisser vers le bas.
     fun ouvrir(a: Activity) {
         ouverte?.dismiss()
         val dialogue = Dialog(a)
         dialogue.requestWindowFeature(Window.FEATURE_NO_TITLE)
         dialogue.setOnDismissListener { if (ouverte === dialogue) ouverte = null }   // (remplacé par le diagnostic s'il y en a un)
-        dialogue.setContentView(contenu(a, dialogue))
+        dialogue.setContentView(FeuilleGlissante(a, contenu(a, dialogue),
+            fermer = {
+                dialogue.window?.setWindowAnimations(0)     // déjà sortie par le bas : pas de 2e animation de fermeture
+                dialogue.dismiss()
+            },
+            voile = { f -> dialogue.window?.setDimAmount(0.7f * f) }      // le fond s'éclaircit à mesure qu'on descend
+        ))
         dialogue.window?.apply {
             setBackgroundDrawable(ColorDrawable(Color.TRANSPARENT))
             setLayout(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT)
@@ -103,7 +117,7 @@ object FenetreSon {
         dialogue.show()
     }
 
-    private fun contenu(a: Activity, dialogue: Dialog): View {
+    private fun contenu(a: Activity, dialogue: Dialog): ScrollView {
         fun px(v: Float) = Style.px(a, v)
         val allume = ReactionSonore.actif(a) && ReactionSonore.permission(a)
         val colonne = LinearLayout(a).apply {
@@ -241,5 +255,92 @@ object FenetreSon {
         ReactionSonore.definirActif(a, true)
         ouverte?.dismiss()
         Toast.makeText(a, a.getString(R.string.son_active), Toast.LENGTH_SHORT).show()
+    }
+}
+
+// LA FEUILLE QU'ON FAIT GLISSER VERS LE BAS POUR LA FERMER (10/11).
+// Elle entoure le contenu de la fenêtre (qui peut défiler). Le principe :
+//  - si le contenu est tout en HAUT et que le doigt descend (plus qu'il ne va sur le côté),
+//    c'est la feuille entière qui suit le doigt vers le bas (au lieu de faire défiler le contenu) ;
+//  - au lâcher : descendue de plus d'un quart de sa hauteur, ou lancée vite vers le bas → elle se ferme ;
+//    sinon elle remonte se remettre en place.
+// Si le contenu a déjà été défilé vers le bas, glisser vers le bas le fait d'abord remonter, comme d'habitude.
+class FeuilleGlissante(
+    context: Context,
+    private val defilant: ScrollView,
+    private val fermer: () -> Unit,
+    private val voile: (Float) -> Unit         // 1 = fond sombre normal, 0 = plus de fond sombre
+) : FrameLayout(context) {
+    private val dp = resources.displayMetrics.density
+    private val seuil = ViewConfiguration.get(context).scaledTouchSlop
+    private var vitesse: VelocityTracker? = null
+    private var xDepart = 0f
+    private var yDepart = 0f
+    private var tire = false                   // vrai pendant qu'on fait glisser la feuille
+
+    init { addView(defilant, LayoutParams(LayoutParams.MATCH_PARENT, LayoutParams.WRAP_CONTENT)) }
+
+    // On utilise « rawY » (la position sur l'ÉCRAN) : la feuille bouge sous le doigt,
+    // donc sa position à elle ne servirait pas de repère fiable.
+    override fun onInterceptTouchEvent(ev: MotionEvent): Boolean {
+        suivre(ev)
+        when (ev.actionMasked) {
+            MotionEvent.ACTION_DOWN -> { xDepart = ev.rawX; yDepart = ev.rawY; tire = false }
+            MotionEvent.ACTION_MOVE -> {
+                val dx = ev.rawX - xDepart
+                val dy = ev.rawY - yDepart
+                // « canScrollVertically(-1) » = le contenu peut encore remonter (il n'est pas tout en haut)
+                if (dy > seuil && dy > abs(dx) && !defilant.canScrollVertically(-1)) {
+                    tire = true
+                    yDepart = ev.rawY                  // la feuille part d'ici : pas de saut
+                    parent?.requestDisallowInterceptTouchEvent(true)
+                    return true
+                }
+            }
+        }
+        return false
+    }
+
+    override fun onTouchEvent(ev: MotionEvent): Boolean {
+        suivre(ev)
+        when (ev.actionMasked) {
+            MotionEvent.ACTION_DOWN -> { xDepart = ev.rawX; yDepart = ev.rawY; tire = true }
+            MotionEvent.ACTION_MOVE -> if (tire) {
+                val descente = (ev.rawY - yDepart).coerceAtLeast(0f)       // (jamais au-dessus de sa place)
+                translationY = descente
+                voile(1f - (descente / height.coerceAtLeast(1)).coerceIn(0f, 1f))
+            }
+            MotionEvent.ACTION_UP, MotionEvent.ACTION_CANCEL -> {
+                vitesse?.computeCurrentVelocity(1000)
+                val vy = vitesse?.yVelocity ?: 0f                           // en pixels par seconde (positif = vers le bas)
+                val lancee = vy > 900f * dp
+                if (tire && (translationY > height * 0.25f || lancee)) {
+                    // elle finit de descendre jusqu'en bas, puis la fenêtre se ferme
+                    animate().translationY(height.toFloat()).setDuration(200)
+                        .setInterpolator(DecelerateInterpolator())
+                        .setUpdateListener { voile(1f - (translationY / height.coerceAtLeast(1)).coerceIn(0f, 1f)) }
+                        .withEndAction { fermer() }.start()
+                } else {
+                    // pas assez : elle remonte à sa place
+                    animate().translationY(0f).setDuration(220)
+                        .setInterpolator(DecelerateInterpolator())
+                        .setUpdateListener { voile(1f - (translationY / height.coerceAtLeast(1)).coerceIn(0f, 1f)) }
+                        .start()
+                }
+                tire = false
+                vitesse?.recycle(); vitesse = null
+            }
+        }
+        return true
+    }
+
+    // Pour mesurer la vitesse du doigt, on lui donne aussi les positions sur l'écran.
+    private fun suivre(ev: MotionEvent) {
+        if (ev.actionMasked == MotionEvent.ACTION_DOWN) { vitesse?.recycle(); vitesse = null }
+        if (vitesse == null) vitesse = VelocityTracker.obtain()
+        val copie = MotionEvent.obtain(ev)
+        copie.setLocation(ev.rawX, ev.rawY)
+        vitesse?.addMovement(copie)
+        copie.recycle()
     }
 }
