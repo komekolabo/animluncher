@@ -43,7 +43,9 @@ import kotlin.math.sqrt
 // les fait défiler toute seule, en boucle, même quand AnimLauncher est fermé.
 // FLUIDITÉ (10/11, demande de Will : la 1re version à 12,5 images/s saccadait) : Android limite la mémoire
 // d'images d'un widget. Les images ne couvrent donc plus tout le galet mais seulement son MILIEU (la « boîte »,
-// 38 dp sur 62, voir widget_dossier.xml) : tout ce qui bouge y tient, et chaque image pèse 3 fois moins.
+// 42 dp sur 62, voir widget_dossier.xml) : tout ce qui bouge y tient, et chaque image pèse 2 fois moins.
+// ICÔNES AGRANDIES (10/11, demande de Will) : boîte passée de 38 à 42 dp, icônes de +25 % (3 colonnes) à +45 %
+// (1 app), vague un peu plus douce (x1,10 au lieu de x1,14) pour qu'elles restent dans la boîte.
 // La lueur rose, plus grande que la boîte, est devenue une couche à part (dossier_lueur_anime.xml).
 // Pour les dossiers de plus de 9 apps, une seule page tient dans la mémoire d'un widget : le SERVICE
 // d'AnimLauncher sert de chef d'orchestre. Tant qu'on est sur l'écran d'accueil, il envoie la page suivante
@@ -53,9 +55,9 @@ object WidgetDossier {
     private const val PAS = 40L                  // une image toutes les 40 ms (25 images par seconde)
     private const val DUREE = 12.0               // la boucle dure 12 s
     private const val N = 300                    // 12 s / 40 ms = 300 images
-    // LA BOÎTE : le carré du milieu du galet couvert par les images (38 dp sur 62), dans le repère 100 x 100
-    // du dessin. Elle est centrée sur l'étoile (50, 48) : de 19,35 à 80,65 en largeur, de 17,35 à 78,65 en hauteur.
-    private const val BOITE = 38f / 62f * 100f   // = 61,29 unités de côté
+    // LA BOÎTE : le carré du milieu du galet couvert par les images (42 dp sur 62), dans le repère 100 x 100
+    // du dessin. Elle est centrée sur l'étoile (50, 48) : de 16,13 à 83,87 en largeur, de 14,13 à 81,87 en hauteur.
+    private const val BOITE = 42f / 62f * 100f   // = 67,74 unités de côté
     private const val BOITE_X = 50f - BOITE / 2
     private const val BOITE_Y = 48f - BOITE / 2
     const val PAR_PAGE = 9                       // 9 apps au plus par boucle
@@ -120,13 +122,13 @@ object WidgetDossier {
         // les apps par paquets de 9 (un dossier vide = une page vide : on ne voit que l'étoile)
         val pages = if (apps.isEmpty()) listOf(emptyList()) else apps.chunked(PAR_PAGE)
 
-        // LA TAILLE DES IMAGES : celle de la boîte (38 dp), réduite si elle dépasse la mémoire permise par Android
-        // pour un widget (environ 1,5 écran ; on garde 20 % de marge, comme pour le widget Games).
+        // LA TAILLE DES IMAGES : celle de la boîte (42 dp), réduite si elle dépasse la mémoire permise par Android
+        // pour un widget (environ 1,5 écran ; on garde 10 % de marge).
         val ecran = (c.getSystemService(Context.DISPLAY_SERVICE) as DisplayManager).getDisplay(Display.DEFAULT_DISPLAY)
         val taille = Point()
         @Suppress("DEPRECATION") ecran.getRealSize(taille)
-        val permis = 6.0 * taille.x * taille.y * 0.8
-        var px = min((38 * c.resources.displayMetrics.density).toInt(), sqrt(permis / (N * 4.0)).toInt()).coerceAtLeast(32)
+        val permis = 6.0 * taille.x * taille.y * 0.9
+        var px = min((42 * c.resources.displayMetrics.density).toInt(), sqrt(permis / (N * 4.0)).toInt()).coerceAtLeast(32)
 
         for (essai in 0 until 3) {
             try {
@@ -175,7 +177,7 @@ object WidgetDossier {
 
     // L'icône d'une app, dessinée en grand une seule fois (on la réduit ensuite à chaque image).
     private fun icone(c: Context, pkg: String, px: Int): Bitmap {
-        val s = (px * 0.6).toInt().coerceAtLeast(8)           // la plus grande taille possible (1 app, avec la vague)
+        val s = (px * 0.75).toInt().coerceAtLeast(8)          // la plus grande taille possible (1 app, avec la vague)
         val b = Bitmap.createBitmap(s, s, Bitmap.Config.ARGB_8888)
         try {
             val d = c.packageManager.getApplicationIcon(pkg)
@@ -260,9 +262,9 @@ object WidgetDossier {
         init {
             // LA GRILLE : 1 app = une grande icône ; 2 à 4 = 2 colonnes ; 5 à 9 = 3 colonnes
             val (cols, s, ecart) = when {
-                n <= 1 -> Triple(1, 30f, 0f)
-                n <= 4 -> Triple(2, 22f, 4f)
-                else -> Triple(3, 16f, 3f)
+                n <= 1 -> Triple(1, 44f, 0f)
+                n <= 4 -> Triple(2, 30f, 3f)
+                else -> Triple(3, 20f, 2.5f)
             }
             cote = s
             val rangs = ceil(n / cols.toDouble()).toInt()
@@ -362,8 +364,8 @@ object WidgetDossier {
                 val d = 0.06 * i
                 val vague1 = 7.6 + 0.12 * i; val vague2 = 8.7 + 0.12 * i
                 val sc = cle(t, (6.8 + d) to 0.0 by LIN, (7.3 + d) to 1.0 by RESSORT,
-                             vague1 to 1.0 by LIN, (vague1 + 0.25) to 1.14 by DOUX, (vague1 + 0.5) to 1.0 by DOUX,
-                             vague2 to 1.0 by LIN, (vague2 + 0.25) to 1.14 by DOUX, (vague2 + 0.5) to 1.0 by DOUX,
+                             vague1 to 1.0 by LIN, (vague1 + 0.25) to 1.10 by DOUX, (vague1 + 0.5) to 1.0 by DOUX,
+                             vague2 to 1.0 by LIN, (vague2 + 0.25) to 1.10 by DOUX, (vague2 + 0.5) to 1.0 by DOUX,
                              (9.8 + d) to 1.0 by LIN, (10.4 + d) to 0.0 by ACC)
                 if (sc <= 0.001) continue
                 val rentre = cle(t, (9.8 + d) to 0.0 by LIN, (10.4 + d) to 1.0 by ACC)
