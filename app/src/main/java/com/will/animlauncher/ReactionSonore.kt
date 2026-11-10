@@ -207,6 +207,8 @@ class VueSonore(context: Context) : View(context) {
     // la mémoire des dernières images : permet de demander « combien valaient les graves il y a 0,2 s ? »
     // (c'est ce qui fait REMONTER la vague des basses du bas vers le haut, des deux côtés)
     private val memoireG = FloatArray(256)
+    private val memoireC = FloatArray(256)       // pareil pour les COUPS de basse (l'onde qui fait le tour)
+    private var coup = 0f
     private var rang = 0
     private var imagesParSeconde = 60f
 
@@ -247,7 +249,7 @@ class VueSonore(context: Context) : View(context) {
         if (al <= 0) return
         tampon.color = couleur; tampon.alpha = al
         c.save()
-        c.translate(lx[s], ly[s])
+        c.translate(px[s], py[s])
         c.rotate(angle[s])                           // on tourne la feuille pour que le segment soit « à plat »
         zone.set(0f, -demiLargeur, longueur[s], demiLargeur)
         c.drawBitmap(tache, tranche, zone, tampon)
@@ -276,6 +278,10 @@ class VueSonore(context: Context) : View(context) {
     private val freq = FloatArray(N)                      // où est le segment sur le « piano » : 0 = bas (grave) … 1 = haut (aigu)
     private val hasard = FloatArray(N) { ((it * 7919) % 101) / 100f }
     private val intensites = FloatArray(N)
+    private val nX = FloatArray(N + 1)                    // en chaque point, la direction « vers l'intérieur de l'écran »
+    private val nY = FloatArray(N + 1)
+    private val px = FloatArray(N + 1)                    // la ligne de CETTE image (elle vibre sur les coups de basse)
+    private val py = FloatArray(N + 1)
     private val angle = FloatArray(N)                     // la direction de chaque segment (en degrés) et sa longueur
     private val longueur = FloatArray(N)
     private var w = 0f
@@ -292,6 +298,9 @@ class VueSonore(context: Context) : View(context) {
             val s = k.toFloat() / N
             pointDuTour(s, marge, coin).let { lx[k] = it[0]; ly[k] = it[1] }
             pointDuTour(s, marge / 2f, coin).let { bx[k] = it[0]; by[k] = it[1] }
+            // la bande est entre le bord et la ligne : « de la bande vers la ligne » = vers l'intérieur
+            val l = max(hypot(lx[k] - bx[k], ly[k] - by[k]), 0.001f)
+            nX[k] = (lx[k] - bx[k]) / l; nY[k] = (ly[k] - by[k]) / l
         }
         for (k in 0 until N) {
             angle[k] = Math.toDegrees(atan2((ly[k + 1] - ly[k]).toDouble(), (lx[k + 1] - lx[k]).toDouble())).toFloat()
@@ -435,9 +444,9 @@ class VueSonore(context: Context) : View(context) {
         val e = (x - centre) / largeur
         return exp(-e * e)
     }
-    private fun ilYA(secondes: Float): Float {
+    private fun ilYA(memoire: FloatArray, secondes: Float): Float {
         val images = (secondes * imagesParSeconde).toInt().coerceIn(0, 255)
-        return memoireG[(rang - images) and 255]
+        return memoire[(rang - images) and 255]
     }
     private fun opacite(x: Float): Int = (x * presence * 255f).toInt().coerceIn(0, 255)
 
@@ -472,12 +481,15 @@ class VueSonore(context: Context) : View(context) {
         g += (EcouteSon.grave - g) * min(1f, dt * (if (EcouteSon.grave > g) 45f else 8f))
         m += (EcouteSon.medium - m) * min(1f, dt * (if (EcouteSon.medium > m) 25f else 5f))
         a += (EcouteSon.aigu - a) * min(1f, dt * (if (EcouteSon.aigu > a) 40f else 12f))
-        h += (EcouteSon.hauteur - h) * min(1f, dt * 8f)
+        h += (EcouteSon.hauteur - h) * min(1f, dt * 3f)      // (lent : sinon la zone de la mélodie saute partout)
         // un son sec : on retient l'instant (au plus un toutes les 0,25 s)
         if (EcouteSon.claque > 0.5f && t - tClaque > 0.25f) tClaque = t
         claque = exp(-(t - tClaque) / 0.14f)
         rang = (rang + 1) and 255
         memoireG[rang] = g
+        // le coup de basse : on prend le plus fort entre celui qui arrive et le nôtre qui retombe
+        coup = max(EcouteSon.coup, coup * exp(-dt / 0.15f))
+        memoireC[rang] = coup
 
         prisme(c, couleurs[ReactionSonore.style.coerceIn(0, 1)], PALETTES[ReactionSonore.style.coerceIn(0, 1)][3])
         // … et on demande l'image suivante (sur un écran rapide : celle d'après, donc 60 images/s)
@@ -486,16 +498,27 @@ class VueSonore(context: Context) : View(context) {
 
     // ================= LE PRISME, TOUR COMPLET =================
     private fun prisme(c: Canvas, coul: IntArray, eclatCouleur: Int) {
-        // 1) LA FORCE de chaque segment, selon sa place sur le « piano »
+        // 1) LA FORCE de chaque segment. (10/11, Will : « je veux que ça vibre sur les basses, ça paraît random ».)
+        //    Les BASSES commandent maintenant TOUT le tour ; la mélodie et les aigus ne sont plus que des détails.
         for (k in 0 until N) {
             val f = freq[k]
-            // basses : partent du bas et montent des deux côtés. (10/11 : la vague monte 2 fois plus vite, 0,22 au
-            // lieu de 0,42 : sinon les côtés s'allumaient jusqu'à un quart de seconde APRÈS le coup, d'où le « hors rythme »)
-            var i = ilYA(f * 0.22f) * max(0f, 1f - f / 0.62f).pow(1.3f)
-            i += m * cloche(f, 0.42f + 0.30f * h, 0.065f)                    // mélodie : une zone qui suit la note
-            i += 0.8f * claque * cloche(f, 0.80f, 0.06f)                     // son sec (caisse claire)
-            i += a * (0.3f + 0.7f * hasard[k]) * max(0f, (f - 0.87f) / 0.13f)   // aigus : scintillement tout en haut
+            // le COUP de basse : une onde part du bas et fait le tour en un cinquième de seconde ; tout s'allume
+            var i = ilYA(memoireC, f * 0.20f) * (1f - 0.40f * f)
+            // la basse qui dure : la vague du bas, qui monte sur les côtés
+            i += 0.55f * ilYA(memoireG, f * 0.22f) * max(0f, 1f - f / 0.75f).pow(1.2f)
+            i += 0.5f * m * cloche(f, 0.42f + 0.30f * h, 0.065f)             // mélodie : une zone qui suit la note
+            i += 0.6f * claque * cloche(f, 0.80f, 0.06f)                     // son sec (caisse claire)
+            i += 0.6f * a * (0.3f + 0.7f * hasard[k]) * max(0f, (f - 0.87f) / 0.13f)   // aigus : scintillement tout en haut
             intensites[k] = min(1f, i)
+        }
+        // LA VIBRATION : à chaque coup, la ligne tremble comme une corde qu'on vient de pincer (jusqu'à 3,5 dp),
+        // puis se calme. « kk » compte les segments depuis le bas, pareil à gauche et à droite (pas de cassure en bas).
+        for (k in 0..N) {
+            val kk = min(k, N - k)
+            val f = 1f - abs(2f * k / N - 1f)
+            val tremble = ilYA(memoireC, f * 0.20f) * 3.5f * d * sin(kk * 0.7f - t * 75f)
+            px[k] = lx[k] + nX[k] * tremble
+            py[k] = ly[k] + nY[k] * tremble
         }
 
         // 2) LA BANDE entre la ligne et le bord : chaque morceau prend la couleur de sa place,
@@ -516,7 +539,9 @@ class VueSonore(context: Context) : View(context) {
             val i = intensites[s]
             if (i > 0.04f) {
                 val base = 0.14f + 0.86f * i
-                tamponner(c, (lx[s] + lx[s + 1]) / 2f, (ly[s] + ly[s + 1]) / 2f, (24f + 6f * i) * d, coul[s], 0.48f * base * (0.2f + 0.4f * i))
+                // (le halo GROSSIT sur les coups de basse : c'est le « débordement » qui bat)
+                val battement = ilYA(memoireC, freq[s] * 0.20f)
+                tamponner(c, (px[s] + px[s + 1]) / 2f, (py[s] + py[s + 1]) / 2f, (24f + 6f * i + 14f * battement) * d, coul[s], 0.48f * base * (0.2f + 0.4f * i + 0.25f * battement))
                 etirer(c, s, (7f + i) * d, coul[s], 0.70f * base * (0.30f + 0.65f * i))
             }
         }
@@ -526,10 +551,10 @@ class VueSonore(context: Context) : View(context) {
             val i = intensites[s]
             trait.color = coul[s]
             trait.strokeWidth = (1f + 2.2f * i) * d; trait.alpha = opacite(0.14f + 0.86f * i)
-            c.drawLine(lx[s], ly[s], lx[s + 1], ly[s + 1], trait)
+            c.drawLine(px[s], py[s], px[s + 1], py[s + 1], trait)
             if (i > 0.45f) {
                 trait.color = Color.WHITE; trait.strokeWidth = 0.5f * d; trait.alpha = opacite((i - 0.45f) * 0.8f)
-                c.drawLine(lx[s], ly[s], lx[s + 1], ly[s + 1], trait)
+                c.drawLine(px[s], py[s], px[s + 1], py[s + 1], trait)
             }
         }
 
@@ -537,7 +562,7 @@ class VueSonore(context: Context) : View(context) {
         if (a > 0.03f) for (j in 0..8) {
             val s = (N * (0.40f + 0.20f * ((j * 0.37f + 0.11f) % 1f))).toInt()
             val onde = max(0f, sin(t * 2.3f + j * 5f))
-            eclat(c, lx[s], ly[s], 4.5f, a * onde * onde, eclatCouleur)
+            eclat(c, px[s], py[s], 4.5f, a * onde * onde, eclatCouleur)
         }
     }
 }

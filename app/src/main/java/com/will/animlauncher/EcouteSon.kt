@@ -9,6 +9,8 @@ import kotlin.math.exp
 import kotlin.math.hypot
 import kotlin.math.ln
 import kotlin.math.max
+import kotlin.math.min
+import kotlin.math.pow
 
 // L'ÉCOUTE DU SON (pour la « réaction sonore », voir ReactionSonore.kt).
 //
@@ -26,7 +28,17 @@ import kotlin.math.max
 //     ne voyait pas les coups. Maintenant « grave » = surtout ce qui DÉPASSE la moyenne de la dernière
 //     demi-seconde (le coup qui arrive), plus un peu de la force (pour ne pas s'éteindre entre deux coups).
 //
-// Ce fichier range ces nombres dans 5 valeurs simples, de 0 à 1, que les dessins viennent lire :
+// LES BASSES QUI TAPENT (10/11, Will : « je veux voir la lumière bien vibrer sur la phonk, ça paraît random ») :
+//  3) Le réglage « normalisé » d'Android remet chaque mesure au volume maximum : un passage calme et un
+//     passage fort se ressemblaient. On lit donc EN PLUS le vrai volume du moment (« getMeasurementPeakRms »)
+//     et on multiplie : la lumière baisse dans les passages calmes et remonte quand ça envoie.
+//  4) Musiques très compressées (phonk : la basse ne s'arrête jamais) : on retient aussi le niveau le plus BAS
+//     entendu récemment, et on étire ce qui se passe entre ce plancher et le maximum (plus de contraste).
+//  5) Nouveau signal « coup » : il saute à 1 à chaque coup de basse puis retombe en ~0,15 s. C'est lui qui
+//     fait battre et vibrer tout le tour de l'écran (voir ReactionSonore.kt).
+//
+// Ce fichier range ces nombres dans 6 valeurs simples, de 0 à 1, que les dessins viennent lire :
+//   coup    : un coup de basse vient de tomber (saute à 1, retombe vite)
 //   grave   : la grosse caisse, la basse            (43 à 170 Hz)
 //   medium  : les voix, la mélodie                  (300 à 2 000 Hz)
 //   aigu    : les cymbales, les « s »               (4 000 à 12 000 Hz)
@@ -43,6 +55,15 @@ object EcouteSon {
         private set
     @Volatile var claque = 0f
         private set
+    @Volatile var coup = 0f
+        private set
+
+    // le vrai volume du moment (voir le point 3 en haut)
+    private var mesureOk = false
+    private val mesure = Visualizer.MeasurementPeakRms()
+    private var refVolume = 0.0001f
+    private var basGrave = 0f                      // le plancher des basses (voir le point 4)
+    private var depuisCoup = 1f                    // secondes depuis le dernier coup
 
     @Volatile private var visu: Visualizer? = null
     private var fil: HandlerThread? = null         // le fil à part qui demande les mesures
@@ -79,6 +100,8 @@ object EcouteSon {
             // « normalisé » : la mesure ne dépend pas du volume réglé sur le téléphone
             try { v.setScalingMode(Visualizer.SCALING_MODE_NORMALIZED) } catch (_: Throwable) {}
             tampon = ByteArray(v.captureSize)
+            mesureOk = try { v.setMeasurementMode(Visualizer.MEASUREMENT_MODE_PEAK_RMS) == Visualizer.SUCCESS } catch (_: Throwable) { false }
+            refVolume = 0.0001f; basGrave = 0f; depuisCoup = 1f; coup = 0f
             v.setEnabled(true)
             visu = v
             ratees = 0; moyGrave = 0f; derniereMesure = 0L
@@ -108,7 +131,7 @@ object EcouteSon {
             t?.quitSafely()
         }
         if (p == null || !p.post(eteindre)) eteindre.run()
-        grave = 0f; medium = 0f; aigu = 0f; claque = 0f
+        grave = 0f; medium = 0f; aigu = 0f; claque = 0f; coup = 0f
     }
 
     // UNE MESURE (dans le fil « son »), puis rendez-vous dans 16 ms.
@@ -153,6 +176,18 @@ object EcouteSon {
         return somme / (k2 - k1 + 1)
     }
 
+    // Le vrai volume du moment, de 0 à 1, comparé au plus fort entendu récemment.
+    // (Android le donne en « millibels » : -9600 = silence, 0 = le maximum. Si le téléphone ne sait pas, on renvoie 1.)
+    private fun volume(dt: Float): Float {
+        if (!mesureOk) return 1f
+        val v = visu ?: return 1f
+        try { if (v.getMeasurementPeakRms(mesure) != Visualizer.SUCCESS) return 1f } catch (_: Throwable) { return 1f }
+        if (mesure.mRms <= -9000) return 1f
+        val force = 10f.pow(mesure.mRms / 2000f)
+        refVolume = max(max(refVolume * exp(-dt / 15f), force), 0.0001f)
+        return (force / refVolume).coerceIn(0f, 1f).pow(0.6f)
+    }
+
     private fun niveau(valeur: Float, reference: Float, seuil: Float): Float =
         ((valeur / reference - seuil) / (1f - seuil)).coerceIn(0f, 1f)
 
@@ -165,13 +200,16 @@ object EcouteSon {
         derniereMesure = maintenant
         val hzParCase = frequenceMilliHz / 1000f / fft.size
         if (hzParCase <= 0f) return
-        val g = bande(fft, hzParCase, 43f, 170f)
-        val m = bande(fft, hzParCase, 300f, 2000f)
-        val a = bande(fft, hzParCase, 4000f, 12000f)
-        val sec = bande(fft, hzParCase, 2000f, 5000f)
+        val vol = volume(dt)
+        val g = bande(fft, hzParCase, 30f, 180f) * vol
+        val m = bande(fft, hzParCase, 300f, 2000f) * vol
+        val a = bande(fft, hzParCase, 4000f, 12000f) * vol
+        val sec = bande(fft, hzParCase, 2000f, 5000f) * vol
+        depuisCoup += dt
+        coup *= exp(-dt / 0.15f)                       // le coup retombe tout seul
 
         if (g + m + a < 1.5f) {                        // silence : tout retombe
-            grave = 0f; medium = 0f; aigu = 0f; claque = 0f; ancienSec = sec; moyGrave = 0f
+            grave = 0f; medium = 0f; aigu = 0f; claque = 0f; ancienSec = sec; moyGrave = 0f; basGrave = 0f
             return
         }
         // la référence descend très lentement, et remonte tout de suite si le son est plus fort
@@ -180,9 +218,18 @@ object EcouteSon {
         refMedium = max(max(refMedium * baisse, m), 4f)
         refAigu = max(max(refAigu * baisse, a), 2f)
         // LES BASSES : surtout le COUP (ce qui dépasse la moyenne de la dernière demi-seconde), plus un peu de la force
-        val coup = ((g - moyGrave * 1.15f) / (refGrave * 0.45f)).coerceIn(0f, 1f)
-        moyGrave += (g - moyGrave) * (1f - exp(-dt / 0.5f))
-        grave = (0.40f * niveau(g, refGrave, 0.30f) + 0.85f * coup).coerceIn(0f, 1f)
+        // le plancher : il remonte doucement vers le maximum (en ~3 s) et redescend tout de suite si le son baisse
+        basGrave = min(basGrave + (refGrave - basGrave) * (1f - exp(-dt / 3f)), g)
+        val ecart = max(refGrave - basGrave, refGrave * 0.25f)      // la place entre le plancher et le maximum
+        val tenue = ((g - (refGrave - ecart)) / ecart).coerceIn(0f, 1f)             // la basse qui dure
+        val elan = ((g - moyGrave * 1.12f) / (ecart * 0.55f)).coerceIn(0f, 1f)      // la basse qui ARRIVE
+        moyGrave += (g - moyGrave) * (1f - exp(-dt / 0.4f))
+        grave = (0.35f * tenue + 0.85f * elan).coerceIn(0f, 1f)
+        // UN COUP : un élan net, et pas deux coups à moins de 0,11 s (sinon ça grésille)
+        if (elan > 0.35f && depuisCoup > 0.11f) {
+            coup = max(coup, 0.55f + 0.45f * elan)
+            depuisCoup = 0f
+        }
         medium = niveau(m, refMedium, 0.20f)
         aigu = niveau(a, refAigu, 0.25f)
         // ce qui vient d'augmenter d'un coup : on compare à « ancienSec », qui suit le son avec ~50 ms de retard
