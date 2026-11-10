@@ -84,12 +84,13 @@ object EcouteSon {
     private var coupVif = 0f                       // le coup « en direct » (avant le retard)
 
     // LE PALIER (point 8) : 1 = très lent, 2 = calme, 3 = moyen, 4 = ça envoie, 5 = très fort.
-    // Les 4 frontières entre paliers, sur l'échelle d'« énergie » (voir situer()). Calées le 10/11 sur 5 extraits
-    // envoyés par Will : son morceau lent mesure ~0,44, ses deux moyens ~0,61 et ~0,64, son rapide ~0,93,
-    // et le drop qu'il veut « au moins rouge » ~0,68 (précédé d'une intro à ~0,31).
-    // ATTENTION : ces chiffres viennent d'une SIMULATION sur le son des vidéos. Le téléphone ne mesure pas pareil
-    // (une phonk simulée « vert » est restée bleue chez Will) : à recaler avec les mesures affichées à l'écran.
-    val SEUILS = floatArrayOf(0.27f, 0.52f, 0.655f, 1.08f)
+    // Les 4 frontières entre paliers, sur l'échelle d'« énergie » (voir situer()).
+    // RECALÉES le 10/11 à 23h sur les chiffres LUS SUR LE TÉLÉPHONE de Will (ligne de mesures, voir MesuresSon.kt),
+    // sur 7 extraits qu'il juge « à confettis » (phonk, dubstep) : plein 40 à 48 (un seul à 61), basses 45 à 70.
+    // Ce qui les distingue des morceaux moyens, ce sont les BASSES (moyens : plein 45-49 aussi, mais basses ~25-40).
+    // Le téléphone lit des basses plus faibles qu'une simulation sur ordinateur (environ x 0,7) : ne se fier
+    // qu'aux chiffres du téléphone. Les paliers 1 à 3 n'ont pas encore été vérifiés sur le téléphone.
+    val SEUILS = floatArrayOf(0.13f, 0.42f, 0.52f, 0.62f)
     @Volatile var palier = 3
         private set
     @Volatile var energieVue = 0                   // pour le diagnostic : l'énergie du moment x 100
@@ -289,9 +290,11 @@ object EcouteSon {
 
     // SUR QUEL PALIER EST LA MUSIQUE ? (point 8). Appelé à chaque mesure.
     //   partBasses = la part des basses (sous 180 Hz) dans tout le son, de 0 à 1.
-    // L'ÉNERGIE = à quel point le son est plein (voir lireCrete), gonflé quand les basses dominent : dès qu'elles
-    // font plus de la moitié du son, elles comptent beaucoup (Will, 10/11 : « trop exigeant », un drop porté par
-    // la basse restait vert). Elle est lissée sur ~2 secondes : un seul coup ne change pas le palier.
+    // L'ÉNERGIE = à quel point le son est plein (voir lireCrete) x (0,4 + 2,2 x la part des basses).
+    // Les BASSES pèsent donc très lourd : les mesures faites sur le téléphone de Will ont montré que c'est
+    // elles qui distinguent une phonk ou un dubstep (basses 45 à 70 %) d'un morceau moyen (25 à 40 %), alors
+    // que le « plein » est presque le même (40 à 48). Exemples : plein 45 et basses 55 -> 0,45 x 1,61 = 0,72 ;
+    // plein 45 et basses 27 -> 0,45 x 0,99 = 0,45. L'énergie est lissée sur ~2 s : un seul coup ne change rien.
     // LE CONTRASTE : on retient aussi l'énergie « habituelle » du morceau (moyenne sur ~25 s). Quand la musique
     // monte nettement au-dessus de son habitude (un drop après une intro calme), on ajoute la moitié de l'écart :
     // c'est ce saut qu'on ressent, plus que le niveau lui-même.
@@ -308,7 +311,7 @@ object EcouteSon {
         bassesLisses += (partBasses - bassesLisses) * doux
         pleinVu = (pleinLisse * 100f).toInt()
         bassesVues = (bassesLisses * 100f).toInt()
-        val brute = plein * (1f + 2.5f * max(0f, partBasses - 0.5f))
+        val brute = plein * (0.4f + 2.2f * partBasses)
         duree += dt; depuisPalier += dt
         energie = if (energie <= 0f) brute
                   else energie + (brute - energie) * (1f - exp(-dt / (if (duree < 2.5f) 0.4f else 2f)))
