@@ -18,6 +18,7 @@ import android.hardware.display.DisplayManager
 import android.os.Build
 import android.os.Handler
 import android.os.Looper
+import android.os.Process
 import android.os.SystemClock
 import android.view.Display
 import android.widget.RemoteViews
@@ -51,6 +52,14 @@ import kotlin.math.sqrt
 // d'AnimLauncher sert de chef d'orchestre. Tant qu'on est sur l'écran d'accueil, il envoie la page suivante
 // toutes les 12 s (la visionneuse repart alors de la 1re image : le changement tombe pile sur l'étoile).
 // Sans le service (accessibilité éteinte), le widget montre la 1re page en boucle.
+//
+// POUR NE PAS FAIRE RAMER LE TÉLÉPHONE (10/11, Will voyait des saccades à l'ouverture des apps) :
+//  - le dessin des images se fait en PRIORITÉ BASSE : il laisse passer tout le reste (dont l'animation d'ouverture) ;
+//  - on réutilise toujours les 300 MÊMES images en mémoire (la « réserve ») au lieu d'en créer 300 nouvelles
+//    à chaque page : sinon Android passe son temps à faire le ménage dans la mémoire, et ça se sent ;
+//  - en arrivant sur l'accueil on ne fait RIEN pendant 2 s (c'est souvent le moment où l'on ouvre une app),
+//    et la page suivante n'arrive qu'après une boucle complète (12 s), plus à l'arrivée ;
+//  - dès qu'on quitte l'accueil, tout s'arrête.
 object WidgetDossier {
     private const val PAS = 40L                  // une image toutes les 40 ms (25 images par seconde)
     private const val DUREE = 12.0               // la boucle dure 12 s
@@ -62,10 +71,16 @@ object WidgetDossier {
     private const val BOITE_Y = 48f - BOITE / 2
     const val PAR_PAGE = 9                       // 9 apps au plus par boucle
 
-    private val fil = Executors.newSingleThreadExecutor()   // les dessins se font à part, sans bloquer l'app
+    // les dessins se font à part, sans bloquer l'app, et en priorité basse (« BACKGROUND » = travail de fond)
+    private val fil = Executors.newSingleThreadExecutor { travail ->
+        Thread({
+            try { Process.setThreadPriority(Process.THREAD_PRIORITY_BACKGROUND) } catch (_: Throwable) {}
+            travail.run()
+        }, "widget-dossier")
+    }
     private val minuteur = Handler(Looper.getMainLooper())
     private val JETON = Any()
-    private var enMarche = false                 // le chef d'orchestre tourne-t-il ? (lu et écrit sur le fil principal)
+    @Volatile private var enMarche = false       // le chef d'orchestre tourne-t-il ? (= est-on sur l'écran d'accueil ?)
 
     // CE QU'ON RETIENT POUR CHAQUE DOSSIER posé sur l'accueil (lu et écrit seulement sur « fil »).
     private class Etat(
@@ -73,7 +88,6 @@ object WidgetDossier {
         val pages: List<List<String>>,           // les apps, par paquets de 9
         var page: Int,                           // la page montrée en ce moment
         var px: Int,                             // la taille des images (en pixels)
-        var prochaine: List<Bitmap>? = null,     // la page suivante, dessinée d'avance
         var envoyeA: Long = SystemClock.uptimeMillis()   // quand la page en cours a été envoyée au widget
     )
     private val etats = HashMap<String, Etat>()
@@ -138,8 +152,8 @@ object WidgetDossier {
                 val etat = Etat(signature, pages, 0, px)
                 etats[groupe] = etat
                 Journal.noter(c, "widget dossier $groupe : ${apps.size} apps, ${pages.size} page(s), $N images de $px px en ${SystemClock.uptimeMillis() - debut} ms")
-                // plusieurs pages : on prépare déjà la suivante (le chef d'orchestre l'enverra)
-                if (pages.size > 1) etat.prochaine = dessinerPage(c, px, pages[1], hsv)
+                // aucun dossier de plus de 9 apps : la réserve d'images ne resservira pas, on rend la mémoire
+                if (etats.values.none { it.pages.size > 1 }) { reserve = null; reserveCle = "" }
                 return
             } catch (e: IllegalArgumentException) {
                 // trop d'images pour la mémoire d'un widget : on recommence en plus petit
@@ -154,25 +168,29 @@ object WidgetDossier {
         for (id in ids) gestionnaire.updateAppWidget(id, vues(c, id, groupe, images))
     }
 
-    // LES 300 IMAGES d'une page. Les images où l'on ne voit que l'étoile (avant 3,2 s et après 11 s) sont les
-    // mêmes pour toutes les pages : on les garde de côté (« communes ») pour ne pas les redessiner.
-    private val communes = HashMap<String, Bitmap>()
+    // LES 300 IMAGES d'une page, dessinées dans la RÉSERVE : 300 images créées une fois, qu'on efface et qu'on
+    // redessine à chaque page. (Une fois envoyées au widget, Android en a sa propre copie : on peut les réutiliser.)
+    // Les images où l'on ne voit que l'étoile (avant 3,2 s et après 11 s) sont les mêmes pour toutes les pages :
+    // si la réserve les contient déjà (même taille, mêmes couleurs d'étoile), on ne les redessine pas.
+    private var reserve: Array<Bitmap>? = null
+    private var reservePx = 0
+    private var reserveCle = ""                  // les couleurs de l'étoile déjà dessinée dans la réserve
     private fun dessinerPage(c: Context, px: Int, apps: List<String>, hsv: FloatArray?): List<Bitmap> {
         val etoile = couleursEtoile(hsv)
+        // la réserve : on garde celle qu'on a si elle est à la bonne taille, sinon on en crée une neuve
+        val images: Array<Bitmap> = reserve?.takeIf { reservePx == px }
+            ?: Array(N) { Bitmap.createBitmap(px, px, Bitmap.Config.ARGB_8888) }.also { reserve = it; reservePx = px; reserveCle = "" }
+        val cle = etoile.joinToString(",")
+        val etoileDejaLa = cle == reserveCle
         val dessin = Boucle(apps.map { icone(c, it, px) }, etoile)
-        val cle = "$px|${etoile.joinToString(",")}|"
-        if (communes.size > 4 * N && !communes.keys.any { it.startsWith(cle) }) communes.clear()   // pas plus de 4 jeux en réserve
-        return List(N) { i ->
+        for (i in 0 until N) {
             val t = i * PAS / 1000.0
-            if (t < 3.2 || t >= 11.0) communes.getOrPut(cle + i) { image(px) { dessin.dessiner(it, px, t) } }
-            else image(px) { dessin.dessiner(it, px, t) }
+            if (etoileDejaLa && (t < 3.2 || t >= 11.0)) continue
+            images[i].eraseColor(Color.TRANSPARENT)          // on efface l'ancienne image…
+            dessin.dessiner(Canvas(images[i]), px, t)        // …et on dessine la nouvelle par-dessus
         }
-    }
-
-    private fun image(px: Int, dessin: (Canvas) -> Unit): Bitmap {
-        val b = Bitmap.createBitmap(px, px, Bitmap.Config.ARGB_8888)
-        dessin(Canvas(b))
-        return b
+        reserveCle = cle
+        return images.asList()
     }
 
     // L'icône d'une app, dessinée en grand une seule fois (on la réduit ensuite à chaque image).
@@ -197,18 +215,22 @@ object WidgetDossier {
 
     // ---------------- LE CHEF D'ORCHESTRE (appelé par le service d'AnimLauncher) ----------------
 
-    // On arrive sur l'écran d'accueil : on vérifie que les widgets sont à jour (apps ajoutées, retirées…),
-    // et les dossiers de plus de 9 apps passent à la page suivante (puis une nouvelle page toutes les 12 s).
+    // On arrive sur l'écran d'accueil. On ne fait RIEN tout de suite (on est peut-être juste en train d'ouvrir
+    // une app). Après 2 s : on vérifie que les widgets sont à jour (apps ajoutées, retirées…). Après 12 s (une
+    // boucle complète) : les dossiers de plus de 9 apps passent à la page suivante, puis toutes les 12 s.
     fun surAccueil(contexte: Context) {
         val c = contexte.applicationContext
         minuteur.post {
             if (enMarche) return@post
             enMarche = true
-            fil.execute {
-                try { for (g in WidgetGroupe.groupesPoses(c)) if (g != WidgetTop.GROUPE) construire(c, g, false) }
-                catch (e: Exception) { Journal.noter(c, "ERREUR widget dossier (accueil) : " + Journal.pile(e)) }
-            }
-            relancer(c)
+            val maintenant = SystemClock.uptimeMillis()
+            minuteur.postAtTime({
+                fil.execute {
+                    try { for (g in WidgetGroupe.groupesPoses(c)) if (enMarche && g != WidgetTop.GROUPE) construire(c, g, false) }
+                    catch (e: Exception) { Journal.noter(c, "ERREUR widget dossier (accueil) : " + Journal.pile(e)) }
+                }
+            }, JETON, maintenant + 2000)
+            minuteur.postAtTime({ tic(c) }, JETON, maintenant + (DUREE * 1000).toLong())
         }
     }
 
@@ -218,12 +240,6 @@ object WidgetDossier {
             enMarche = false
             minuteur.removeCallbacksAndMessages(JETON)
         }
-    }
-
-    // On tourne la page tout de suite, puis toutes les 12 s.
-    private fun relancer(c: Context) {
-        minuteur.removeCallbacksAndMessages(JETON)
-        tic(c)
     }
 
     private fun tic(c: Context) {
@@ -236,6 +252,7 @@ object WidgetDossier {
 
     private fun pageSuivante(c: Context) {
         for ((groupe, etat) in etats) {
+            if (!enMarche) return                    // on a quitté l'accueil entre-temps : on arrête là
             if (etat.pages.size < 2) continue
             // une page envoyée il y a moins de 6 s (widget tout juste redessiné) : on la laisse jouer
             if (SystemClock.uptimeMillis() - etat.envoyeA < 6000) continue
@@ -243,12 +260,10 @@ object WidgetDossier {
             if (ids.isEmpty()) continue
             val hsv = Groupes.couleur(c, groupe)
             etat.page = (etat.page + 1) % etat.pages.size
-            val images = etat.prochaine ?: dessinerPage(c, etat.px, etat.pages[etat.page], hsv)
+            val images = dessinerPage(c, etat.px, etat.pages[etat.page], hsv)
             etat.envoyeA = SystemClock.uptimeMillis()
             try { envoyer(c, groupe, ids, images) }
             catch (e: IllegalArgumentException) { Journal.noter(c, "widget dossier $groupe : page refusée (${e.message})") }
-            // la page d'après, dessinée d'avance (elle sera prête dans 12 s)
-            etat.prochaine = dessinerPage(c, etat.px, etat.pages[(etat.page + 1) % etat.pages.size], hsv)
         }
     }
 

@@ -6,6 +6,7 @@ import android.graphics.PixelFormat
 import android.graphics.PorterDuff
 import android.os.Handler
 import android.os.Looper
+import android.os.Process
 import android.os.SystemClock
 import android.view.SurfaceHolder
 import android.view.SurfaceView
@@ -106,6 +107,9 @@ class Rideau(context: Context) : SurfaceView(context), SurfaceHolder.Callback {
     // LA BOUCLE (dans son propre fil) : elle dort tant qu'il n'y a rien à jouer,
     // et se réveille dès qu'une séance arrive.
     private fun boucle() {
+        // PRIORITÉ « affichage » (10/11) : ce fil passe avant les travaux de fond du téléphone (et les nôtres,
+        // comme le dessin des widgets), pour que l'animation ne saccade pas quand le téléphone est occupé.
+        try { Process.setThreadPriority(Process.THREAD_PRIORITY_DISPLAY) } catch (_: Throwable) {}
         effacer()
         while (vivant) {
             val s = synchronized(verrou) {
@@ -122,6 +126,12 @@ class Rideau(context: Context) : SurfaceView(context), SurfaceHolder.Callback {
     private fun jouerSeance(s: Seance) {
         val debut = SystemClock.uptimeMillis()
         var debutRevelation = 0L
+        // LE RYTHME DES IMAGES (10/11). Avant : on dessinait, puis on attendait 16 ms -> une image toutes les
+        // « 16 ms + le temps du dessin », donc un rythme irrégulier (et plus lent quand le dessin est lourd).
+        // Maintenant : un rendez-vous fixe toutes les 16,67 ms (60 images par seconde, pile) ; on n'attend que
+        // le temps qui RESTE jusqu'au rendez-vous. « nanoTime » = une horloge très précise (milliardièmes de seconde).
+        val pas = 16_666_667L
+        var rendezVous = System.nanoTime() + pas
         while (vivant && !s.arretee) {
             val maintenant = SystemClock.uptimeMillis()
             val ecoule = maintenant - debut
@@ -150,7 +160,13 @@ class Rideau(context: Context) : SurfaceView(context), SurfaceHolder.Callback {
             s.images++
 
             if (revelation >= 1f) return
-            try { Thread.sleep(16) } catch (_: InterruptedException) { return }
+            val reste = rendezVous - System.nanoTime()
+            if (reste > 0) {
+                try { Thread.sleep(reste / 1_000_000L, (reste % 1_000_000L).toInt()) } catch (_: InterruptedException) { return }
+                rendezVous += pas
+            } else {
+                rendezVous = System.nanoTime() + pas       // le dessin a été trop long : on repart d'ici (pas de rattrapage en rafale)
+            }
         }
     }
 }

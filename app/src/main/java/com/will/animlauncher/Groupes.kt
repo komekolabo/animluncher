@@ -1,8 +1,13 @@
 package com.will.animlauncher
 
+import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
+import android.content.IntentFilter
 import android.content.pm.ApplicationInfo
+import android.os.Build
+import android.os.SystemClock
+import java.util.concurrent.ConcurrentHashMap
 
 // LES GROUPES D'APPS (09/11) : AnimLauncher range tout seul les apps du téléphone par catégorie
 // (IA, réseaux sociaux, jeux…), et propose pour chaque groupe un widget « dossier animé »
@@ -108,14 +113,70 @@ object Groupes {
     }
 
     // Le nom affiché d'une app (« Claude »), ou son nom technique si on ne le trouve pas.
-    fun nomApp(c: Context, pkg: String): String = try {
-        val pm = c.packageManager
-        pm.getApplicationLabel(pm.getApplicationInfo(pkg, 0)).toString()
-    } catch (_: Exception) { pkg }
+    fun nomApp(c: Context, pkg: String): String {
+        memoireNoms[pkg]?.let { return it }
+        val nom = try {
+            val pm = c.packageManager
+            pm.getApplicationLabel(pm.getApplicationInfo(pkg, 0)).toString()
+        } catch (_: Exception) { pkg }
+        memoireNoms[pkg] = nom
+        return nom
+    }
+
+    // LA MÉMOIRE DU TRI (10/11, pour ne plus faire ramer le téléphone). Ranger les apps demande à Android,
+    // une par une, le nom et la catégorie de CHAQUE app du téléphone : des centaines de questions. Avant, on
+    // refaisait tout à chaque retour sur l'écran d'accueil (pour chaque widget !). Maintenant on garde le
+    // résultat en mémoire, et on ne l'oublie que si :
+    //  - une app est installée, désinstallée ou mise à jour (Android nous prévient, voir « ecoute ») ;
+    //  - la langue du téléphone change (les noms des apps changent) ;
+    //  - ou, par sécurité, au bout de 10 minutes.
+    // Les choix de l'utilisateur (apps décochées, ajoutées, ordre) ne sont PAS dans cette mémoire : ils sont
+    // relus à chaque fois (c'est rapide), donc une modification d'un dossier se voit tout de suite.
+    private val memoireNoms = ConcurrentHashMap<String, String>()
+    @Volatile private var memoireTri: Map<String, List<String>>? = null
+    @Volatile private var memoireTriA = 0L
+    @Volatile private var ecoutePosee = false
+    private val ecoute = object : BroadcastReceiver() {
+        override fun onReceive(c: Context?, intention: Intent?) { oublier() }
+    }
+    fun oublier() { memoireTri = null; memoireNoms.clear() }
+
+    private fun poserEcoute(c: Context) {
+        if (ecoutePosee) return
+        ecoutePosee = true
+        try {
+            val app = c.applicationContext
+            // les apps installées / retirées / mises à jour (ces messages parlent d'un « package »)
+            val paquets = IntentFilter().apply {
+                addAction(Intent.ACTION_PACKAGE_ADDED); addAction(Intent.ACTION_PACKAGE_REMOVED)
+                addAction(Intent.ACTION_PACKAGE_CHANGED); addAction(Intent.ACTION_PACKAGE_REPLACED)
+                addDataScheme("package")
+            }
+            val langue = IntentFilter(Intent.ACTION_LOCALE_CHANGED)
+            // (Android 13 et plus demande de préciser que seuls le système et notre app peuvent nous écrire)
+            if (Build.VERSION.SDK_INT >= 33) {
+                app.registerReceiver(ecoute, paquets, Context.RECEIVER_NOT_EXPORTED)
+                app.registerReceiver(ecoute, langue, Context.RECEIVER_NOT_EXPORTED)
+            } else {
+                app.registerReceiver(ecoute, paquets)
+                app.registerReceiver(ecoute, langue)
+            }
+        } catch (_: Exception) {}          // pas d'écoute ? tant pis : la mémoire s'efface quand même toutes les 10 minutes
+    }
 
     // TOUTES les apps du téléphone qui ont une icône, rangées par catégorie (avant les choix de
     // l'utilisateur). Les apps sans catégorie ne sont pas dans le résultat.
     fun detecter(c: Context): Map<String, List<String>> {
+        poserEcoute(c)
+        val garde = memoireTri
+        if (garde != null && SystemClock.elapsedRealtime() - memoireTriA < 600_000L) return garde
+        val resultat = detecterVraiment(c)
+        memoireTri = resultat
+        memoireTriA = SystemClock.elapsedRealtime()
+        return resultat
+    }
+
+    private fun detecterVraiment(c: Context): Map<String, List<String>> {
         val pm = c.packageManager
         val intention = Intent(Intent.ACTION_MAIN).addCategory(Intent.CATEGORY_LAUNCHER)
         val paquets = pm.queryIntentActivities(intention, 0).map { it.activityInfo.packageName }
