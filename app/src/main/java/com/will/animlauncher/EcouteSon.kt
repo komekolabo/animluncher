@@ -1,6 +1,11 @@
 package com.will.animlauncher
 
 import android.media.audiofx.Visualizer
+import android.os.Handler
+import android.os.HandlerThread
+import android.os.Process
+import android.os.SystemClock
+import kotlin.math.exp
 import kotlin.math.hypot
 import kotlin.math.ln
 import kotlin.math.max
@@ -9,9 +14,17 @@ import kotlin.math.max
 //
 // Android fournit un outil, le « Visualizer », qui donne en direct un RÉSUMÉ de ce qui sort du
 // haut-parleur : pour chaque tranche de fréquences (graves, médiums, aigus…), sa force du moment.
-// Ce ne sont que des nombres, environ 20 fois par seconde. On ne reçoit PAS le son lui-même,
-// on n'enregistre rien, on ne garde rien : chaque mesure remplace la précédente.
+// Ce ne sont que des nombres. On ne reçoit PAS le son lui-même, on n'enregistre rien, on ne garde
+// rien : chaque mesure remplace la précédente.
 // (Android exige quand même la permission « micro » pour cet outil : c'est sa règle.)
+//
+// LE RYTHME (10/11, Will : « pas très en rythme avec la musique »). Deux corrections :
+//  1) Avant, Android nous envoyait les mesures 20 fois par seconde au plus : un coup de grosse caisse
+//     pouvait être vu jusqu'à 50 ms en retard. Maintenant c'est NOUS qui demandons une mesure toutes
+//     les 16 ms (60 fois par seconde), dans un petit fil à part (« son »).
+//  2) Avant, « grave » = la force des basses. Une basse qui dure restait donc allumée en continu, et on
+//     ne voyait pas les coups. Maintenant « grave » = surtout ce qui DÉPASSE la moyenne de la dernière
+//     demi-seconde (le coup qui arrive), plus un peu de la force (pour ne pas s'éteindre entre deux coups).
 //
 // Ce fichier range ces nombres dans 5 valeurs simples, de 0 à 1, que les dessins viennent lire :
 //   grave   : la grosse caisse, la basse            (43 à 170 Hz)
@@ -31,7 +44,14 @@ object EcouteSon {
     @Volatile var claque = 0f
         private set
 
-    private var visu: Visualizer? = null
+    @Volatile private var visu: Visualizer? = null
+    private var fil: HandlerThread? = null         // le fil à part qui demande les mesures
+    private var poste: Handler? = null
+    private var tampon = ByteArray(0)              // la mesure en cours (réutilisée : aucune mémoire gaspillée)
+    private var derniereMesure = 0L
+    private var ratees = 0
+    private var moyGrave = 0f                      // la moyenne des basses sur la dernière demi-seconde
+    private const val PAS = 16L                    // une mesure toutes les 16 ms
 
     // Pour le diagnostic (fenêtre du rond) : la dernière erreur, et combien de mesures sont arrivées.
     @Volatile var derniereErreur: String? = null
@@ -58,14 +78,14 @@ object EcouteSon {
             v.setCaptureSize(1024.coerceIn(tailles[0], tailles[1]))
             // « normalisé » : la mesure ne dépend pas du volume réglé sur le téléphone
             try { v.setScalingMode(Visualizer.SCALING_MODE_NORMALIZED) } catch (_: Throwable) {}
-            v.setDataCaptureListener(object : Visualizer.OnDataCaptureListener {
-                override fun onWaveFormDataCapture(visualizer: Visualizer?, donnees: ByteArray?, frequence: Int) {}
-                override fun onFftDataCapture(visualizer: Visualizer?, fft: ByteArray?, frequence: Int) {
-                    if (fft != null) analyser(fft, frequence)
-                }
-            }, Visualizer.getMaxCaptureRate(), false, true)
+            tampon = ByteArray(v.captureSize)
             v.setEnabled(true)
             visu = v
+            ratees = 0; moyGrave = 0f; derniereMesure = 0L
+            // le fil à part : il demande une mesure, l'analyse, et recommence 16 ms plus tard
+            val t = HandlerThread("son", Process.THREAD_PRIORITY_MORE_FAVORABLE).apply { start() }
+            fil = t
+            poste = Handler(t.looper).also { it.post(tic) }
             derniereErreur = null
             AnimApp.noter("son : écoute démarrée")
             true
@@ -79,9 +99,47 @@ object EcouteSon {
     fun arreter() {
         val v = visu ?: return
         visu = null
-        try { v.setEnabled(false) } catch (_: Throwable) {}
-        try { v.release() } catch (_: Throwable) {}
+        val t = fil; val p = poste
+        fil = null; poste = null
+        // on éteint l'outil DANS le fil des mesures (jamais pendant qu'une mesure est en cours), puis on ferme le fil
+        val eteindre = Runnable {
+            try { v.setEnabled(false) } catch (_: Throwable) {}
+            try { v.release() } catch (_: Throwable) {}
+            t?.quitSafely()
+        }
+        if (p == null || !p.post(eteindre)) eteindre.run()
         grave = 0f; medium = 0f; aigu = 0f; claque = 0f
+    }
+
+    // UNE MESURE (dans le fil « son »), puis rendez-vous dans 16 ms.
+    private val tic = object : Runnable {
+        override fun run() {
+            val v = visu ?: return
+            val p = poste ?: return
+            try {
+                if (v.getFft(tampon) == Visualizer.SUCCESS) { ratees = 0; analyser(tampon, v.samplingRate) }
+                else ratees++
+            } catch (_: Throwable) { ratees++ }
+            // FILET DE SÉCURITÉ : si le téléphone refuse 30 demandes de suite, on revient à l'ancienne
+            // méthode (Android nous envoie lui-même les mesures, 20 fois par seconde).
+            if (ratees >= 30) {
+                try {
+                    v.setEnabled(false)
+                    v.setDataCaptureListener(object : Visualizer.OnDataCaptureListener {
+                        override fun onWaveFormDataCapture(visualizer: Visualizer?, donnees: ByteArray?, frequence: Int) {}
+                        override fun onFftDataCapture(visualizer: Visualizer?, fft: ByteArray?, frequence: Int) {
+                            if (fft != null) analyser(fft, frequence)
+                        }
+                    }, Visualizer.getMaxCaptureRate(), false, true)
+                    v.setEnabled(true)
+                    AnimApp.noter("son : mesures à la demande refusées, retour à l'ancienne méthode")
+                } catch (e: Throwable) {
+                    derniereErreur = "${e.javaClass.simpleName} ${e.message ?: ""}".trim()
+                }
+                return
+            }
+            p.postDelayed(this, PAS)
+        }
     }
 
     // La force moyenne entre deux fréquences. « fft » range les mesures par paires (partie réelle,
@@ -101,6 +159,10 @@ object EcouteSon {
     private fun analyser(fft: ByteArray, frequenceMilliHz: Int) {
         if (fft.size < 16) return
         mesures++
+        // le temps depuis la mesure d'avant (pour que les réglages ne dépendent pas du nombre de mesures par seconde)
+        val maintenant = SystemClock.uptimeMillis()
+        val dt = ((maintenant - derniereMesure) / 1000f).coerceIn(0.005f, 0.1f)
+        derniereMesure = maintenant
         val hzParCase = frequenceMilliHz / 1000f / fft.size
         if (hzParCase <= 0f) return
         val g = bande(fft, hzParCase, 43f, 170f)
@@ -109,18 +171,23 @@ object EcouteSon {
         val sec = bande(fft, hzParCase, 2000f, 5000f)
 
         if (g + m + a < 1.5f) {                        // silence : tout retombe
-            grave = 0f; medium = 0f; aigu = 0f; claque = 0f; ancienSec = sec
+            grave = 0f; medium = 0f; aigu = 0f; claque = 0f; ancienSec = sec; moyGrave = 0f
             return
         }
         // la référence descend très lentement, et remonte tout de suite si le son est plus fort
-        refGrave = max(max(refGrave * 0.997f, g), 4f)
-        refMedium = max(max(refMedium * 0.997f, m), 4f)
-        refAigu = max(max(refAigu * 0.997f, a), 2f)
-        grave = niveau(g, refGrave, 0.30f)
+        val baisse = exp(-0.06f * dt)                  // (même vitesse qu'avant : -6 % par seconde)
+        refGrave = max(max(refGrave * baisse, g), 4f)
+        refMedium = max(max(refMedium * baisse, m), 4f)
+        refAigu = max(max(refAigu * baisse, a), 2f)
+        // LES BASSES : surtout le COUP (ce qui dépasse la moyenne de la dernière demi-seconde), plus un peu de la force
+        val coup = ((g - moyGrave * 1.15f) / (refGrave * 0.45f)).coerceIn(0f, 1f)
+        moyGrave += (g - moyGrave) * (1f - exp(-dt / 0.5f))
+        grave = (0.40f * niveau(g, refGrave, 0.30f) + 0.85f * coup).coerceIn(0f, 1f)
         medium = niveau(m, refMedium, 0.20f)
         aigu = niveau(a, refAigu, 0.25f)
-        claque = ((sec - ancienSec) / refMedium * 3f).coerceIn(0f, 1f)     // ce qui vient d'augmenter d'un coup
-        ancienSec = sec
+        // ce qui vient d'augmenter d'un coup : on compare à « ancienSec », qui suit le son avec ~50 ms de retard
+        claque = ((sec - ancienSec) / refMedium * 3f).coerceIn(0f, 1f)
+        ancienSec += (sec - ancienSec) * (1f - exp(-dt / 0.05f))
 
         // la note dominante : la case la plus forte entre 200 et 2 000 Hz
         val cases = fft.size / 2

@@ -5,7 +5,7 @@ import android.accessibilityservice.AccessibilityService
 import android.content.Context
 import android.content.pm.PackageManager
 import android.content.res.Configuration
-import android.graphics.BlurMaskFilter
+import android.graphics.Bitmap
 import android.graphics.Canvas
 import android.graphics.Color
 import android.graphics.Paint
@@ -13,6 +13,8 @@ import android.graphics.PixelFormat
 import android.graphics.Point
 import android.graphics.PorterDuff
 import android.graphics.PorterDuffXfermode
+import android.graphics.Rect
+import android.graphics.RectF
 import android.hardware.display.DisplayManager
 import android.media.AudioManager
 import android.os.Build
@@ -27,12 +29,15 @@ import android.view.WindowInsets
 import android.view.WindowManager
 import kotlin.math.PI
 import kotlin.math.abs
+import kotlin.math.atan2
+import kotlin.math.hypot
 import kotlin.math.cos
 import kotlin.math.exp
 import kotlin.math.max
 import kotlin.math.min
 import kotlin.math.pow
 import kotlin.math.sin
+import java.nio.ByteBuffer
 
 // LA RÉACTION SONORE : les bords de l'écran bougent au rythme de la musique du téléphone,
 // PARTOUT (écran d'accueil, autres apps), même quand AnimLauncher est fermé.
@@ -48,6 +53,14 @@ import kotlin.math.sin
 //   - 2 palettes au choix : CHAUDE (braise -> orange -> or) et FROIDE (violet -> bleu -> turquoise).
 //
 // Le choix (allumé ou non, quelle palette) est rangé dans un carnet à part, « son ».
+//
+// ALLÈGEMENT (10/11, Will : les barres lumineuses faisaient ramer le téléphone). Le coupable : le « flou »
+// (BlurMaskFilter). À CHAQUE image, le téléphone devait recalculer 90 grands traits flous, pixel par pixel.
+// Maintenant le flou est calculé UNE SEULE FOIS, dans une petite image ronde (« tache » : pleine au centre,
+// transparente au bord), et on la « tamponne » le long du bord, teintée de la couleur du moment : pour la
+// carte graphique, coller une petite image est presque gratuit. Le rendu est quasiment le même.
+// Et sur un écran rapide (120 images/s), on ne dessine qu'une image sur deux (60/s) : invisible sur une
+// lueur, et deux fois moins de travail.
 object ReactionSonore {
     private const val CARNET = "son"
     const val STYLES = 2          // 0 = chaud, 1 = froid
@@ -205,9 +218,45 @@ class VueSonore(context: Context) : View(context) {
 
     // ---------- les pinceaux, créés une seule fois ----------
     private val ajout = PorterDuffXfermode(PorterDuff.Mode.ADD)     // la lumière s'ADDITIONNE (comme de vraies lampes)
-    private val flouLarge = BlurMaskFilter(16f * d, BlurMaskFilter.Blur.NORMAL)
-    private val flouMoyen = BlurMaskFilter(4f * d, BlurMaskFilter.Blur.NORMAL)
-    private val flouFin = BlurMaskFilter(2.5f * d, BlurMaskFilter.Blur.NORMAL)
+    // LA TACHE DE LUMIÈRE (remplace les flous) : une petite image ronde de 64 x 64, faite une seule fois.
+    // Elle ne contient que de la transparence (« ALPHA_8 ») : c'est le pinceau qui lui donne sa couleur.
+    private val tache: Bitmap = Bitmap.createBitmap(64, 64, Bitmap.Config.ALPHA_8).also { image ->
+        val octets = ByteArray(64 * 64)
+        for (y in 0 until 64) for (x in 0 until 64) {
+            val r2 = ((x - 31.5f) * (x - 31.5f) + (y - 31.5f) * (y - 31.5f)) / (32f * 32f)     // 0 au centre, 1 au bord
+            val v = (exp(-r2 * 3.125f) - 0.044f) / 0.956f                                        // une cloche qui finit à 0 au bord
+            octets[y * 64 + x] = (v.coerceIn(0f, 1f) * 255f).toInt().toByte()
+        }
+        image.copyPixelsFromBuffer(ByteBuffer.wrap(octets))
+    }
+    private val tampon = Paint(Paint.ANTI_ALIAS_FLAG or Paint.FILTER_BITMAP_FLAG).apply { xfermode = ajout }
+    private val zone = RectF()
+    // Colle la tache en (x, y), de rayon r, avec une couleur et une force (0..1).
+    private fun tamponner(c: Canvas, x: Float, y: Float, r: Float, couleur: Int, force: Float) {
+        val al = opacite(force)
+        if (al <= 0) return
+        tampon.color = couleur; tampon.alpha = al
+        zone.set(x - r, y - r, x + r, y + r)
+        c.drawBitmap(tache, null, zone, tampon)
+    }
+    // LA BANDE DE LUMIÈRE : la même tache, mais on n'en prend que la tranche du MILIEU (2 pixels de large), étirée
+    // le long d'un segment du tour : pleine sur la ligne, transparente de chaque côté. Sert au halo serré.
+    private val tranche = Rect(31, 0, 33, 64)
+    private fun etirer(c: Canvas, s: Int, demiLargeur: Float, couleur: Int, force: Float) {
+        val al = opacite(force)
+        if (al <= 0) return
+        tampon.color = couleur; tampon.alpha = al
+        c.save()
+        c.translate(lx[s], ly[s])
+        c.rotate(angle[s])                           // on tourne la feuille pour que le segment soit « à plat »
+        zone.set(0f, -demiLargeur, longueur[s], demiLargeur)
+        c.drawBitmap(tache, tranche, zone, tampon)
+        c.restore()
+    }
+    // Écran rapide (plus de 90 images/s) : on ne dessine qu'une image sur deux.
+    private var ecranRapide = false
+    private val redessiner = Runnable { invalidate() }
+    private val sauterUneImage = Runnable { postOnAnimation(redessiner) }
     private val trait = Paint(Paint.ANTI_ALIAS_FLAG).apply {
         style = Paint.Style.STROKE; strokeCap = Paint.Cap.ROUND; xfermode = ajout
     }
@@ -227,6 +276,8 @@ class VueSonore(context: Context) : View(context) {
     private val freq = FloatArray(N)                      // où est le segment sur le « piano » : 0 = bas (grave) … 1 = haut (aigu)
     private val hasard = FloatArray(N) { ((it * 7919) % 101) / 100f }
     private val intensites = FloatArray(N)
+    private val angle = FloatArray(N)                     // la direction de chaque segment (en degrés) et sa longueur
+    private val longueur = FloatArray(N)
     private var w = 0f
     private var ht = 0f
 
@@ -243,6 +294,8 @@ class VueSonore(context: Context) : View(context) {
             pointDuTour(s, marge / 2f, coin).let { bx[k] = it[0]; by[k] = it[1] }
         }
         for (k in 0 until N) {
+            angle[k] = Math.toDegrees(atan2((ly[k + 1] - ly[k]).toDouble(), (lx[k + 1] - lx[k]).toDouble())).toFloat()
+            longueur[k] = hypot(lx[k + 1] - lx[k], ly[k + 1] - ly[k])
             freq[k] = 1f - abs(2f * (k + 0.5f) / N - 1f)
             for (p in 0..1) couleurs[p][k] = teinte(PALETTES[p], freq[k])
         }
@@ -348,6 +401,7 @@ class VueSonore(context: Context) : View(context) {
     private fun verifier() {
         val paysage = resources.configuration.orientation == Configuration.ORIENTATION_LANDSCAPE
         val musique = try { audio.isMusicActive } catch (_: Exception) { false }
+        ecranRapide = try { (display?.refreshRate ?: 60f) > 90f } catch (_: Throwable) { false }
         val plein = pleinEcran()
         silences = if (musique) 0 else silences + 1
         val voulu = !paysage && !plein && silences < 3              // 3 s sans musique : on arrête
@@ -390,10 +444,8 @@ class VueSonore(context: Context) : View(context) {
     // Un petit ÉCLAT en étoile à 4 branches (sur les aigus).
     private fun eclat(c: Canvas, x: Float, y: Float, taille: Float, force: Float, couleur: Int) {
         if (force * presence < 0.02f) return
-        plein.color = couleur
-        plein.maskFilter = flouFin; plein.alpha = opacite(force * 0.6f); c.drawCircle(x, y, taille * 0.6f * d, plein)
-        plein.maskFilter = null
-        trait.maskFilter = null; trait.color = couleur
+        tamponner(c, x, y, taille * 1.5f * d, couleur, force * 0.6f)
+        trait.color = couleur
         trait.strokeWidth = 0.8f * d; trait.alpha = opacite(force)
         c.drawLine(x - taille * d, y, x + taille * d, y, trait)
         c.drawLine(x, y - taille * d, x, y + taille * d, trait)
@@ -417,7 +469,7 @@ class VueSonore(context: Context) : View(context) {
         }
 
         // on adoucit les mesures : montée rapide, descente lente
-        g += (EcouteSon.grave - g) * min(1f, dt * (if (EcouteSon.grave > g) 30f else 6f))
+        g += (EcouteSon.grave - g) * min(1f, dt * (if (EcouteSon.grave > g) 45f else 8f))
         m += (EcouteSon.medium - m) * min(1f, dt * (if (EcouteSon.medium > m) 25f else 5f))
         a += (EcouteSon.aigu - a) * min(1f, dt * (if (EcouteSon.aigu > a) 40f else 12f))
         h += (EcouteSon.hauteur - h) * min(1f, dt * 8f)
@@ -428,7 +480,8 @@ class VueSonore(context: Context) : View(context) {
         memoireG[rang] = g
 
         prisme(c, couleurs[ReactionSonore.style.coerceIn(0, 1)], PALETTES[ReactionSonore.style.coerceIn(0, 1)][3])
-        postInvalidateOnAnimation()                  // … et on demande l'image suivante
+        // … et on demande l'image suivante (sur un écran rapide : celle d'après, donc 60 images/s)
+        if (ecranRapide) postOnAnimation(sauterUneImage) else postInvalidateOnAnimation()
     }
 
     // ================= LE PRISME, TOUR COMPLET =================
@@ -436,7 +489,9 @@ class VueSonore(context: Context) : View(context) {
         // 1) LA FORCE de chaque segment, selon sa place sur le « piano »
         for (k in 0 until N) {
             val f = freq[k]
-            var i = ilYA(f * 0.42f) * max(0f, 1f - f / 0.62f).pow(1.3f)      // basses : partent du bas et montent des deux côtés
+            // basses : partent du bas et montent des deux côtés. (10/11 : la vague monte 2 fois plus vite, 0,22 au
+            // lieu de 0,42 : sinon les côtés s'allumaient jusqu'à un quart de seconde APRÈS le coup, d'où le « hors rythme »)
+            var i = ilYA(f * 0.22f) * max(0f, 1f - f / 0.62f).pow(1.3f)
             i += m * cloche(f, 0.42f + 0.30f * h, 0.065f)                    // mélodie : une zone qui suit la note
             i += 0.8f * claque * cloche(f, 0.80f, 0.06f)                     // son sec (caisse claire)
             i += a * (0.3f + 0.7f * hasard[k]) * max(0f, (f - 0.87f) / 0.13f)   // aigus : scintillement tout en haut
@@ -453,22 +508,20 @@ class VueSonore(context: Context) : View(context) {
             c.drawLine(bx[k], by[k], bx[k + 1], by[k + 1], bande)
         }
 
-        // 3) LE DÉBORDEMENT vers l'intérieur : deux halos flous (par groupes de 4 segments, moins de travail)
-        var k = 0
-        while (k < N) {
-            val i = (intensites[k] + intensites[k + 1] + intensites[k + 2] + intensites[k + 3]) / 4f
+        // 3) LE DÉBORDEMENT vers l'intérieur, plus grand et plus fort avec le son :
+        //    - le grand halo : une tache collée au milieu de chaque segment (elles se recouvrent largement :
+        //      on ne voit qu'une lueur continue) ;
+        //    - le petit halo serré contre la ligne : une bande de lumière étirée sur chaque segment.
+        for (s in 0 until N) {
+            val i = intensites[s]
             if (i > 0.04f) {
-                trait.color = coul[k + 1]
-                trait.maskFilter = flouLarge; trait.strokeWidth = (1f + 2.2f * i) * 5f * d; trait.alpha = opacite(0.55f * (0.14f + 0.86f * i))
-                c.drawLine(lx[k], ly[k], lx[k + 4], ly[k + 4], trait)
-                trait.maskFilter = flouMoyen; trait.strokeWidth = (1f + 2.2f * i) * 2.2f * d; trait.alpha = opacite(0.70f * (0.14f + 0.86f * i))
-                c.drawLine(lx[k], ly[k], lx[k + 4], ly[k + 4], trait)
+                val base = 0.14f + 0.86f * i
+                tamponner(c, (lx[s] + lx[s + 1]) / 2f, (ly[s] + ly[s + 1]) / 2f, (24f + 6f * i) * d, coul[s], 0.48f * base * (0.2f + 0.4f * i))
+                etirer(c, s, (7f + i) * d, coul[s], 0.70f * base * (0.30f + 0.65f * i))
             }
-            k += 4
         }
 
         // 4) LA LIGNE elle-même, puis son cœur blanc là où elle est forte
-        trait.maskFilter = null
         for (s in 0 until N) {
             val i = intensites[s]
             trait.color = coul[s]
