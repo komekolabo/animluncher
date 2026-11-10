@@ -51,14 +51,16 @@ import java.nio.ByteBuffer
 //     une fine ligne lumineuse qui fait le TOUR COMPLET de l'écran, à 5 dp du bord. La bande entre la
 //     ligne et le bord se remplit de couleur selon le son, et la lumière déborde un peu vers l'intérieur.
 //     C'est un ÉGALISEUR enroulé autour de l'écran : chaque point du tour suit SA tranche de son (graves en
-//     bas, aigus en haut). Depuis le 10/11 au soir la ligne reste DROITE (la ligne qui s'écartait du bord
-//     faisait des bosses : Will a trouvé ça moins beau) et c'est la LUMIÈRE qui joue la musique : chaque endroit
-//     s'allume quand SA tranche de son vient d'arriver (« attaques » dans EcouteSon.kt), puis retombe.
-//   - 2 COULEURS, choisies par Will dans la fenêtre du rond : une pour les moments CALMES, une pour quand
-//     ÇA ENVOIE (refrain, drop). L'app passe de l'une à l'autre toute seule (« fort » dans EcouteSon.kt), en
-//     fondu d'un quart de seconde. (Remplace les 2 palettes « chaude / froide » d'avant.)
+//     bas, aigus en haut). La ligne reste DROITE (celle qui s'écartait du bord faisait des bosses : Will a
+//     trouvé ça moins beau), et chaque endroit brille selon la FORCE de sa tranche de son (« spectre » dans
+//     EcouteSon.kt) : c'est l'accompagnement que Will a préféré (essai « attaques » du 10/11 au soir abandonné).
+//     Le tour est découpé en 360 petits morceaux et la lumière est LISSÉE d'un morceau à l'autre : Will voyait
+//     « plein de petits rectangles collés ».
+//   - 3 COULEURS, choisies par Will dans la fenêtre du rond : une pendant que l'app ÉCOUTE le début du morceau
+//     (vert), une pour les moments CALMES (bleu), une pour quand ÇA ENVOIE (rouge-orangé). L'app passe de l'une
+//     à l'autre toute seule (« moment » dans EcouteSon.kt), en fondu d'un quart de seconde.
 //
-// Le choix (allumé ou non, les deux couleurs) est rangé dans un carnet à part, « son ».
+// Le choix (allumé ou non, les trois couleurs) est rangé dans un carnet à part, « son ».
 //
 // ALLÈGEMENT (10/11, Will : les barres lumineuses faisaient ramer le téléphone). Le coupable : le « flou »
 // (BlurMaskFilter). À CHAQUE image, le téléphone devait recalculer 90 grands traits flous, pixel par pixel.
@@ -69,10 +71,12 @@ import java.nio.ByteBuffer
 // lueur, et deux fois moins de travail.
 object ReactionSonore {
     private const val CARNET = "son"
-    // LES DEUX COULEURS. Une couleur = une « teinte » : un angle de 0 à 360 sur la roue des couleurs
-    // (0 = rouge, 120 = vert, 240 = bleu). L'app en tire toute seule un dégradé de 4 couleurs (voir palette()).
-    const val TEINTE_CALME = 215f     // bleu
-    const val TEINTE_FORT = 6f        // rouge-orangé
+    // LES TROIS COULEURS, dans l'ordre de EcouteSon.moment : 0 = écoute, 1 = calme, 2 = ça envoie.
+    // Une couleur = une « teinte » : un angle de 0 à 360 sur la roue des couleurs (0 = rouge, 120 = vert,
+    // 240 = bleu). L'app en tire toute seule un dégradé de 4 couleurs (voir palette()).
+    val TEINTES_DEFAUT = floatArrayOf(135f, 215f, 6f)         // vert, bleu, rouge-orangé
+    private val CLES = arrayOf("teinte_ecoute", "teinte_calme", "teinte_fort")
+    private val teintes = floatArrayOf(135f, 215f, 6f)
 
     private fun carnet(c: Context) = c.applicationContext.getSharedPreferences(CARNET, Context.MODE_PRIVATE)
 
@@ -82,41 +86,38 @@ object ReactionSonore {
         synchroniser(c)
     }
 
-    @Volatile var teinteCalme = TEINTE_CALME
-        private set
-    @Volatile var teinteFort = TEINTE_FORT
-        private set
+    fun teinte(mode: Int): Float = teintes[mode.coerceIn(0, 2)]
     // Augmente de 1 à chaque changement de couleur : le dessin sait ainsi qu'il doit refaire ses dégradés.
     @Volatile var versionCouleurs = 0
         private set
 
     fun lireCouleurs(c: Context) {
-        teinteCalme = carnet(c).getFloat("teinte_calme", TEINTE_CALME)
-        teinteFort = carnet(c).getFloat("teinte_fort", TEINTE_FORT)
+        for (m in 0..2) teintes[m] = carnet(c).getFloat(CLES[m], TEINTES_DEFAUT[m])
         versionCouleurs++
     }
 
-    // Change une des deux couleurs (fort = true : celle de « quand ça envoie »). Le dessin suit tout de suite.
+    // Change une des trois couleurs (mode : 0 = écoute, 1 = calme, 2 = ça envoie). Le dessin suit tout de suite.
     // « garder » = l'écrire aussi dans le carnet (on ne le fait qu'au lâcher du doigt, pas à chaque millimètre).
-    fun definirTeinte(c: Context, fort: Boolean, teinte: Float, garder: Boolean) {
-        val t = ((teinte % 360f) + 360f) % 360f
-        if (fort) teinteFort = t else teinteCalme = t
+    fun definirTeinte(c: Context, mode: Int, nouvelle: Float, garder: Boolean) {
+        val m = mode.coerceIn(0, 2)
+        val t = ((nouvelle % 360f) + 360f) % 360f
+        teintes[m] = t
         versionCouleurs++
-        if (garder) carnet(c).edit().putFloat(if (fort) "teinte_fort" else "teinte_calme", t).apply()
+        if (garder) carnet(c).edit().putFloat(CLES[m], t).apply()
     }
 
     // LE DÉGRADÉ tiré d'une teinte : 4 couleurs, du grave (bas de l'écran) à l'aigu (haut).
     // On tourne un peu autour de la teinte choisie (-28°, pile dessus, +30°), puis un presque-blanc pour les aigus.
-    // La couleur de « ça envoie » est un peu plus vive (saturation 0,82 au lieu de 0,75).
-    fun palette(teinte: Float, fort: Boolean): IntArray {
-        val vif = if (fort) 0.82f else 0.75f
+    // Plus le moment est fort, plus la couleur est vive (saturation 0,70 / 0,75 / 0,82).
+    fun palette(angleChoisi: Float, mode: Int): IntArray {
+        val vif = when (mode) { 2 -> 0.82f; 1 -> 0.75f; else -> 0.70f }
         fun couleur(angle: Float, saturation: Float) =
             Color.HSVToColor(floatArrayOf(((angle % 360f) + 360f) % 360f, saturation.coerceIn(0f, 1f), 1f))
-        return intArrayOf(couleur(teinte - 28f, vif), couleur(teinte, vif * 0.92f), couleur(teinte + 30f, vif * 0.8f), couleur(teinte + 30f, 0.18f))
+        return intArrayOf(couleur(angleChoisi - 28f, vif), couleur(angleChoisi, vif * 0.92f), couleur(angleChoisi + 30f, vif * 0.8f), couleur(angleChoisi + 30f, 0.18f))
     }
 
-    // L'APERÇU pendant qu'on choisit une couleur dans la fenêtre du rond : -1 = non, 0 = on montre la couleur
-    // « calme », 1 = celle de « ça envoie ». Le tour s'allume alors même sans musique, pour voir ce qu'on règle.
+    // L'APERÇU pendant qu'on choisit une couleur dans la fenêtre du rond : -1 = non, sinon la couleur qu'on
+    // montre (0 = écoute, 1 = calme, 2 = ça envoie). Le tour s'allume alors même sans musique, pour voir ce qu'on règle.
     @Volatile var apercu = -1
         private set
     fun montrer(mode: Int) {
@@ -242,10 +243,10 @@ class VueSonore(context: Context) : View(context) {
     private var a = 0f                   // les aigus (pour les petits éclats du haut)
     private var coup = 0f                // le coup de basse du moment
 
-    // ---------- les 2 COULEURS (calme / ça envoie) et le fondu entre elles ----------
+    // ---------- les 3 COULEURS (écoute / calme / ça envoie) et le fondu entre elles ----------
     private var versionVue = -1          // la version des couleurs pour laquelle nos dégradés sont faits
-    private var melangeFort = 0f         // 0 = couleur calme … 1 = couleur « ça envoie » (glisse en ~0,25 s)
-    private val clairs = IntArray(2)     // le presque-blanc de chaque couleur (pour les éclats des aigus)
+    private val poids = floatArrayOf(1f, 0f, 0f)     // la part de chaque couleur dans l'image (glisse en ~0,25 s)
+    private val clairs = IntArray(3)     // le presque-blanc de chaque couleur (pour les éclats des aigus)
 
     // ---------- les pinceaux, créés une seule fois ----------
     private val ajout = PorterDuffXfermode(PorterDuff.Mode.ADD)     // la lumière s'ADDITIONNE (comme de vraies lampes)
@@ -271,16 +272,16 @@ class VueSonore(context: Context) : View(context) {
         c.drawBitmap(tache, null, zone, tampon)
     }
     // LA BANDE DE LUMIÈRE : la même tache, mais on n'en prend que la tranche du MILIEU (2 pixels de large), étirée
-    // le long d'un segment du tour : pleine sur la ligne, transparente de chaque côté. Sert au halo serré.
+    // le long d'une PAIRE de segments du tour : pleine sur la ligne, transparente de chaque côté. Sert au halo serré.
     private val tranche = Rect(31, 0, 33, 64)
-    private fun etirer(c: Canvas, s: Int, demiLargeur: Float, couleur: Int, force: Float) {
+    private fun etirer(c: Canvas, paire: Int, demiLargeur: Float, couleur: Int, force: Float) {
         val al = opacite(force)
         if (al <= 0) return
         tampon.color = couleur; tampon.alpha = al
         c.save()
-        c.translate(lx[s], ly[s])
-        c.rotate(angle[s])                           // on tourne la feuille pour que le segment soit « à plat »
-        zone.set(0f, -demiLargeur, longueur[s], demiLargeur)
+        c.translate(lx[2 * paire], ly[2 * paire])
+        c.rotate(angle[paire])                       // on tourne la feuille pour que le morceau soit « à plat »
+        zone.set(0f, -demiLargeur, longueur[paire], demiLargeur)
         c.drawBitmap(tache, tranche, zone, tampon)
         c.restore()
     }
@@ -297,18 +298,24 @@ class VueSonore(context: Context) : View(context) {
     private val plein = Paint(Paint.ANTI_ALIAS_FLAG).apply { style = Paint.Style.FILL; xfermode = ajout }
 
     // ---------- LE TOUR, découpé en N petits segments (calculé quand la taille de l'écran est connue) ----------
-    private val N = 180
+    // 360 segments (180 avant le 10/11 au soir) : deux fois plus fins, pour ne plus voir de « petits rectangles ».
+    // Le halo, lui, reste dessiné par PAIRES de segments (180 morceaux) : il est flou, ça ne se voit pas, et le
+    // téléphone n'a pas plus de travail qu'avant pour la partie la plus lourde.
+    private val N = 360
+    private val PAIRES = N / 2
     private val marge = 5f * d                   // la ligne est à 5 dp du bord ; la BANDE colorée est entre les deux
     private val lx = FloatArray(N + 1)           // la ligne
     private val ly = FloatArray(N + 1)
     private val bx = FloatArray(N + 1)           // le milieu de la bande (à mi-chemin entre la ligne et le bord)
     private val by = FloatArray(N + 1)
-    private val couleurs = Array(2) { IntArray(N) }      // la couleur de chaque segment : [0] = calme, [1] = ça envoie
+    private val couleurs = Array(3) { IntArray(N) }      // la couleur de chaque segment : [0] = écoute, [1] = calme, [2] = ça envoie
     private val courant = IntArray(N)                     // la couleur de chaque segment pour CETTE image (le mélange des deux)
     private val freq = FloatArray(N)                      // où est le segment sur le « piano » : 0 = bas (grave) … 1 = haut (aigu)
     private val intensites = FloatArray(N)
-    private val angle = FloatArray(N)                     // la direction de chaque segment (en degrés) et sa longueur
-    private val longueur = FloatArray(N)
+    private val brutes = FloatArray(N)                    // les intensités avant lissage, puis à mi-lissage
+    private val miLisse = FloatArray(N)
+    private val angle = FloatArray(PAIRES)                // la direction de chaque paire de segments (en degrés) et sa longueur
+    private val longueur = FloatArray(PAIRES)
     private var w = 0f
     private var ht = 0f
 
@@ -324,21 +331,22 @@ class VueSonore(context: Context) : View(context) {
             pointDuTour(s, marge, coin).let { lx[k] = it[0]; ly[k] = it[1] }
             pointDuTour(s, marge / 2f, coin).let { bx[k] = it[0]; by[k] = it[1] }
         }
-        for (k in 0 until N) {
-            angle[k] = Math.toDegrees(atan2((ly[k + 1] - ly[k]).toDouble(), (lx[k + 1] - lx[k]).toDouble())).toFloat()
-            longueur[k] = hypot(lx[k + 1] - lx[k], ly[k + 1] - ly[k])
-            freq[k] = 1f - abs(2f * (k + 0.5f) / N - 1f)
+        for (k in 0 until N) freq[k] = 1f - abs(2f * (k + 0.5f) / N - 1f)
+        for (j in 0 until PAIRES) {
+            val k = 2 * j
+            angle[j] = Math.toDegrees(atan2((ly[k + 2] - ly[k]).toDouble(), (lx[k + 2] - lx[k]).toDouble())).toFloat()
+            longueur[j] = hypot(lx[k + 2] - lx[k], ly[k + 2] - ly[k])
         }
         versionVue = -1                              // (les dégradés seront refaits à la prochaine image)
     }
 
-    // Refait les dégradés des deux couleurs, seulement si Will vient d'en changer une.
+    // Refait les dégradés des trois couleurs, seulement si Will vient d'en changer une.
     private fun recolorer() {
         val version = ReactionSonore.versionCouleurs
         if (version == versionVue) return
         versionVue = version
-        for (p in 0..1) {
-            val pal = ReactionSonore.palette(if (p == 1) ReactionSonore.teinteFort else ReactionSonore.teinteCalme, p == 1)
+        for (p in 0..2) {
+            val pal = ReactionSonore.palette(ReactionSonore.teinte(p), p)
             for (k in 0 until N) couleurs[p][k] = teinte(pal, freq[k])
             clairs[p] = pal[3]
         }
@@ -383,6 +391,12 @@ class VueSonore(context: Context) : View(context) {
             (Color.green(c1) + (Color.green(c2) - Color.green(c1)) * x).toInt(),
             (Color.blue(c1) + (Color.blue(c2) - Color.blue(c1)) * x).toInt())
     }
+
+    // Le mélange de 3 couleurs, chacune avec sa part (les 3 parts font 1 au total).
+    private fun trio(c0: Int, c1: Int, c2: Int, p0: Float, p1: Float, p2: Float): Int =
+        Color.rgb((Color.red(c0) * p0 + Color.red(c1) * p1 + Color.red(c2) * p2).toInt().coerceIn(0, 255),
+            (Color.green(c0) * p0 + Color.green(c1) * p1 + Color.green(c2) * p2).toInt().coerceIn(0, 255),
+            (Color.blue(c0) * p0 + Color.blue(c1) * p1 + Color.blue(c2) * p2).toInt().coerceIn(0, 255))
 
     // ---------- quand jouer ? (vérifié une fois par seconde) ----------
     private val verification = object : Runnable {
@@ -512,35 +526,42 @@ class VueSonore(context: Context) : View(context) {
             return
         }
 
-        // LA COULEUR DU MOMENT : calme ou « ça envoie » ? (pendant l'aperçu d'une couleur, c'est celle qu'on règle.)
-        // On ne saute pas d'une couleur à l'autre : « melangeFort » glisse de 0 à 1 en un quart de seconde.
+        // LA COULEUR DU MOMENT : écoute, calme ou « ça envoie » ? (pendant l'aperçu d'une couleur, c'est celle qu'on règle.)
+        // On ne saute pas d'une couleur à l'autre : la part de chacune (« poids ») glisse en un quart de seconde.
         recolorer()
         val montre = ReactionSonore.apercu
-        val cible = if (montre >= 0) montre.toFloat() else if (EcouteSon.fort) 1f else 0f
-        melangeFort += (cible - melangeFort) * (1f - exp(-dt / 0.25f))
-        for (k in 0 until N) courant[k] = melange(couleurs[0][k], couleurs[1][k], melangeFort)
+        val mode = if (montre >= 0) montre else EcouteSon.moment
+        val glisse = 1f - exp(-dt / 0.25f)
+        var somme = 0f
+        for (p in 0..2) {
+            poids[p] += ((if (p == mode) 1f else 0f) - poids[p]) * glisse
+            somme += poids[p]
+        }
+        if (somme < 0.001f) { poids[0] = 1f; somme = 1f }
+        val p0 = poids[0] / somme
+        val p1 = poids[1] / somme
+        val p2 = poids[2] / somme
+        for (k in 0 until N) courant[k] = trio(couleurs[0][k], couleurs[1][k], couleurs[2][k], p0, p1, p2)
 
         // les aigus (pour les petits éclats du haut) : la moyenne des 6 tranches les plus aiguës
-        val at = EcouteSon.attaques
+        val sp = EcouteSon.spectre
         var haut = 0f
-        for (b in EcouteSon.BANDES - 6 until EcouteSon.BANDES) haut += at[b]
+        for (b in EcouteSon.BANDES - 6 until EcouteSon.BANDES) haut += sp[b]
         a = haut / 6f
-        // le coup de basse : on prend le plus fort entre celui qui arrive et le nôtre qui retombe (en ~0,25 s)
-        coup = max(EcouteSon.frappe, coup * exp(-dt / 0.25f))
+        // le coup de basse : on prend le plus fort entre celui qui arrive et le nôtre qui retombe
+        coup = max(EcouteSon.coup, coup * exp(-dt / 0.15f))
 
-        prisme(c, courant, melange(clairs[0], clairs[1], melangeFort))
+        prisme(c, courant, trio(clairs[0], clairs[1], clairs[2], p0, p1, p2))
         // … et on demande l'image suivante (sur un écran rapide : celle d'après, donc 60 images/s)
         if (ecranRapide) postOnAnimation(sauterUneImage) else postInvalidateOnAnimation()
     }
 
     // ================= LE PRISME, TOUR COMPLET =================
     private fun prisme(c: Canvas, coul: IntArray, eclatCouleur: Int) {
-        // 1) LA FORCE de chaque segment (10/11 au soir : les ATTAQUES, plus le niveau).
+        // 1) LA FORCE de chaque segment = la force de SA tranche de son (le spectre : l'accompagnement préféré de Will).
         //    Le tour est un égaliseur : très graves en bas, de plus en plus aigu en montant, pareil à gauche et à
-        //    droite. Un endroit s'allume quand SA tranche de son vient d'arriver, puis retombe en ~0,2 s.
-        //    Entre deux coups il ne reste qu'un fil très discret (3 %) : c'est ce noir qui fait sentir le rythme.
-        //    Et à chaque coup de basse, tout le tour bat (surtout en bas).
-        val at = EcouteSon.attaques
+        //    droite. Une note qu'on entend allume TOUJOURS le même endroit. Et sur un coup de basse, tout le tour bat.
+        val sp = EcouteSon.spectre
         val fin = EcouteSon.BANDES - 1
         // (pendant l'aperçu d'une couleur : une lumière moyenne qui respire, pour bien voir la couleur sans musique)
         val demo = if (ReactionSonore.apercu >= 0) 0.42f + 0.10f * sin(t * 2.2f) else 0f
@@ -548,9 +569,15 @@ class VueSonore(context: Context) : View(context) {
             val f = freq[k]                                      // 0 = en bas (grave) … 1 = en haut (aigu)
             val pos = f * fin
             val b = pos.toInt().coerceIn(0, fin - 1)
-            val v = at[b] + (at[b + 1] - at[b]) * (pos - b)      // (entre deux tranches : on glisse de l'une à l'autre)
-            intensites[k] = max(demo, min(1f, 0.03f + 0.85f * coup * (1f - 0.35f * f) + 0.65f * v))
+            val q = pos - b
+            // entre deux tranches on glisse de l'une à l'autre en courbe douce (pas en ligne brisée)
+            val v = sp[b] + (sp[b + 1] - sp[b]) * (q * q * (3f - 2f * q))
+            brutes[k] = max(demo, min(1f, 0.85f * v + 0.30f * coup * (1f - 0.5f * f)))
         }
+        // LE LISSAGE : chaque segment se mélange un peu avec ses deux voisins (un quart, la moitié, un quart),
+        // deux fois de suite. Deux segments qui se touchent ont alors presque la même lumière : plus de marches.
+        for (k in 0 until N) miLisse[k] = (brutes[(k + N - 1) % N] + 2f * brutes[k] + brutes[(k + 1) % N]) / 4f
+        for (k in 0 until N) intensites[k] = (miLisse[(k + N - 1) % N] + 2f * miLisse[k] + miLisse[(k + 1) % N]) / 4f
 
         // 2) LA BANDE entre la ligne et le bord : chaque morceau prend la couleur de sa place,
         //    plus ou moins forte (et plus claire, vers le blanc) selon le son à cet endroit
@@ -558,7 +585,7 @@ class VueSonore(context: Context) : View(context) {
         for (k in 0 until N) {
             val i = intensites[k]
             bande.color = melange(coul[k], Color.WHITE, 0.35f * i * i)
-            bande.alpha = opacite(0.06f + 0.84f * i)
+            bande.alpha = opacite(0.10f + 0.80f * i)
             c.drawLine(bx[k], by[k], bx[k + 1], by[k + 1], bande)
         }
 
@@ -566,14 +593,15 @@ class VueSonore(context: Context) : View(context) {
         //    - le grand halo : une tache collée au milieu de chaque segment (elles se recouvrent largement :
         //      on ne voit qu'une lueur continue) ;
         //    - le petit halo serré contre la ligne : une bande de lumière étirée sur chaque segment.
-        for (s in 0 until N) {
-            val i = intensites[s]
+        for (j in 0 until PAIRES) {
+            val s = 2 * j
+            val i = (intensites[s] + intensites[s + 1]) / 2f
             if (i > 0.04f) {
                 val base = 0.14f + 0.86f * i
                 // (le halo GROSSIT sur les coups de basse : c'est le « débordement » qui bat)
                 // (luminosité réglée « entre les deux versions », à la demande de Will)
-                tamponner(c, (lx[s] + lx[s + 1]) / 2f, (ly[s] + ly[s + 1]) / 2f, (24f + 6f * i + 7f * coup) * d, coul[s], 0.48f * base * (0.2f + 0.4f * i + 0.12f * coup))
-                etirer(c, s, (7f + i) * d, coul[s], 0.70f * base * (0.30f + 0.65f * i))
+                tamponner(c, lx[s + 1], ly[s + 1], (24f + 6f * i + 7f * coup) * d, coul[s], 0.48f * base * (0.2f + 0.4f * i + 0.12f * coup))
+                etirer(c, j, (7f + i) * d, coul[s], 0.70f * base * (0.30f + 0.65f * i))
             }
         }
 

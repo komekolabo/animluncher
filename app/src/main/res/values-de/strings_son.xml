@@ -10,6 +10,8 @@
     <string name="son_expl_micro">Android fragt nach dem Mikrofonzugriff: Er ist nötig, um den Pegel zu lesen.</string>
     <string name="son_service">Aktiviere zuerst AnimLauncher in den Bedienungshilfen: Der Effekt braucht das, um zu erscheinen.</string>
     <string name="son_couleurs">Farben</string>
+    <string name="son_ecoute">Zuhören</string>
+    <string name="son_ecoute_desc">Bis die App den Track erfasst hat</string>
     <string name="son_calme">Ruhig</string>
     <string name="son_calme_desc">Wenn die Musik atmet</string>
     <string name="son_fort">Wenn es abgeht</string>

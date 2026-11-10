@@ -10,6 +10,8 @@
     <string name="son_expl_micro">Android va demander l’accès au micro : c’est obligatoire pour lire le niveau du son.</string>
     <string name="son_service">Active d’abord AnimLauncher dans les réglages d’accessibilité : l’effet en a besoin pour s’afficher.</string>
     <string name="son_couleurs">Couleurs</string>
+    <string name="son_ecoute">Écoute</string>
+    <string name="son_ecoute_desc">Le temps de capter le morceau</string>
     <string name="son_calme">Calme</string>
     <string name="son_calme_desc">Quand la musique respire</string>
     <string name="son_fort">Quand ça envoie</string>
