@@ -153,6 +153,17 @@ Objectif : la publier sur le Google Play Store, avec une pub non invasive.
   chaude/froide (clé « style ») n'existent plus. Le diagnostic affiche « Moment : calme/ça envoie (xx %) ».
   PAS ENCORE TESTÉ sur le téléphone : les seuils (62/38, 1,6) et la sensibilité des attaques ont été réglés sur
   le son propre d'une vidéo, pas sur les mesures 8 bits du Visualizer -> à ajuster selon le retour de Will.
+  V4 (10/11, 21h30, envoyée SANS aperçu à la demande de Will) — CORRIGE la V3 : (1) Will préfère l'accompagnement
+  d'avant : l'intensité redevient le NIVEAU du spectre (0,85·spectre + 0,30·coup), `attaques`/`frappe` sont encore
+  calculés mais plus utilisés ; la ligne reste droite ; (2) « petits rectangles » visibles -> 360 segments au lieu
+  de 180 + lissage (1/4, 1/2, 1/4 deux fois) ; le halo reste dessiné par paires (180) pour ne pas alourdir ;
+  (3) 3 COULEURS : `EcouteSon.moment` 0 = ÉCOUTE (8 premières secondes, vert 135), 1 = calme, 2 = ça envoie ;
+  carnet « son » : `teinte_ecoute`, `teinte_calme`, `teinte_fort`. Protocole dans `EcouteSon.situer()` : repères
+  « habituels » qui bougent (descendent en 8 s, montent en 30 s, 90 s pendant un « ça envoie »), 3 indices qui
+  votent (niveau > 1,35 x, basses > 1,5 x, cadence > 1,3 x ; 2 sur 3 ; sortie à 1,15 / 1,2 / 1,1), couleur tenue
+  au moins 2 s, signature du drop (creux bref puis coup de basse fort -> rouge immédiat), silence > 1 s -> retour
+  à l'écoute. Rien de tout ça n'a été testé sur le téléphone ni même en aperçu : seuils à régler avec Will
+  (le diagnostic affiche « Moment : … (xx %) » = niveau / habituel).
   Idées batterie proposées, sans réponse : pause écran éteint, arrêt en économie d'énergie, mode 30 images/s.
   Will aimait aussi le style « Souffle » (les cartes de l'accueil qui respirent sur les basses) : pas encore codé.
 - `Reglages.kt` : kill switch, « seulement au démarrage », réglages par app (durée, variantes).
