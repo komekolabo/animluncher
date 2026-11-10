@@ -84,14 +84,16 @@ object EcouteSon {
     private var coupVif = 0f                       // le coup « en direct » (avant le retard)
 
     // LE PALIER (point 8) : 1 = très lent, 2 = calme, 3 = moyen, 4 = ça envoie, 5 = très fort.
-    // Les 4 frontières entre paliers, sur l'échelle d'« énergie » (voir situer()). Calées le 10/11 sur 4 extraits
-    // envoyés par Will : son morceau lent mesure ~0,39, ses deux moyens ~0,50 et ~0,56, son rapide ~0,70.
-    val SEUILS = floatArrayOf(0.30f, 0.445f, 0.63f, 0.80f)
+    // Les 4 frontières entre paliers, sur l'échelle d'« énergie » (voir situer()). Calées le 10/11 sur 5 extraits
+    // envoyés par Will : son morceau lent mesure ~0,44, ses deux moyens ~0,61 et ~0,64, son rapide ~0,93,
+    // et le drop qu'il veut « au moins rouge » ~0,68 (précédé d'une intro à ~0,31).
+    val SEUILS = floatArrayOf(0.27f, 0.52f, 0.655f, 1.08f)
     @Volatile var palier = 3
         private set
     @Volatile var energieVue = 0                   // pour le diagnostic : l'énergie du moment x 100
         private set
     private var energie = 0f
+    private var habitude = 0f                      // l'énergie « habituelle » de ce morceau (moyenne lente, ~25 s)
     @Volatile private var creteVive = -1f          // à quel point le son est « plein » en ce moment (-1 = inconnu)
     private var onde = ByteArray(0)                // la forme du son (réutilisée : aucune mémoire gaspillée)
     private var duree = 0f                         // depuis combien de secondes le son joue sans vrai silence
@@ -144,7 +146,7 @@ object EcouteSon {
             mesureOk = try { v.setMeasurementMode(Visualizer.MEASUREMENT_MODE_PEAK_RMS) == Visualizer.SUCCESS } catch (_: Throwable) { false }
             refVolume = 0.0001f; basGrave = 0f; depuisCoup = 1f; coup = 0f; coupVif = 0f
             valeur.fill(0f); spectre.fill(0f); memCoup.fill(0f); for (m in memSpectre) m.fill(0f)
-            palier = 3; energieVue = 0; energie = 0f; creteVive = -1f; duree = 0f; muet = 0f; depuisPalier = 0f
+            palier = 3; energieVue = 0; energie = 0f; habitude = 0f; creteVive = -1f; duree = 0f; muet = 0f; depuisPalier = 0f
             v.setEnabled(true)
             visu = v
             ratees = 0; moyGrave = 0f; derniereMesure = 0L
@@ -268,26 +270,33 @@ object EcouteSon {
 
     // SUR QUEL PALIER EST LA MUSIQUE ? (point 8). Appelé à chaque mesure.
     //   partBasses = la part des basses (sous 180 Hz) dans tout le son, de 0 à 1.
-    // L'ÉNERGIE = à quel point le son est plein (voir lireCrete), gonflé quand les basses dominent
-    // (plus de la moitié du son). Elle est lissée sur ~2 secondes : un seul coup ne change pas le palier.
-    // Ensuite on regarde entre quelles frontières (SEUILS) elle tombe. Pour éviter que ça clignote quand
-    // l'énergie est pile sur une frontière : il faut la dépasser un peu (0,02) et un palier dure au moins 1,5 s.
+    // L'ÉNERGIE = à quel point le son est plein (voir lireCrete), gonflé quand les basses dominent : dès qu'elles
+    // font plus de la moitié du son, elles comptent beaucoup (Will, 10/11 : « trop exigeant », un drop porté par
+    // la basse restait vert). Elle est lissée sur ~2 secondes : un seul coup ne change pas le palier.
+    // LE CONTRASTE : on retient aussi l'énergie « habituelle » du morceau (moyenne sur ~25 s). Quand la musique
+    // monte nettement au-dessus de son habitude (un drop après une intro calme), on ajoute la moitié de l'écart :
+    // c'est ce saut qu'on ressent, plus que le niveau lui-même.
+    // Ensuite on regarde entre quelles frontières (SEUILS) le résultat tombe. Pour éviter que ça clignote quand
+    // il est pile sur une frontière : il faut la dépasser un peu (0,02) et un palier dure au moins 1,5 s.
     // Les 2,5 premières secondes d'un morceau, on reste sur le palier du milieu, le temps d'avoir une mesure sûre.
     private fun situer(partBasses: Float, dt: Float) {
         val plein = creteVive
         if (plein < 0f) return
         muet = 0f
-        val brute = plein * (1f + 0.8f * max(0f, partBasses - 0.5f))
+        val brute = plein * (1f + 2.5f * max(0f, partBasses - 0.5f))
         duree += dt; depuisPalier += dt
         energie = if (energie <= 0f) brute
                   else energie + (brute - energie) * (1f - exp(-dt / (if (duree < 2.5f) 0.4f else 2f)))
-        energieVue = (energie * 100f).toInt()
+        if (duree < 2.5f) habitude = energie
+        else habitude += (energie - habitude) * (1f - exp(-dt / 25f))
+        val ressentie = energie + 0.5f * max(0f, energie - habitude)
+        energieVue = (ressentie * 100f).toInt()
         var naturel = 1                                // le palier où tombe l'énergie, sans précaution
-        for (seuil in SEUILS) if (energie > seuil) naturel++
+        for (seuil in SEUILS) if (ressentie > seuil) naturel++
         if (duree < 2.5f) { palier = 3; depuisPalier = 1.5f; return }
         if (depuisPalier < 1.5f || naturel == palier) return
-        if (naturel > palier && energie > SEUILS[palier - 1] + 0.02f) { palier = naturel; depuisPalier = 0f }
-        else if (naturel < palier && energie < SEUILS[palier - 2] - 0.02f) { palier = naturel; depuisPalier = 0f }
+        if (naturel > palier && ressentie > SEUILS[palier - 1] + 0.02f) { palier = naturel; depuisPalier = 0f }
+        else if (naturel < palier && ressentie < SEUILS[palier - 2] - 0.02f) { palier = naturel; depuisPalier = 0f }
     }
 
     private fun niveau(valeur: Float, reference: Float, seuil: Float): Float =

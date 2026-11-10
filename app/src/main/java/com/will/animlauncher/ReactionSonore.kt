@@ -58,6 +58,11 @@ import java.util.Random
 //     couche est UN SEUL trait qui fait tout le tour, et c'est sa peinture qui change le long du chemin :
 //     un « dégradé tournant » (SweepGradient) centré au milieu de l'écran, comme un phare qui éclaire chaque
 //     direction d'une couleur différente. Le téléphone fond lui-même les couleurs entre elles : plus aucun bord.
+//   - LA LUEUR FONDUE (10/11, 22h30). Le halo était fait de 7 traits de plus en plus larges posés les uns sur
+//     les autres : Will voyait leurs bords, comme de grandes bandes autour de l'écran. Maintenant le halo est
+//     peint dans une PETITE image (6 fois plus petite que l'écran), puis cette image est agrandie : en
+//     l'agrandissant, le téléphone la floute, et les bords des traits disparaissent. (Et c'est moins de travail :
+//     36 fois moins de points à colorier.)
 //   - 5 PALIERS (idée de Will, voir « palier » dans EcouteSon.kt) et 3 COULEURS réglables :
 //       1 très lent  -> couleur « calme » + des petits Z qui montent
 //       2 calme      -> couleur « calme » (bleu)
@@ -289,6 +294,12 @@ class VueSonore(context: Context) : View(context) {
     private val lettre = Paint(Paint.ANTI_ALIAS_FLAG).apply {
         typeface = Typeface.DEFAULT_BOLD; textAlign = Paint.Align.CENTER; xfermode = ajout
     }
+    // LA LUEUR : la petite image où l'on peint le halo, sa « toile » (pour dessiner dedans), et le pinceau qui la
+    // recolle sur l'écran en l'agrandissant (FILTER_BITMAP = agrandir en floutant, pas en gros carrés).
+    private val REDUCTION = 6f
+    private var lueur: Bitmap? = null
+    private var toileLueur: Canvas? = null
+    private val colleLueur = Paint(Paint.FILTER_BITMAP_FLAG).apply { xfermode = ajout }
 
     // ---------- LE TOUR (calculé quand la taille de l'écran est connue) ----------
     // M REPÈRES répartis sur le tour. Ce ne sont PAS des morceaux qu'on dessine : seulement les endroits où
@@ -327,6 +338,13 @@ class VueSonore(context: Context) : View(context) {
 
     override fun onSizeChanged(largeur: Int, hauteur: Int, ancienneL: Int, ancienneH: Int) {
         w = largeur.toFloat(); ht = hauteur.toFloat()
+        // la petite image de la lueur : 6 fois plus petite que l'écran dans chaque sens
+        try {
+            lueur?.recycle()
+            val image = Bitmap.createBitmap((largeur / REDUCTION).toInt() + 1, (hauteur / REDUCTION).toInt() + 1, Bitmap.Config.ARGB_8888)
+            lueur = image
+            toileLueur = Canvas(image)
+        } catch (_: Throwable) { lueur = null; toileLueur = null }
         // l'arrondi des coins de l'écran (Android le connaît depuis la version 12) : la ligne le suit
         var coin = 40f * d
         if (Build.VERSION.SDK_INT >= 31) {
@@ -665,17 +683,28 @@ class VueSonore(context: Context) : View(context) {
         // 3) LA BANDE entre la ligne et le bord
         couche(c, cheminBande, marge + 1f, SweepGradient(cx, cy, cBande, positions), 1f)
 
-        // 4) LE DÉBORDEMENT vers l'intérieur : le même trait, de plus en plus large et de plus en plus léger.
-        //    Empilés, ces traits font une lueur qui s'éteint doucement en s'éloignant de la ligne.
+        // 4) LE DÉBORDEMENT vers l'intérieur (la lueur fondue, voir tout en haut du fichier).
+        //    Dans la petite image : 17 traits, du plus large (70 dp) au plus étroit (6 dp), de plus en plus forts.
+        //    Chacun dépasse à peine du suivant, et l'agrandissement floute le tout : on ne voit plus qu'une
+        //    lueur qui s'éteint doucement en s'éloignant de la ligne.
         //    (Rien à dessiner quand tout est éteint : on économise le téléphone.)
         if (haloMax > 0.01f) {
             val halo = SweepGradient(cx, cy, cHalo, positions)
-            couche(c, cheminLigne, (62f + 14f * coup) * d, halo, 0.18f)
-            couche(c, cheminLigne, 44f * d, halo, 0.22f)
-            couche(c, cheminLigne, 30f * d, halo, 0.26f)
-            couche(c, cheminLigne, 16f * d, halo, 0.35f)
-            couche(c, cheminLigne, 11f * d, halo, 0.35f)
-            couche(c, cheminLigne, 7f * d, halo, 0.35f)
+            val image = lueur
+            val toile = toileLueur
+            if (image != null && toile != null) {
+                image.eraseColor(Color.TRANSPARENT)              // on efface la petite image de l'image d'avant
+                toile.save()
+                toile.scale(1f / REDUCTION, 1f / REDUCTION)      // tout ce qu'on y dessine est 6 fois plus petit
+                for (n in 0..16) {
+                    // (les traits larges s'élargissent un peu sur un coup de basse : la lueur « bat »)
+                    val largeur = 70f - 4f * n + 10f * coup * (1f - n / 16f)
+                    couche(toile, cheminLigne, largeur * d, halo, 0.033f + 0.0085f * n)
+                }
+                toile.restore()
+                zone.set(0f, 0f, image.width * REDUCTION, image.height * REDUCTION)
+                c.drawBitmap(image, null, zone, colleLueur)      // … et on la recolle, agrandie, sur l'écran
+            }
             couche(c, cheminLigne, 3.2f * d, halo, 1f)           // la ligne s'épaissit là où le son est fort
         }
 
