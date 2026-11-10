@@ -16,6 +16,7 @@ import android.graphics.PorterDuffXfermode
 import android.graphics.Rect
 import android.graphics.RectF
 import android.hardware.display.DisplayManager
+import android.media.AudioDeviceInfo
 import android.media.AudioManager
 import android.os.Build
 import android.os.Handler
@@ -49,7 +50,8 @@ import java.nio.ByteBuffer
 //   - Un seul dessin, le PRISME (validé par Will sur aperçu le 10/11, à la place des 4 styles d'avant) :
 //     une fine ligne lumineuse qui fait le TOUR COMPLET de l'écran, à 5 dp du bord. La bande entre la
 //     ligne et le bord se remplit de couleur selon le son, et la lumière déborde un peu vers l'intérieur.
-//     Rangé « comme un piano » : graves en bas, mélodie sur les côtés, aigus en haut (voir EcouteSon.kt).
+//     C'est un ÉGALISEUR enroulé autour de l'écran : chaque point du tour suit SA tranche de son (graves en
+//     bas, aigus en haut, voir « spectre » dans EcouteSon.kt), et la ligne s'écarte du bord là où ça joue.
 //   - 2 palettes au choix : CHAUDE (braise -> orange -> or) et FROIDE (violet -> bleu -> turquoise).
 //
 // Le choix (allumé ou non, quelle palette) est rangé dans un carnet à part, « son ».
@@ -196,21 +198,8 @@ class VueSonore(context: Context) : View(context) {
     private var dernier = 0L
     private var t = 0f                   // le temps qui passe, en secondes
 
-    // les niveaux du son, ADOUCIS (ils montent vite et redescendent doucement : pas d'à-coup)
-    private var g = 0f                   // graves
-    private var m = 0f                   // médiums (mélodie)
-    private var a = 0f                   // aigus
-    private var h = 0.5f                 // hauteur de la note
-    private var tClaque = -9f            // l'instant du dernier son sec
-    private var claque = 0f
-
-    // la mémoire des dernières images : permet de demander « combien valaient les graves il y a 0,2 s ? »
-    // (c'est ce qui fait REMONTER la vague des basses du bas vers le haut, des deux côtés)
-    private val memoireG = FloatArray(256)
-    private val memoireC = FloatArray(256)       // pareil pour les COUPS de basse (l'onde qui fait le tour)
-    private var coup = 0f
-    private var rang = 0
-    private var imagesParSeconde = 60f
+    private var a = 0f                   // les aigus (pour les petits éclats du haut)
+    private var coup = 0f                // le coup de basse du moment
 
     // ---------- les 2 PALETTES : 4 couleurs, du grave (bas de l'écran) à l'aigu (haut) ----------
     private val PALETTES = arrayOf(
@@ -276,7 +265,6 @@ class VueSonore(context: Context) : View(context) {
     private val by = FloatArray(N + 1)
     private val couleurs = Array(2) { IntArray(N) }      // la couleur de chaque segment, pour chaque palette
     private val freq = FloatArray(N)                      // où est le segment sur le « piano » : 0 = bas (grave) … 1 = haut (aigu)
-    private val hasard = FloatArray(N) { ((it * 7919) % 101) / 100f }
     private val intensites = FloatArray(N)
     private val nX = FloatArray(N + 1)                    // en chaque point, la direction « vers l'intérieur de l'écran »
     private val nY = FloatArray(N + 1)
@@ -411,6 +399,12 @@ class VueSonore(context: Context) : View(context) {
         val paysage = resources.configuration.orientation == Configuration.ORIENTATION_LANDSCAPE
         val musique = try { audio.isMusicActive } catch (_: Exception) { false }
         ecranRapide = try { (display?.refreshRate ?: 60f) > 90f } catch (_: Throwable) { false }
+        // Écouteurs / enceinte Bluetooth : le son arrive ~0,18 s plus tard aux oreilles -> on retarde le dessin d'autant.
+        // (26 et 27 = les nouveaux appareils Bluetooth « basse consommation ».)
+        val bluetooth = try {
+            audio.getDevices(AudioManager.GET_DEVICES_OUTPUTS).any { it.type == AudioDeviceInfo.TYPE_BLUETOOTH_A2DP || it.type == 26 || it.type == 27 }
+        } catch (_: Throwable) { false }
+        EcouteSon.retardMs = if (bluetooth) 180 else 0
         val plein = pleinEcran()
         silences = if (musique) 0 else silences + 1
         val voulu = !paysage && !plein && silences < 3              // 3 s sans musique : on arrête
@@ -440,14 +434,6 @@ class VueSonore(context: Context) : View(context) {
     }
 
     // ---------- petits outils de calcul ----------
-    private fun cloche(x: Float, centre: Float, largeur: Float): Float {
-        val e = (x - centre) / largeur
-        return exp(-e * e)
-    }
-    private fun ilYA(memoire: FloatArray, secondes: Float): Float {
-        val images = (secondes * imagesParSeconde).toInt().coerceIn(0, 255)
-        return memoire[(rang - images) and 255]
-    }
     private fun opacite(x: Float): Int = (x * presence * 255f).toInt().coerceIn(0, 255)
 
     // Un petit ÉCLAT en étoile à 4 branches (sur les aigus).
@@ -468,7 +454,6 @@ class VueSonore(context: Context) : View(context) {
         val dt = ((maintenant - dernier) / 1000f).coerceIn(0.001f, 0.05f)       // le temps depuis l'image d'avant
         dernier = maintenant
         t += dt
-        imagesParSeconde += (1f / dt - imagesParSeconde) * 0.05f
 
         // apparaître / disparaître en douceur
         presence += ((if (jouer) 1f else 0f) - presence) * min(1f, dt * 3f)
@@ -477,19 +462,13 @@ class VueSonore(context: Context) : View(context) {
             return
         }
 
-        // on adoucit les mesures : montée rapide, descente lente
-        g += (EcouteSon.grave - g) * min(1f, dt * (if (EcouteSon.grave > g) 45f else 8f))
-        m += (EcouteSon.medium - m) * min(1f, dt * (if (EcouteSon.medium > m) 25f else 5f))
-        a += (EcouteSon.aigu - a) * min(1f, dt * (if (EcouteSon.aigu > a) 40f else 12f))
-        h += (EcouteSon.hauteur - h) * min(1f, dt * 3f)      // (lent : sinon la zone de la mélodie saute partout)
-        // un son sec : on retient l'instant (au plus un toutes les 0,25 s)
-        if (EcouteSon.claque > 0.5f && t - tClaque > 0.25f) tClaque = t
-        claque = exp(-(t - tClaque) / 0.14f)
-        rang = (rang + 1) and 255
-        memoireG[rang] = g
+        // les aigus (pour les petits éclats du haut) : la moyenne des 6 tranches les plus aiguës
+        val sp = EcouteSon.spectre
+        var haut = 0f
+        for (b in EcouteSon.BANDES - 6 until EcouteSon.BANDES) haut += sp[b]
+        a = haut / 6f
         // le coup de basse : on prend le plus fort entre celui qui arrive et le nôtre qui retombe
         coup = max(EcouteSon.coup, coup * exp(-dt / 0.15f))
-        memoireC[rang] = coup
 
         prisme(c, couleurs[ReactionSonore.style.coerceIn(0, 1)], PALETTES[ReactionSonore.style.coerceIn(0, 1)][3])
         // … et on demande l'image suivante (sur un écran rapide : celle d'après, donc 60 images/s)
@@ -498,27 +477,24 @@ class VueSonore(context: Context) : View(context) {
 
     // ================= LE PRISME, TOUR COMPLET =================
     private fun prisme(c: Canvas, coul: IntArray, eclatCouleur: Int) {
-        // 1) LA FORCE de chaque segment. (10/11, Will : « je veux que ça vibre sur les basses, ça paraît random ».)
-        //    Les BASSES commandent maintenant TOUT le tour ; la mélodie et les aigus ne sont plus que des détails.
-        for (k in 0 until N) {
-            val f = freq[k]
-            // le COUP de basse : une onde part du bas et fait le tour en un cinquième de seconde ; tout s'allume
-            var i = ilYA(memoireC, f * 0.20f) * (1f - 0.40f * f)
-            // la basse qui dure : la vague du bas, qui monte sur les côtés
-            i += 0.55f * ilYA(memoireG, f * 0.22f) * max(0f, 1f - f / 0.75f).pow(1.2f)
-            i += 0.5f * m * cloche(f, 0.42f + 0.30f * h, 0.065f)             // mélodie : une zone qui suit la note
-            i += 0.6f * claque * cloche(f, 0.80f, 0.06f)                     // son sec (caisse claire)
-            i += 0.6f * a * (0.3f + 0.7f * hasard[k]) * max(0f, (f - 0.87f) / 0.13f)   // aigus : scintillement tout en haut
-            intensites[k] = min(1f, i)
-        }
-        // LA VIBRATION : à chaque coup, la ligne tremble comme une corde qu'on vient de pincer (jusqu'à 3,5 dp),
-        // puis se calme. « kk » compte les segments depuis le bas, pareil à gauche et à droite (pas de cassure en bas).
+        // 1) LA FORCE de chaque segment = la force de SA tranche de son (10/11 au soir : le vrai spectre).
+        //    Le tour est un égaliseur : très graves en bas, de plus en plus aigu en montant, pareil à gauche et à
+        //    droite. Aucun retard, aucun hasard : une note qu'on entend allume et pousse TOUJOURS le même endroit.
+        //    Et la LIGNE s'écarte du bord (jusqu'à 9 dp) là où le son est fort : on voit la musique se dessiner.
+        val sp = EcouteSon.spectre
+        val fin = EcouteSon.BANDES - 1
         for (k in 0..N) {
+            val f = 1f - abs(2f * k / N - 1f)                    // 0 = en bas (grave) … 1 = en haut (aigu)
+            val pos = f * fin
+            val b = pos.toInt().coerceIn(0, fin - 1)
+            val v = sp[b] + (sp[b + 1] - sp[b]) * (pos - b)      // (entre deux tranches : on glisse de l'une à l'autre)
+            // un petit tremblement en plus sur les coups de basse (2 dp), surtout en bas
             val kk = min(k, N - k)
-            val f = 1f - abs(2f * k / N - 1f)
-            val tremble = ilYA(memoireC, f * 0.20f) * 3.5f * d * sin(kk * 0.7f - t * 75f)
-            px[k] = lx[k] + nX[k] * tremble
-            py[k] = ly[k] + nY[k] * tremble
+            val pousse = v * 9f * d + coup * (1f - 0.6f * f) * 2f * d * sin(kk * 0.7f - t * 75f)
+            px[k] = lx[k] + nX[k] * pousse
+            py[k] = ly[k] + nY[k] * pousse
+            // la lumière : surtout la tranche, plus un battement de tout le tour sur les coups de basse
+            if (k < N) intensites[k] = min(1f, 0.85f * v + 0.30f * coup * (1f - 0.5f * f))
         }
 
         // 2) LA BANDE entre la ligne et le bord : chaque morceau prend la couleur de sa place,
@@ -540,8 +516,8 @@ class VueSonore(context: Context) : View(context) {
             if (i > 0.04f) {
                 val base = 0.14f + 0.86f * i
                 // (le halo GROSSIT sur les coups de basse : c'est le « débordement » qui bat)
-                val battement = ilYA(memoireC, freq[s] * 0.20f)
-                tamponner(c, (px[s] + px[s + 1]) / 2f, (py[s] + py[s + 1]) / 2f, (24f + 6f * i + 14f * battement) * d, coul[s], 0.48f * base * (0.2f + 0.4f * i + 0.25f * battement))
+                // (luminosité réglée « entre les deux versions », à la demande de Will)
+                tamponner(c, (px[s] + px[s + 1]) / 2f, (py[s] + py[s + 1]) / 2f, (24f + 6f * i + 7f * coup) * d, coul[s], 0.48f * base * (0.2f + 0.4f * i + 0.12f * coup))
                 etirer(c, s, (7f + i) * d, coul[s], 0.70f * base * (0.30f + 0.65f * i))
             }
         }

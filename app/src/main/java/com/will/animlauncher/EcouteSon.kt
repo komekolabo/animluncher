@@ -37,6 +37,13 @@ import kotlin.math.pow
 //  5) Nouveau signal « coup » : il saute à 1 à chaque coup de basse puis retombe en ~0,15 s. C'est lui qui
 //     fait battre et vibrer tout le tour de l'écran (voir ReactionSonore.kt).
 //
+// LE SPECTRE (10/11 au soir, Will : « je ne ressens pas la synchronisation, je veux voir la mélodie sur les bords ») :
+//  6) Avant, on résumait le son en 3 zones (graves, médiums, aigus) : trop grossier, le dessin semblait au hasard.
+//     Maintenant on découpe le son en 40 tranches, de 40 Hz (très grave) à 12 000 Hz (très aigu), comme les
+//     40 barres d'un égaliseur : « spectre ». Chaque note qu'on entend fait monter SA tranche.
+//  7) Écouteurs Bluetooth : le son met ~0,2 s à arriver aux oreilles, alors que nous le « voyons » tout de suite.
+//     « retardMs » permet de RETARDER ce qu'on publie d'autant, pour que l'image et le son tombent ensemble.
+//
 // Ce fichier range ces nombres dans 6 valeurs simples, de 0 à 1, que les dessins viennent lire :
 //   coup    : un coup de basse vient de tomber (saute à 1, retombe vite)
 //   grave   : la grosse caisse, la basse            (43 à 170 Hz)
@@ -57,6 +64,20 @@ object EcouteSon {
         private set
     @Volatile var coup = 0f
         private set
+
+    // LE SPECTRE : 40 tranches de 0 à 1, de la plus grave (0) à la plus aiguë (39). Lu par le dessin à chaque image.
+    const val BANDES = 40
+    val spectre = FloatArray(BANDES)
+    @Volatile var retardMs = 0                     // de combien retarder ce qu'on publie (Bluetooth), en millisecondes
+    private val valeur = FloatArray(BANDES)        // le spectre « en direct » (avant le retard)
+    private val bruts = FloatArray(BANDES)
+    private val refBande = FloatArray(BANDES) { 1.5f }      // le plus fort entendu récemment, tranche par tranche
+    private var forces = FloatArray(0)
+    private const val MEMOIRE = 24                 // on garde les 24 dernières mesures (~0,4 s) pour pouvoir retarder
+    private val memSpectre = Array(MEMOIRE) { FloatArray(BANDES) }
+    private val memCoup = FloatArray(MEMOIRE)
+    private var rangMem = 0
+    private var coupVif = 0f                       // le coup « en direct » (avant le retard)
 
     // le vrai volume du moment (voir le point 3 en haut)
     private var mesureOk = false
@@ -101,7 +122,8 @@ object EcouteSon {
             try { v.setScalingMode(Visualizer.SCALING_MODE_NORMALIZED) } catch (_: Throwable) {}
             tampon = ByteArray(v.captureSize)
             mesureOk = try { v.setMeasurementMode(Visualizer.MEASUREMENT_MODE_PEAK_RMS) == Visualizer.SUCCESS } catch (_: Throwable) { false }
-            refVolume = 0.0001f; basGrave = 0f; depuisCoup = 1f; coup = 0f
+            refVolume = 0.0001f; basGrave = 0f; depuisCoup = 1f; coup = 0f; coupVif = 0f
+            valeur.fill(0f); spectre.fill(0f); memCoup.fill(0f); for (m in memSpectre) m.fill(0f)
             v.setEnabled(true)
             visu = v
             ratees = 0; moyGrave = 0f; derniereMesure = 0L
@@ -188,6 +210,17 @@ object EcouteSon {
         return (force / refVolume).coerceIn(0f, 1f).pow(0.6f)
     }
 
+    // Range la mesure du moment dans la mémoire, et PUBLIE celle d'il y a « retardMs » (ou la toute dernière si 0).
+    private fun publier() {
+        System.arraycopy(valeur, 0, memSpectre[rangMem], 0, BANDES)
+        memCoup[rangMem] = coupVif
+        val recul = (retardMs / PAS.toInt()).coerceIn(0, MEMOIRE - 1)
+        val j = (rangMem - recul + MEMOIRE) % MEMOIRE
+        System.arraycopy(memSpectre[j], 0, spectre, 0, BANDES)
+        coup = memCoup[j]
+        rangMem = (rangMem + 1) % MEMOIRE
+    }
+
     private fun niveau(valeur: Float, reference: Float, seuil: Float): Float =
         ((valeur / reference - seuil) / (1f - seuil)).coerceIn(0f, 1f)
 
@@ -206,11 +239,44 @@ object EcouteSon {
         val a = bande(fft, hzParCase, 4000f, 12000f) * vol
         val sec = bande(fft, hzParCase, 2000f, 5000f) * vol
         depuisCoup += dt
-        coup *= exp(-dt / 0.15f)                       // le coup retombe tout seul
+        coupVif *= exp(-dt / 0.15f)                    // le coup retombe tout seul
 
         if (g + m + a < 1.5f) {                        // silence : tout retombe
             grave = 0f; medium = 0f; aigu = 0f; claque = 0f; ancienSec = sec; moyGrave = 0f; basGrave = 0f
+            valeur.fill(0f); publier()
             return
+        }
+        // LE SPECTRE : la force de chacune des 40 tranches.
+        val nb = fft.size / 2
+        if (forces.size != nb) forces = FloatArray(nb)
+        for (k in 1 until nb) forces[k] = hypot(fft[2 * k].toFloat(), fft[2 * k + 1].toFloat()) * vol
+        val oubli = exp(-dt / 8f)
+        var refMax = 1.5f
+        for (b in 0 until BANDES) {
+            // la tranche b va de f1 à f2 (chaque tranche est ~15 % plus aiguë que la précédente : 40 Hz -> 12 000 Hz)
+            val k1 = 40f * 300f.pow(b / BANDES.toFloat()) / hzParCase
+            val k2 = 40f * 300f.pow((b + 1) / BANDES.toFloat()) / hzParCase
+            val v = if (k2 - k1 < 1.5f) {
+                // tranche plus fine qu'une case de mesure (dans les graves) : on lit ENTRE deux cases
+                val kc = ((k1 + k2) / 2f).coerceIn(1f, nb - 2f)
+                val k0 = kc.toInt()
+                forces[k0] + (forces[k0 + 1] - forces[k0]) * (kc - k0)
+            } else {
+                var plusFort = 0f
+                for (k in k1.toInt().coerceAtLeast(1)..k2.toInt().coerceAtMost(nb - 1)) plusFort = max(plusFort, forces[k])
+                plusFort
+            }
+            bruts[b] = v
+            refBande[b] = max(max(refBande[b] * oubli, v), 1.5f)
+            refMax = max(refMax, refBande[b])
+        }
+        for (b in 0 until BANDES) {
+            // chaque tranche est comparée à SON maximum récent (sinon on ne verrait que les graves), mais une
+            // tranche presque muette n'est pas gonflée artificiellement (au moins 20 % du maximum général)
+            val n = bruts[b] / max(refBande[b], 0.2f * refMax)
+            val cible = ((n - 0.3f) / 0.7f).coerceIn(0f, 1f).pow(1.3f)
+            // monte tout de suite, retombe vite (~0,09 s) : c'est ce qui donne l'impression de « coller » au son
+            valeur[b] = if (cible > valeur[b]) cible else valeur[b] + (cible - valeur[b]) * (1f - exp(-dt / 0.09f))
         }
         // la référence descend très lentement, et remonte tout de suite si le son est plus fort
         val baisse = exp(-0.06f * dt)                  // (même vitesse qu'avant : -6 % par seconde)
@@ -227,7 +293,7 @@ object EcouteSon {
         grave = (0.35f * tenue + 0.85f * elan).coerceIn(0f, 1f)
         // UN COUP : un élan net, et pas deux coups à moins de 0,11 s (sinon ça grésille)
         if (elan > 0.35f && depuisCoup > 0.11f) {
-            coup = max(coup, 0.55f + 0.45f * elan)
+            coupVif = max(coupVif, 0.55f + 0.45f * elan)
             depuisCoup = 0f
         }
         medium = niveau(m, refMedium, 0.20f)
@@ -248,5 +314,6 @@ object EcouteSon {
         }
         // échelle « musicale » (logarithmique) : 200 Hz -> 0, 2 000 Hz -> 1
         hauteur = (ln(meilleure * hzParCase / 200f) / ln(10f)).coerceIn(0f, 1f)
+        publier()
     }
 }
