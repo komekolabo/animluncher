@@ -128,6 +128,12 @@ object EcouteSon {
         private set
     @Volatile var secsVus = 0                      // les sons secs (caisse claire, cloche…) par seconde, x 10
         private set
+    // LE VOLUME RÉEL (11/11) : la force du son en décibels (0 = le maximum possible, -60 = presque rien), lissée
+    // sur 2 s. « plein » et « basses » sont des proportions : un chuchotement (ASMR) peut donc ressembler à du
+    // dubstep. Ce chiffre-là dit si le son est vraiment FORT. Pour l'instant on l'affiche seulement.
+    @Volatile var volumeVu = 0
+        private set
+    private var volumeLisse = -60f
     private var pleinLisse = 0f
     private var bassesLisses = 0f
     private var cadenceCoups = 0f
@@ -298,6 +304,8 @@ object EcouteSon {
         if (!mesureOk) return 1f
         val v = visu ?: return 1f
         try { if (v.getMeasurementPeakRms(mesure) != Visualizer.SUCCESS) return 1f } catch (_: Throwable) { return 1f }
+        volumeLisse += (max(mesure.mRms / 100f, -90f) - volumeLisse) * (1f - exp(-dt / 2f))
+        volumeVu = volumeLisse.toInt()
         if (mesure.mRms <= -9000) return 1f
         val force = 10f.pow(mesure.mRms / 2000f)
         refVolume = max(max(refVolume * exp(-dt / 15f), force), 0.0001f)

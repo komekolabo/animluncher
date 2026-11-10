@@ -13,7 +13,7 @@ import android.graphics.Typeface
 //   plein  = à quel point le son est plein (0 à 100)
 //   basses = la part des basses dans le son (0 à 100)
 //   coups  = les coups de basse par seconde
-//   secs   = les sons secs (caisse claire, cloche…) par seconde
+//   vol    = le volume réel du son, en décibels (0 = le maximum, -60 = presque rien)
 //   HP     = (seulement si c'est le cas) le son sort du haut-parleur du téléphone : plein et basses sont alors corrigés
 // À RETIRER quand les paliers seront réglés : mettre AFFICHER à false (ou supprimer ce fichier et son appel).
 object MesuresSon {
@@ -36,7 +36,7 @@ object MesuresSon {
         if (maintenant - dernier > 500L) {
             dernier = maintenant
             texte = "P" + EcouteSon.palier + "  E" + EcouteSon.energieVue + "  plein " + EcouteSon.pleinVu +
-                "  basses " + EcouteSon.bassesVues + "  coups " + (EcouteSon.coupsVus / 10f) + "  secs " + (EcouteSon.secsVus / 10f) +
+                "  basses " + EcouteSon.bassesVues + "  coups " + (EcouteSon.coupsVus / 10f) + "  vol " + EcouteSon.volumeVu +
                 (if (EcouteSon.hautParleur) "  HP" else "")
         }
         chiffres.textSize = 10.5f * d
