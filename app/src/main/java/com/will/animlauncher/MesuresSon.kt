@@ -14,6 +14,7 @@ import android.graphics.Typeface
 //   basses = la part des basses dans le son (0 à 100)
 //   coups  = les coups de basse par seconde
 //   secs   = les sons secs (caisse claire, cloche…) par seconde
+//   HP     = (seulement si c'est le cas) le son sort du haut-parleur du téléphone : plein et basses sont alors corrigés
 // À RETIRER quand les paliers seront réglés : mettre AFFICHER à false (ou supprimer ce fichier et son appel).
 object MesuresSon {
     const val AFFICHER = true
@@ -35,9 +36,10 @@ object MesuresSon {
         if (maintenant - dernier > 500L) {
             dernier = maintenant
             texte = "P" + EcouteSon.palier + "  E" + EcouteSon.energieVue + "  plein " + EcouteSon.pleinVu +
-                "  basses " + EcouteSon.bassesVues + "  coups " + (EcouteSon.coupsVus / 10f) + "  secs " + (EcouteSon.secsVus / 10f)
+                "  basses " + EcouteSon.bassesVues + "  coups " + (EcouteSon.coupsVus / 10f) + "  secs " + (EcouteSon.secsVus / 10f) +
+                (if (EcouteSon.hautParleur) "  HP" else "")
         }
-        chiffres.textSize = 11f * d
+        chiffres.textSize = 10.5f * d
         chiffres.alpha = (force.coerceIn(0f, 1f) * 230f).toInt()
         c.drawText(texte, x, y, chiffres)
     }

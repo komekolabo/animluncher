@@ -1,5 +1,7 @@
 package com.will.animlauncher
 
+import android.content.Context
+import android.media.AudioManager
 import android.media.audiofx.Visualizer
 import android.os.Handler
 import android.os.HandlerThread
@@ -103,6 +105,17 @@ object EcouteSon {
     private var muet = 0f                          // depuis combien de secondes c'est le silence
     private var depuisPalier = 0f                  // depuis combien de secondes on est sur ce palier
 
+    // LE HAUT-PARLEUR DU TÉLÉPHONE (10/11, 23h). Quand le son sort du petit haut-parleur (aucun casque, aucune
+    // enceinte), le téléphone lui retire une grande partie des basses AVANT qu'on puisse le mesurer. Sur le même
+    // morceau, Will a lu : au casque plein 43-59 et basses 47-70 ; au haut-parleur plein 35 et basses 24.
+    // On corrige donc les deux mesures dans ce cas (x 1,35 et x 2,4). Une seule comparaison pour l'instant :
+    // à affiner si les paliers sont faux au haut-parleur.
+    @Volatile var hautParleur = false
+        private set
+    private var depuisSortie = 99f                 // (on ne regarde par où sort le son que toutes les 2 secondes)
+    // les sorties « extérieures » : casque filaire (3, 4), Bluetooth (7, 8, 26, 27), USB (11, 22), appareil auditif (23)
+    private val EXTERIEURES = intArrayOf(3, 4, 7, 8, 11, 22, 23, 26, 27)
+
     // POUR LE RÉGLAGE (provisoire) : les ingrédients de l'énergie, lissés sur 2-3 s, que le tour affiche en petit
     // en bas de l'écran. Will filme son écran, et on lit ce que le VRAI téléphone mesure sur chaque morceau.
     @Volatile var pleinVu = 0                      // à quel point le son est plein, x 100
@@ -166,7 +179,7 @@ object EcouteSon {
             refVolume = 0.0001f; basGrave = 0f; depuisCoup = 1f; coup = 0f; coupVif = 0f
             valeur.fill(0f); spectre.fill(0f); memCoup.fill(0f); for (m in memSpectre) m.fill(0f)
             palier = 3; energieVue = 0; energie = 0f; habitude = 0f; creteVive = -1f; duree = 0f; muet = 0f; depuisPalier = 0f
-            pleinLisse = 0f; bassesLisses = 0f; cadenceCoups = 0f; cadenceSecs = 0f; claqueAvant = 0f
+            pleinLisse = 0f; bassesLisses = 0f; cadenceCoups = 0f; cadenceSecs = 0f; claqueAvant = 0f; depuisSortie = 99f
             v.setEnabled(true)
             visu = v
             ratees = 0; moyGrave = 0f; derniereMesure = 0L
@@ -254,6 +267,18 @@ object EcouteSon {
         creteVive = if (pic < 6 || points.isEmpty()) -1f else sqrt(somme.toFloat() / points.size) / pic
     }
 
+    // PAR OÙ SORT LE SON ? (regardé toutes les 2 secondes.) Android donne la liste des sorties branchées :
+    // s'il n'y a ni casque ni enceinte dans la liste, c'est le haut-parleur du téléphone.
+    private fun regarderSortie(dt: Float) {
+        depuisSortie += dt
+        if (depuisSortie < 2f) return
+        depuisSortie = 0f
+        try {
+            val audio = AnimApp.contexte?.getSystemService(Context.AUDIO_SERVICE) as? AudioManager ?: return
+            hautParleur = audio.getDevices(AudioManager.GET_DEVICES_OUTPUTS).none { it.type in EXTERIEURES }
+        } catch (_: Throwable) {}
+    }
+
     // La force moyenne entre deux fréquences. « fft » range les mesures par paires (partie réelle,
     // partie imaginaire) : la force d'une case = la longueur de ce petit vecteur.
     private fun bande(fft: ByteArray, hzParCase: Float, de: Float, a: Float): Float {
@@ -301,9 +326,15 @@ object EcouteSon {
     // Ensuite on regarde entre quelles frontières (SEUILS) le résultat tombe. Pour éviter que ça clignote quand
     // il est pile sur une frontière : il faut la dépasser un peu (0,02) et un palier dure au moins 1,5 s.
     // Les 2,5 premières secondes d'un morceau, on reste sur le palier du milieu, le temps d'avoir une mesure sûre.
-    private fun situer(partBasses: Float, dt: Float) {
-        val plein = creteVive
+    private fun situer(partMesuree: Float, dt: Float) {
+        var plein = creteVive
         if (plein < 0f) return
+        var partBasses = partMesuree
+        // au haut-parleur du téléphone, on rend aux deux mesures ce que le téléphone leur a retiré (voir plus haut)
+        if (hautParleur) {
+            plein = min(1f, plein * 1.35f)
+            partBasses = min(1f, partBasses * 2.4f)
+        }
         muet = 0f
         // (pour le réglage : les deux ingrédients, lissés sur 2 s)
         val doux = 1f - exp(-dt / 2f)
@@ -337,6 +368,7 @@ object EcouteSon {
         val maintenant = SystemClock.uptimeMillis()
         val dt = ((maintenant - derniereMesure) / 1000f).coerceIn(0.005f, 0.1f)
         derniereMesure = maintenant
+        regarderSortie(dt)
         val hzParCase = frequenceMilliHz / 1000f / fft.size
         if (hzParCase <= 0f) return
         val vol = volume(dt)
