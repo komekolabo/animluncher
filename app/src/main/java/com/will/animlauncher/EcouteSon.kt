@@ -87,6 +87,8 @@ object EcouteSon {
     // Les 4 frontières entre paliers, sur l'échelle d'« énergie » (voir situer()). Calées le 10/11 sur 5 extraits
     // envoyés par Will : son morceau lent mesure ~0,44, ses deux moyens ~0,61 et ~0,64, son rapide ~0,93,
     // et le drop qu'il veut « au moins rouge » ~0,68 (précédé d'une intro à ~0,31).
+    // ATTENTION : ces chiffres viennent d'une SIMULATION sur le son des vidéos. Le téléphone ne mesure pas pareil
+    // (une phonk simulée « vert » est restée bleue chez Will) : à recaler avec les mesures affichées à l'écran.
     val SEUILS = floatArrayOf(0.27f, 0.52f, 0.655f, 1.08f)
     @Volatile var palier = 3
         private set
@@ -99,6 +101,22 @@ object EcouteSon {
     private var duree = 0f                         // depuis combien de secondes le son joue sans vrai silence
     private var muet = 0f                          // depuis combien de secondes c'est le silence
     private var depuisPalier = 0f                  // depuis combien de secondes on est sur ce palier
+
+    // POUR LE RÉGLAGE (provisoire) : les ingrédients de l'énergie, lissés sur 2-3 s, que le tour affiche en petit
+    // en bas de l'écran. Will filme son écran, et on lit ce que le VRAI téléphone mesure sur chaque morceau.
+    @Volatile var pleinVu = 0                      // à quel point le son est plein, x 100
+        private set
+    @Volatile var bassesVues = 0                   // la part des basses dans le son, x 100
+        private set
+    @Volatile var coupsVus = 0                     // les coups de basse par seconde, x 10
+        private set
+    @Volatile var secsVus = 0                      // les sons secs (caisse claire, cloche…) par seconde, x 10
+        private set
+    private var pleinLisse = 0f
+    private var bassesLisses = 0f
+    private var cadenceCoups = 0f
+    private var cadenceSecs = 0f
+    private var claqueAvant = 0f
 
     // le vrai volume du moment (voir le point 3 en haut)
     private var mesureOk = false
@@ -147,6 +165,7 @@ object EcouteSon {
             refVolume = 0.0001f; basGrave = 0f; depuisCoup = 1f; coup = 0f; coupVif = 0f
             valeur.fill(0f); spectre.fill(0f); memCoup.fill(0f); for (m in memSpectre) m.fill(0f)
             palier = 3; energieVue = 0; energie = 0f; habitude = 0f; creteVive = -1f; duree = 0f; muet = 0f; depuisPalier = 0f
+            pleinLisse = 0f; bassesLisses = 0f; cadenceCoups = 0f; cadenceSecs = 0f; claqueAvant = 0f
             v.setEnabled(true)
             visu = v
             ratees = 0; moyGrave = 0f; derniereMesure = 0L
@@ -283,6 +302,12 @@ object EcouteSon {
         val plein = creteVive
         if (plein < 0f) return
         muet = 0f
+        // (pour le réglage : les deux ingrédients, lissés sur 2 s)
+        val doux = 1f - exp(-dt / 2f)
+        pleinLisse += (plein - pleinLisse) * doux
+        bassesLisses += (partBasses - bassesLisses) * doux
+        pleinVu = (pleinLisse * 100f).toInt()
+        bassesVues = (bassesLisses * 100f).toInt()
         val brute = plein * (1f + 2.5f * max(0f, partBasses - 0.5f))
         duree += dt; depuisPalier += dt
         energie = if (energie <= 0f) brute
@@ -383,15 +408,27 @@ object EcouteSon {
         moyGrave += (g - moyGrave) * (1f - exp(-dt / 0.4f))
         grave = (0.35f * tenue + 0.85f * elan).coerceIn(0f, 1f)
         // UN COUP : un élan net, et pas deux coups à moins de 0,11 s (sinon ça grésille)
+        var coupTombe = false
         if (elan > 0.35f && depuisCoup > 0.11f) {
             coupVif = max(coupVif, 0.55f + 0.45f * elan)
             depuisCoup = 0f
+            coupTombe = true
         }
         medium = niveau(m, refMedium, 0.20f)
         aigu = niveau(a, refAigu, 0.25f)
         // ce qui vient d'augmenter d'un coup : on compare à « ancienSec », qui suit le son avec ~50 ms de retard
-        claque = ((sec - ancienSec) / refMedium * 3f).coerceIn(0f, 1f)
+        val claqueVive = ((sec - ancienSec) / refMedium * 3f).coerceIn(0f, 1f)
+        claque = claqueVive
         ancienSec += (sec - ancienSec) * (1f - exp(-dt / 0.05f))
+        // (pour le réglage : combien de coups de basse et de sons secs par seconde, en moyenne sur ~3 s.
+        //  Chaque événement ajoute une petite marche qui s'efface doucement : on obtient un nombre par seconde.)
+        val secTombe = claqueVive > 0.5f && claqueAvant <= 0.5f
+        claqueAvant = claqueVive
+        val lent = 1f - exp(-dt / 3f)
+        cadenceCoups += ((if (coupTombe) 1f / dt else 0f) - cadenceCoups) * lent
+        cadenceSecs += ((if (secTombe) 1f / dt else 0f) - cadenceSecs) * lent
+        coupsVus = (cadenceCoups * 10f).toInt()
+        secsVus = (cadenceSecs * 10f).toInt()
 
         // la note dominante : la case la plus forte entre 200 et 2 000 Hz
         val cases = fft.size / 2
