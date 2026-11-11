@@ -599,7 +599,7 @@ class VueSonore(context: Context) : View(context) {
         coupAvant = arrive
         coup = max(arrive, coup * exp(-dt / 0.15f))
         // LES VAGUES DE LUMIÈRE : chaque percussion lance une vague qui court le long du tour (voir VaguesSon.kt)
-        VaguesSon.suivre(dt, tombe, arrive, M)
+        VaguesSon.suivre(dt, tombe, arrive, M, palier, mode)
 
         prisme(c, p0, p1, p2)
         val clair = trio(clairs[0], clairs[1], clairs[2], p0, p1, p2)
@@ -632,7 +632,9 @@ class VueSonore(context: Context) : View(context) {
         //    (11/11 : avant, sur un coup de basse, TOUT le tour s'allumait d'un coup : Will trouvait que ça
         //    clignotait. Maintenant le coup lance une VAGUE qui voyage le long du tour, voir VaguesSon.kt ;
         //    il ne reste qu'un tout petit battement d'ensemble.)
-        val sp = EcouteSon.spectre
+        //    VERSION 3 (validée par Will sur la démo du 11/11) : ce fond est plus discret (0,55 au lieu de 0,85)
+        //    et il GLISSE au lieu de trembler : on lit le spectre adouci par VaguesSon (« fond »), pas le spectre brut.
+        val sp = VaguesSon.fond
         val fin = EcouteSon.BANDES - 1
         // (pendant l'aperçu d'une couleur : une lumière moyenne qui respire, pour bien voir la couleur sans musique)
         val demo = if (ReactionSonore.apercu >= 0) 0.42f + 0.10f * sin(t * 2.2f) else 0f
@@ -643,9 +645,9 @@ class VueSonore(context: Context) : View(context) {
             val q = (pos - b).coerceIn(0f, 1f)
             // entre deux tranches on glisse de l'une à l'autre en courbe douce (pas en ligne brisée)
             val v = sp[b] + (sp[b + 1] - sp[b]) * (q * q * (3f - 2f * q))
-            brutes[k] = max(demo, min(1f, 0.85f * v + 0.10f * coup * (1f - 0.5f * f)))
+            brutes[k] = max(demo, min(1f, 0.55f * v + 0.06f * coup * (1f - 0.5f * f)))
         }
-        // … plus les vagues de lumière en train de voyager
+        // … puis VaguesSon lisse ce fond, y ajoute les vagues en train de voyager, et la rémanence
         VaguesSon.eclairer(brutes)
         // un léger lissage : chaque repère se mélange un peu avec ses deux voisins (un quart, la moitié, un quart)
         for (k in 0 until M) intensites[k] = (brutes[(k + M - 1) % M] + 2f * brutes[k] + brutes[(k + 1) % M]) / 4f
@@ -655,9 +657,11 @@ class VueSonore(context: Context) : View(context) {
         for (j in 0 until M) {
             val k = ordre[j]
             val i = intensites[k]
-            val couleur = trio(couleurs[0][k], couleurs[1][k], couleurs[2][k], p0, p1, p2)
+            // LA COULEUR QUI VOYAGE : chaque repère a SA part de chaque couleur (voir VaguesSon.part) : quand la
+            // musique change de palier, la nouvelle couleur part du bas et monte, au lieu de changer partout d'un coup.
+            val couleur = trio(couleurs[0][k], couleurs[1][k], couleurs[2][k], VaguesSon.part(0, k), VaguesSon.part(1, k), VaguesSon.part(2, k))
             // la bande : de plus en plus forte, et de plus en plus claire (vers le blanc), avec le son
-            cBande[j + 1] = voile(melange(couleur, Color.WHITE, 0.35f * i * i), 0.10f + 0.80f * i)
+            cBande[j + 1] = voile(melange(couleur, Color.WHITE, 0.42f * i * i), 0.10f + 0.80f * i)
             // le halo : presque rien quand c'est calme, il monte vite quand ça joue (et un peu plus sur un coup de basse)
             val halo = ((0.14f + 0.86f * i) * (0.2f + 0.5f * i + 0.05f * coup) - 0.03f).coerceIn(0f, 1f)
             if (halo > haloMax) haloMax = halo
