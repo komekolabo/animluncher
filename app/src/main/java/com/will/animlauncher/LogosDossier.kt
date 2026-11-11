@@ -103,6 +103,19 @@ object LogosDossier {
         else -> if (connu(groupe)) 40.0 to 25.0 else null
     }
 
+    // LE DÉBUT DU TRACÉ (11/11) : les logos qui se DESSINENT (la courbe de Finance, l'itinéraire de Maps, le tracé
+    // du cœur de Health, les lignes du journal de News) commencent leur geste en effaçant leur dessin, puis le
+    // refont. Dans le widget, quand le logo revient après les apps, on démarre donc directement à ce moment
+    // « vide » : le logo se dessine pendant qu'il revient, au lieu d'apparaître plein, s'effacer, et se redessiner.
+    // null = les autres logos (leur geste n'efface rien).
+    fun debutTrace(groupe: String): Double? = when (groupe) {
+        "finance" -> 0.58
+        "trajets" -> 0.55
+        "sante" -> 0.6
+        "infos" -> 0.58
+        else -> null
+    }
+
     // ---------------- les pinceaux ----------------
     private val p = Paint(Paint.ANTI_ALIAS_FLAG)
     private val efface = Paint(Paint.ANTI_ALIAS_FLAG).apply { xfermode = PorterDuffXfermode(PorterDuff.Mode.CLEAR) }

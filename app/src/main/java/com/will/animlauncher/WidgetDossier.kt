@@ -350,7 +350,17 @@ object WidgetDossier {
             }
             // l'horloge du geste : un peu plus rapide que le temps (1,15 x) pour tenir avant la sortie ;
             // en dehors, le logo est au repos (0,3)
-            val geste = if (t < 2.3) min(0.3 + t * 1.15, 2.9) else 0.3
+            // Les logos qui se DESSINENT (11/11, voir LogosDossier.debutTrace) : leur geste démarre dès que le logo
+            // revient (10,9 s), depuis le dessin vide, et continue après le tour de boucle (0 -> 2,3 s), un peu plus
+            // lentement (0,85 x) pour remplir tout ce temps. Comme ça, il ne réapparaît pas plein pour s'effacer ensuite.
+            val trace = LogosDossier.debutTrace(groupe)
+            val geste = when {
+                trace != null && t >= 10.9 -> min(trace + (t - 10.9) * 0.85, 2.9)
+                trace != null && t < 2.3 -> min(trace + (t + DUREE - 10.9) * 0.85, 2.9)
+                trace != null -> trace
+                t < 2.3 -> min(0.3 + t * 1.15, 2.9)
+                else -> 0.3
+            }
             cv.save()
             cv.rotate(tour.toFloat(), CX, CY)
             cv.scale(taille.toFloat(), taille.toFloat(), CX, CY)
