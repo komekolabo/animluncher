@@ -4,6 +4,7 @@ import android.graphics.Canvas
 import android.graphics.Color
 import android.graphics.DashPathEffect
 import android.graphics.LinearGradient
+import android.graphics.Matrix
 import android.graphics.Paint
 import android.graphics.Path
 import android.graphics.PorterDuff
@@ -24,8 +25,10 @@ import kotlin.math.sin
 // qui raconte quelque chose :
 //   AI            l'étoile (inchangée)
 //   Social        deux bulles : celle de devant « écrit » (3 points qui sautent), celle du fond arrive en rebondissant
-//   Music & Video un vinyle qui tourne, avec son reflet ; le bras de la platine vient se poser dessus
-//   Photos        un diaphragme d'appareil photo qui se ferme et se rouvre (« clic »)
+//   Music & Video un vinyle qui tourne, avec son reflet ; le bras de la platine vient se poser dessus, et des notes
+//                 de musique s'échappent du disque (« A · Notes », choisi par Will le 11/11)
+//   Photos        un boîtier d'appareil photo : clic du diaphragme, le flash scintille doucement, puis une photo
+//                 sort par le haut et se développe (« A · Polaroïd », choisi par Will le 11/11)
 //   Finance       une courbe de bourse qui se trace en montant, avec l'aire dessous
 //   Maps & Travel une carte pliée en 3 ; un itinéraire se trace en pointillés, puis une épingle tombe à l'arrivée
 //   Productivity  une liste de tâches dont les 3 cases se cochent l'une après l'autre
@@ -48,7 +51,8 @@ import kotlin.math.sin
 // LES TROUS (les points de la bulle, la route, les lignes du journal…) sont « découpés » dans le logo : on
 // voit le galet au travers. Pour ça, le logo est dessiné sur un calque à part (saveLayer), puis on efface
 // ces zones avec un pinceau spécial (mode CLEAR = « rendre transparent »).
-// L'aperçu Python de ces logos (logos2.py) dessine exactement la même chose.
+// L'aperçu Python de ces logos (logos2.py) dessine la même chose (sans les versions du 11/11 de Music & Video et
+// Photos : leur aperçu est la page web « logos animés des dossiers », en JavaScript).
 object LogosDossier {
     private const val CX = 50f
     private const val CY = 48f
@@ -95,11 +99,10 @@ object LogosDossier {
 
     // LA ROTATION quand le logo part (en degrés) et le petit recul avec lequel il revient.
     // null = l'étoile, qui garde exactement ses mouvements d'origine (voir WidgetDossier.Boucle.logo).
-    // Seul le diaphragme (rond) fait un demi-tour ; les autres ne tournent que de 40 degrés, pour qu'on ne les
-    // voie jamais tête en bas.
+    // Tous ne tournent que de 40 degrés, pour qu'on ne les voie jamais tête en bas (11/11 : l'appareil photo
+    // n'est plus un diaphragme rond, il ne fait donc plus de demi-tour).
     fun tours(groupe: String): Pair<Double, Double>? = when (groupe) {
         "ia" -> null
-        "photo" -> 180.0 to 90.0
         else -> if (connu(groupe)) 40.0 to 25.0 else null
     }
 
@@ -333,6 +336,8 @@ object LogosDossier {
         cv.drawCircle(cx, cy, 17f, gomme(1.3f))
         cv.drawCircle(cx, cy, 12.5f, gomme(1.3f))
         cv.drawCircle(cx, cy, 2.2f, gomme())
+        // les notes qui s'échappent (une fois le bras posé), sous le bras
+        notesQuiSechappent(cv, g, src)
         // le bras : un liseré découpé autour, puis le bras lui-même
         val pose = cle(g, 0.4 to 0.0 by LIN, 0.85 to 1.0 by DOUX)
         val th = Math.toRadians(95 + 23 * pose)
@@ -345,35 +350,121 @@ object LogosDossier {
         etincelle(cv, 28f, 30f, 5f, lum, bosse(g, 0.9, 0.2))
     }
 
+    // UNE NOTE DE MUSIQUE, la tête centrée en (0, 0) : une croche (une tête, une tige, un drapeau) ou une double
+    // croche (deux têtes, deux tiges, une barre). Toutes les pièces sont tracées dans le même sens (CW), pour que
+    // l'endroit où elles se chevauchent reste plein (sinon il pourrait devenir un trou).
+    private val mat = Matrix()
+    private val ovale = Path()
+    private val note = Path()
+    private fun tete(x: Float, y: Float) {
+        ovale.reset(); ovale.addOval(-3.4f, -2.6f, 3.4f, 2.6f, Path.Direction.CW)
+        mat.setRotate(-25f); mat.postTranslate(x, y)
+        ovale.transform(mat)
+        note.addPath(ovale)
+    }
+    private fun noteChemin(double: Boolean): Path {
+        note.reset()
+        tete(0f, 0f)
+        note.addRect(2.2f, -12f, 3.8f, -0.4f, Path.Direction.CW)
+        if (!double) {
+            note.moveTo(3.8f, -12f)
+            note.cubicTo(5f, -9f, 9f, -8.5f, 7.6f, -3.6f)
+            note.cubicTo(7.2f, -6.6f, 5.6f, -7.6f, 3.8f, -8.4f)
+            note.close()
+        } else {
+            tete(8.4f, -2.2f)
+            note.addRect(10.6f, -14.2f, 12.2f, -2.6f, Path.Direction.CW)
+            note.moveTo(2.2f, -12f); note.lineTo(12.2f, -14.6f); note.lineTo(12.2f, -11.4f); note.lineTo(2.2f, -8.8f); note.close()
+        }
+        return note
+    }
+
+    // LES NOTES QUI S'ÉCHAPPENT du vinyle : chacune naît sur le haut du disque (un liseré découpé autour la détache
+    // du disque), grossit avec un petit élan, monte en se balançant, puis rapetisse et disparaît.
+    // Une note = (naissance dans le geste, départ x, départ y, dérive en x, double croche ?)
+    private class Note(val nait: Double, val x: Float, val y: Float, val derive: Float, val double: Boolean)
+    private val NOTES = arrayOf(Note(0.95, 44f, 33f, -3f, false), Note(1.3, 55f, 34f, 5f, true), Note(1.65, 38f, 37f, -1f, false))
+    private fun notesQuiSechappent(cv: Canvas, g: Double, src: Shader) {
+        for ((i, n) in NOTES.withIndex()) {
+            val u = (g - n.nait) / 1.15                     // l'âge de la note, de 0 (naissance) à 1 (disparue)
+            if (u <= 0 || u >= 1) continue
+            val apparait = DEC(min(1.0, u / 0.22))
+            val part = if (u > 0.68) 1 - DOUX((u - 0.68) / 0.32) else 1.0
+            val taille = (apparait * part * (if (n.double) 0.78 else 0.9)).toFloat()
+            if (taille <= 0.02f) continue
+            val x = (n.x + n.derive * u + 2.4 * sin(u * PI * 2.2 + i * 1.7)).toFloat()
+            val y = (n.y - 19 * DEC(u)).toFloat()
+            val penche = ((if (i % 2 == 1) 14 else -14) * sin(u * PI * 1.6)).toFloat()
+            cv.save()
+            cv.translate(x, y); cv.rotate(penche); cv.scale(taille, taille)
+            val forme = noteChemin(n.double)
+            cv.drawPath(forme, gomme(3f))
+            remplir(cv, forme, src)
+            cv.restore()
+        }
+    }
+
     private fun remplirCercle(cv: Canvas, x: Float, y: Float, r: Float, src: Shader) {
         p.reset(); p.isAntiAlias = true; p.style = Paint.Style.FILL; p.shader = src
         cv.drawCircle(x, y, r, p)
     }
 
-    // PHOTOS : un disque, avec au milieu l'ouverture en hexagone et les 6 lamelles (des fentes fines) ;
-    // l'étincelle est le reflet de l'objectif, qui brille au moment du « clic »
+    // PHOTOS (« A · Polaroïd », 11/11) : un boîtier d'appareil photo, avec un viseur et une fente découpés, et son
+    // objectif (une bague découpée, et dedans le diaphragme : l'ouverture en hexagone et les 6 lamelles).
+    // Le geste : le diaphragme fait « clic », l'étincelle du flash scintille DOUCEMENT (pas de flash blanc), puis une
+    // photo sort par le haut (elle était cachée derrière le boîtier) et se développe : l'image, d'abord sombre,
+    // prend les couleurs du logo, avec des montagnes et un petit soleil.
     private fun photo(cv: Canvas, g: Double, src: Shader, lum: Int) {
-        chemin.reset(); chemin.addCircle(CX, CY, 25f, Path.Direction.CW)
+        val sortie = cle(g, 1.3 to 0.0 by LIN, 1.85 to 1.0 by DEC, 2.6 to 1.0 by LIN, 2.9 to 0.0 by ACC).toFloat()
+        val devel = cle(g, 1.55 to 0.0 by LIN, 2.3 to 1.0 by DOUX)
+        // 1) la photo, dessinée AVANT le boîtier (il la cache tant qu'elle n'est pas sortie)
+        if (sortie > 0.01f) {
+            cv.save()
+            cv.translate(0f, -22f * sortie)
+            rect.set(35f, 36f, 65f, 62f)
+            cv.drawRoundRect(rect, 2.5f, 2.5f, uni(lum))                       // le cadre clair
+            rect.set(38.5f, 39f, 61.5f, 55f)
+            cv.drawRoundRect(rect, 1.2f, 1.2f, uni(Color.argb(217, 20, 14, 8)))  // l'image pas encore développée
+            cv.saveLayerAlpha(calque, (255 * devel).toInt())                     // l'image qui se développe
+            chemin.reset(); chemin.addRoundRect(38.5f, 39f, 61.5f, 55f, 1.2f, 1.2f, Path.Direction.CW)
+            remplir(cv, chemin, src)
+            chemin.reset()
+            chemin.moveTo(38.5f, 55f); chemin.lineTo(45f, 46f); chemin.lineTo(49f, 50f); chemin.lineTo(54f, 43.5f)
+            chemin.lineTo(61.5f, 52f); chemin.lineTo(61.5f, 55f); chemin.close()
+            cv.drawPath(chemin, uni(Color.argb(140, 40, 22, 10)))                // les montagnes
+            cv.drawCircle(44f, 43.5f, 2.6f, uni(lum))                            // le soleil
+            cv.restore()
+            cv.restore()
+        }
+        // 2) le boîtier, détaché de la photo par un liseré découpé
+        chemin.reset(); chemin.addRoundRect(24f, 36f, 76f, 70f, 9f, 9f, Path.Direction.CW)
+        cv.drawPath(chemin, gomme(3.2f))
         remplir(cv, chemin, src)
-        val ouv = cle(g, 1.15 to 9.5 by LIN, 1.32 to 2.6 by ACC, 1.7 to 9.5 by RESSORT)
-        val ang = Math.toRadians(cle(g, 1.15 to 0.0 by LIN, 1.32 to 28.0 by ACC, 1.7 to 0.0 by DOUX))
-        val pts = Array(6) { k -> floatArrayOf((CX + ouv * cos(ang + k * PI / 3)).toFloat(), (CY + ouv * sin(ang + k * PI / 3)).toFloat()) }
+        rect.set(30f, 40.5f, 39f, 45.5f)
+        cv.drawRoundRect(rect, 1.6f, 1.6f, gomme())                              // le viseur
+        cv.drawLine(33f, 37.2f, 67f, 37.2f, gomme(1.3f))                         // la fente d'où sort la photo
+        // 3) l'objectif : la bague, puis le diaphragme qui se ferme au clic et se rouvre avec un ressort
+        cv.drawCircle(50f, 55f, 11.5f, gomme(2.2f))
+        val ouv = cle(g, 0.9 to 5.2 by LIN, 1.05 to 1.4 by ACC, 1.4 to 5.2 by RESSORT)
+        val ang = Math.toRadians(cle(g, 0.9 to 0.0 by LIN, 1.05 to 28.0 by ACC, 1.4 to 0.0 by DOUX))
+        val pts = Array(6) { k -> floatArrayOf((50 + ouv * cos(ang + k * PI / 3)).toFloat(), (55 + ouv * sin(ang + k * PI / 3)).toFloat()) }
         chemin.reset(); chemin.moveTo(pts[0][0], pts[0][1])
         for (k in 1..5) chemin.lineTo(pts[k][0], pts[k][1])
         chemin.close()
         cv.drawPath(chemin, gomme())
-        // les lamelles : chaque côté de l'hexagone, prolongé vers l'extérieur (sans dépasser du disque)
+        // les lamelles : chaque côté de l'hexagone, prolongé vers l'extérieur (sans sortir de l'objectif)
         cv.save()
-        chemin.reset(); chemin.addCircle(CX, CY, 20.5f, Path.Direction.CW)
+        chemin.reset(); chemin.addCircle(50f, 55f, 9.2f, Path.Direction.CW)
         cv.clipPath(chemin)
-        val gm = gomme(1.7f)
+        val gm = gomme(1.1f)
         for (k in 0..5) {
             val a = pts[(k + 5) % 6]; val b = pts[k]
             val dx = b[0] - a[0]; val dy = b[1] - a[1]; val l = hypot(dx, dy).coerceAtLeast(0.01f)
-            cv.drawLine(b[0], b[1], b[0] + dx / l * 40f, b[1] + dy / l * 40f, gm)
+            cv.drawLine(b[0], b[1], b[0] + dx / l * 20f, b[1] + dy / l * 20f, gm)
         }
         cv.restore()
-        etincelle(cv, 33f, 31f, 5.5f, lum, bosse(g, 1.4, 0.22))
+        // 4) le flash : l'étincelle, qui scintille au moment du clic
+        etincelle(cv, 68.5f, 43f, 4.6f, lum, bosse(g, 1.05, 0.2))
     }
 
     // FINANCE : une courbe de bourse qui s'efface puis se retrace en montant, avec l'aire dessous (à 35 %) et un
