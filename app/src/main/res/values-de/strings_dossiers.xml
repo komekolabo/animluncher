@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Les textes des dossiers perso (créer, renommer, changer le logo, supprimer ; DossiersPerso.kt, 11/11). Un fichier par langue. -->
+<resources>
+    <string name="nouveau_dossier">＋ Neuer Ordner</string>
+    <string name="dossier_titre_nouveau">Neuer Ordner</string>
+    <string name="dossier_nom_indice">Ordnername</string>
+    <string name="dossier_choisir_logo">Wähle sein animiertes Logo</string>
+    <string name="dossier_creer">Erstellen</string>
+    <string name="dossier_annuler">Abbrechen</string>
+    <string name="dossier_ok">OK</string>
+    <string name="dossier_renommer">Umbenennen</string>
+    <string name="dossier_renommer_titre">Ordner umbenennen</string>
+    <string name="dossier_changer_logo">Logo ändern</string>
+    <string name="dossier_supprimer">Ordner löschen</string>
+    <string name="dossier_supprimer_question">Diesen Ordner löschen? Seine Apps bleiben auf deinem Handy.</string>
+    <string name="dossier_personnaliser">Anpassen</string>
+    <string name="dossier_vide">Noch leer: füge Apps mit ＋ App hinzufügen hinzu.</string>
+</resources>

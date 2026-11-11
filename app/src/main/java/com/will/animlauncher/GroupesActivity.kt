@@ -83,14 +83,24 @@ class GroupesActivity : Activity() {
     // L'écran est (re)construit à chaque retour ici : on voit tout de suite l'app qu'on vient d'ajouter.
     override fun onResume() {
         super.onResume()
+        rafraichir()
+        principal.removeCallbacks(battement)
+        principal.postDelayed(battement, 2400)
+    }
+
+    // Relit les dossiers et les apps, puis refait l'écran (au retour ici, et après un changement : nouveau dossier,
+    // nom, logo, suppression).
+    private fun rafraichir() {
         rayons = Rayons.ranger(this)
         dossiers = Groupes.CATEGORIES.mapNotNull { cat ->
             val apps = Groupes.tous(this, cat.id)
-            if (apps.size < 2) null else cat to apps      // un dossier d'une seule app n'a pas d'intérêt
+            // (Groupes.categorie : la même catégorie, avec le nom que l'utilisateur lui a donné s'il l'a renommée)
+            if (apps.size < 2) null else (Groupes.categorie(cat.id) ?: cat) to apps      // un dossier d'une seule app n'a pas d'intérêt
+        } + Groupes.persos(this).mapNotNull { id ->
+            // (11/11) les dossiers PERSO, toujours montrés (même vides : on vient de les créer)
+            Groupes.categorie(id)?.let { it to Groupes.tous(this, id) }
         }
         construire()
-        principal.removeCallbacks(battement)
-        principal.postDelayed(battement, 2400)
     }
 
     override fun onPause() {
@@ -189,6 +199,14 @@ class GroupesActivity : Activity() {
     private fun ecranDossiers(): View {
         val colonne = colonne()
         colonne.addView(note(getString(R.string.dossiers_choix)))
+        // (11/11) CRÉER UN DOSSIER PERSO : un nom, un logo animé, puis on arrive dans le dossier pour y mettre des apps
+        colonne.addView(Style.boutonBlanc(this, getString(R.string.nouveau_dossier)) {
+            DossiersPerso.nouveau(this) { nom, logo ->
+                val id = Groupes.creer(this, nom, logo)
+                rafraichir()                     // (pour que la liste des dossiers connaisse le nouveau)
+                aller(DOSSIER, id)
+            }
+        }, LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, px(50f)).apply { bottomMargin = px(14f) })
         for ((cat, _) in dossiers) {
             val dedans = Groupes.apps(this, cat.id)        // les apps du dossier, sans celles qu'on a décochées
             colonne.addView(barre(Rayons.nom(this, cat.id), getString(R.string.n_apps, dedans.size), miniDossier(dedans)) {
@@ -230,9 +248,53 @@ class GroupesActivity : Activity() {
         })
         colonne.addView(carte)
 
+        // (11/11) LA CARTE « PERSONNALISER » : le logo animé du dossier, et de quoi le renommer, changer son logo,
+        // ou (pour un dossier perso) le supprimer. Après chaque changement, le widget sur l'accueil est repeint.
+        val perso = choisi in Groupes.persos(this)
+        val cartePerso = Style.carte(this)
+        cartePerso.addView(Style.titreCarte(this, getString(R.string.dossier_personnaliser)))
+        val logo = LogoVue(this, cat.id, Teinte.de(this, cat.id).logo)
+        cartePerso.addView(LinearLayout(this).apply {
+            orientation = LinearLayout.HORIZONTAL
+            gravity = Gravity.CENTER_VERTICAL
+            addView(logo, LinearLayout.LayoutParams(px(56f), px(56f)).apply { rightMargin = px(12f) })
+            addView(Style.texte(this@GroupesActivity, cat.nom, 18f, Style.TEXTE, gras = true),
+                LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f))
+            setOnClickListener { logo.jouer() }
+        })
+        logo.postDelayed({ logo.jouer() }, 400)
+        cartePerso.addView(LinearLayout(this).apply {
+            orientation = LinearLayout.HORIZONTAL
+            setPadding(0, px(12f), 0, 0)
+            addView(Style.boutonDiscret(this@GroupesActivity, getString(R.string.dossier_renommer)) {
+                DossiersPerso.renommer(this@GroupesActivity, cat.nom) { nouveau ->
+                    Groupes.renommer(this@GroupesActivity, cat.id, nouveau)
+                    try { WidgetGroupe.rafraichir(this@GroupesActivity, cat.id) } catch (_: Exception) {}
+                    rafraichir()
+                }
+            }, LinearLayout.LayoutParams(0, px(46f), 1f))
+            addView(Style.boutonDiscret(this@GroupesActivity, getString(R.string.dossier_changer_logo)) {
+                DossiersPerso.choisirLogo(this@GroupesActivity, LogosDossier.cleDe(cat.id)) { nouveau ->
+                    Groupes.definirLogo(this@GroupesActivity, cat.id, nouveau)
+                    try { WidgetGroupe.rafraichir(this@GroupesActivity, cat.id) } catch (_: Exception) {}
+                    rafraichir()
+                }
+            }, LinearLayout.LayoutParams(0, px(46f), 1f).apply { leftMargin = px(8f) })
+        })
+        if (perso) cartePerso.addView(Style.boutonDiscret(this, getString(R.string.dossier_supprimer)) {
+            DossiersPerso.confirmerSuppression(this) {
+                Groupes.supprimer(this, cat.id)
+                etat = DOSSIERS
+                rafraichir()
+            }
+        }, LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, px(46f)).apply { topMargin = px(8f) })
+        colonne.addView(cartePerso)
+
         // la carte du bas : une case à cocher par app, et « Ajouter une app »
         val carteApps = Style.carte(this)
         carteApps.addView(Style.titreCarte(this, getString(R.string.apps_du_dossier)))
+        if (liste.isEmpty()) carteApps.addView(DossiersPerso.note(this, getString(R.string.dossier_vide))
+            .apply { setPadding(0, 0, 0, px(8f)) })
         val teinte = ColorStateList(arrayOf(intArrayOf(android.R.attr.state_checked), intArrayOf()),
             intArrayOf(Style.TEXTE, Color.rgb(113, 113, 122)))
         for (pkg in liste) {

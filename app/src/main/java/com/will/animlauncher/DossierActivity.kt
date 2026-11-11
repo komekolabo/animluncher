@@ -74,6 +74,8 @@ class DossierActivity : Activity() {
         // sourceBounds = la place du widget sur l'écran (donnée par l'écran d'accueil) : l'étoile part de là
         // et y revient. On la retient : si un jour l'écran d'accueil ne la donne pas, on reprend la dernière.
         val v = DossierVue(this, groupe, nom, apps, placeDuWidget(), { ouvrir(it) }, { ajouter() }, { fermer() })
+        // (11/11) toucher le TITRE du dossier ouvre une petite fenêtre pour le renommer
+        v.surTitre = { renommer() }
         vue = v
         setContentView(v)
     }
@@ -103,6 +105,18 @@ class DossierActivity : Activity() {
             try { startActivity(it) } catch (_: Exception) {}
         }
         fermer()
+    }
+
+    // On a touché le titre : une petite fenêtre pour donner au dossier le nom qu'on veut (voir DossiersPerso.kt).
+    // Le nouveau nom s'affiche tout de suite dans le dossier, sur son widget et dans l'écran des dossiers.
+    private fun renommer() {
+        if (fini) return
+        val actuel = Groupes.categorie(groupe)?.nom ?: ""
+        DossiersPerso.renommer(this, actuel) { nouveau ->
+            Groupes.renommer(this, groupe, nouveau)
+            vue?.renommer(Groupes.categorie(groupe)?.nom ?: nouveau)
+            try { WidgetGroupe.rafraichir(this, groupe) } catch (_: Exception) {}
+        }
     }
 
     // On a touché la bulle « + » : la liste des apps s'ouvre ; le dossier se rouvrira avec l'app choisie.
@@ -156,13 +170,20 @@ class DossierActivity : Activity() {
 class DossierVue(
     c: Context,
     private val groupe: String,
-    private val nom: String,
+    private var nom: String,
     apps: List<String>,
     private val depart: Rect?,
     private val surApp: (String) -> Unit,
     private val surAjout: () -> Unit,
     private val surFin: () -> Unit
 ) : View(c) {
+
+    // (11/11) RENOMMER : ce qu'on fait quand on touche le titre (donné par DossierActivity), la zone du titre
+    // (calculée à chaque image, en pixels), et le changement de nom une fois choisi.
+    var surTitre: (() -> Unit)? = null
+    private var titreG = 0f
+    private var titreD = 0f
+    fun renommer(nouveau: String) { nom = nouveau; invalidate() }
 
     // UNE CASE du dossier : l'app, son nom, son icône (dessinée à la bonne taille), et ses infos.
     // dx, dy = l'endroit où elle est DESSINÉE : il rejoint en douceur sa vraie place (quand on déplace
@@ -452,6 +473,7 @@ class DossierVue(
         texte.typeface = gras
         val tw = texte.apply { textSize = 28f * k }.measureText(nom)
         val titreX = panneau.centerX() - (41f * k + tw) / 2 + 19f * k
+        titreG = titreX - 24f * k; titreD = titreX + 22f * k + tw + 12f * k      // la zone qu'on peut toucher pour renommer
         val titreY = panneau.top + 44f * k
         if (p > 0) {
             val ef = effet
@@ -1003,6 +1025,11 @@ class DossierVue(
                 if (abs(e.x - pointX()) < 30f * k && abs(e.y - pointY()) < 30f * k) { ouvrirRoue(); return true }
                 // la bulle « + »
                 if (abs(e.x - bulleX()) < 40f * k && abs(e.y - bulleY()) < 40f * k) { surAjout(); return true }
+                // le titre : on peut renommer le dossier (11/11)
+                val action = surTitre
+                if (action != null && e.x in titreG..titreD && e.y in (panneau.top + 14f * k)..(panneau.top + 66f * k)) {
+                    action(); return true
+                }
                 if (!panneau.contains(e.x, e.y)) { refermer(); return true }
                 val i = caseSous(e.x, e.y)
                 if (i >= 0) {
