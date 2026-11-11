@@ -16,6 +16,7 @@ import android.graphics.Typeface
 //   vol    = le volume réel du son, en décibels (0 = le maximum, -60 = presque rien)
 //            puis le repère = le plus fort déjà entendu avec ce réglage de volume (-99 = pas encore connu)
 //   HP     = (seulement si c'est le cas) le son sort du haut-parleur du téléphone : plein et basses sont alors corrigés
+//   DROP   = (seulement si c'est le cas) un drop est en cours : les confettis sont permis dès le rouge (voir DropSon.kt)
 // À RETIRER quand les paliers seront réglés : mettre AFFICHER à false (ou supprimer ce fichier et son appel).
 object MesuresSon {
     const val AFFICHER = true
@@ -38,7 +39,7 @@ object MesuresSon {
             dernier = maintenant
             texte = "P" + EcouteSon.palier + "  E" + EcouteSon.energieVue + "  plein " + EcouteSon.pleinVu +
                 "  basses " + EcouteSon.bassesVues + "  coups " + (EcouteSon.coupsVus / 10f) + "  vol " + EcouteSon.volumeVu + "/" + EcouteSon.repereVu +
-                (if (EcouteSon.hautParleur) "  HP" else "")
+                (if (EcouteSon.hautParleur) "  HP" else "") + (if (DropSon.actif) "  DROP" else "")
         }
         chiffres.textSize = 10.5f * d
         chiffres.alpha = (force.coerceIn(0f, 1f) * 230f).toInt()
