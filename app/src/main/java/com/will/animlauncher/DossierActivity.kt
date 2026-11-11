@@ -51,6 +51,9 @@ import kotlin.math.sin
 // croix permet d'en retirer une, et on peut les déplacer en les faisant glisser (l'ordre est retenu).
 // COULEUR (09/11) : le point multicolore en haut à gauche ouvre une ROUE CHROMATIQUE (l'anneau = la teinte,
 // le carré = intensité et luminosité). Le logo, la fenêtre ET le widget sur l'accueil changent en direct.
+// TRANSITIONS PAR DOSSIER (11/11) : Maps se déplie comme une carte (ville en trame de points + itinéraire),
+// Health bat, Photos ouvre un objectif, Finance trace une courbe (voir TransitionsDossier.kt). Les autres dossiers
+// gardent l'ouverture ci-dessus.
 // Toucher à côté (ou le bouton retour) referme le dossier et l'étoile rentre dans le widget ; le geste
 // « accueil » aussi : là, c'est le service d'AnimLauncher qui dessine le retour (voir RetourEtoile.kt).
 class DossierActivity : Activity() {
@@ -258,6 +261,10 @@ class DossierVue(
     private val hsv = Groupes.couleur(c, groupe) ?: Teinte.DEPART.copyOf()
     private var degradeEtoile = LinearGradient(-1f, -1f, 1f, 1f, teinte.logo, floatArrayOf(0f, 0.5f, 1f), Shader.TileMode.CLAMP)
 
+    // LA TRANSITION D'OUVERTURE propre au dossier (11/11 : Maps, Health, Photos, Finance ; voir TransitionsDossier.kt).
+    // null = l'ouverture d'origine (les traînées de poussière).
+    private val effet: EffetOuverture? = TransitionsDossier.pour(groupe)
+
     private fun lisse(x: Float) = x * x * (3 - 2 * x)               // départ et arrêt en douceur
     private fun seg(t: Float, a: Float, b: Float) = lisse(((t - a) / (b - a)).coerceIn(0f, 1f))
     private fun mix(a: Float, b: Float, u: Float) = a + (b - a) * u
@@ -309,6 +316,26 @@ class DossierVue(
         panneau = RectF(cx - largeur / 2, cy - hauteur / 2, cx + largeur / 2, cy + hauteur / 2)
         haut = panneau.top + 110f * k
         if (page > pages - 1) { page = (pages - 1).toFloat(); pageCible = page }
+        preparerEffet()
+    }
+
+    // On donne à la transition la mise en page de la 1re page (la fenêtre, la place de chaque app, celle du logo) :
+    // elle y calcule une fois pour toutes ce qui est lourd (la carte de Maps, la courbe de Finance…).
+    private fun preparerEffet() {
+        val ef = effet ?: return
+        if (width == 0 || cases.isEmpty()) return
+        val m = min(cases.size, parPage)
+        val lignes = max(1, ceil(m / colonnes.toFloat()).toInt())
+        texte.typeface = gras
+        texte.textSize = 28f * k
+        val tw = texte.measureText(nom)
+        texte.typeface = Typeface.DEFAULT
+        try {
+            ef.preparer(CadreDossier(RectF(panneau), k, colonnes, lignes, celluleL, celluleH,
+                FloatArray(m) { panneau.left + 20f * k + celluleL * (it % colonnes + 0.5f) },
+                FloatArray(m) { haut + celluleH * (it / colonnes) + icone / 2 + 6f * k },
+                panneau.centerX() - (41f * k + tw) / 2 + 19f * k, panneau.top + 44f * k, teinte))
+        } catch (_: Exception) {}
     }
 
     // La VRAIE place (le centre) de la case numéro i : sa page, puis sa place dans la page.
@@ -351,6 +378,7 @@ class DossierVue(
         if (!roue || roueFermeA >= 0) return
         roueFermeA = maintenant()
         enregistrerCouleur(true)
+        preparerEffet()        // la transition reprend la nouvelle couleur
     }
 
     // On a bougé une poignée : toutes les couleurs du dossier sont recalculées, tout de suite.
@@ -426,51 +454,20 @@ class DossierVue(
         val titreX = panneau.centerX() - (41f * k + tw) / 2 + 19f * k
         val titreY = panneau.top + 44f * k
         if (p > 0) {
-            val e = 0.25f + 0.75f * freine(p)
-            c.save()
-            c.scale(e, e, sx, sy)          // agrandi depuis le widget : il « sort » de la boîte
-            pinceau.shader = LinearGradient(0f, panneau.top, 0f, panneau.bottom,
-                Teinte.avecAlpha(teinte.haut, 235 * p), Teinte.avecAlpha(teinte.bas, 235 * p), Shader.TileMode.CLAMP)
-            pinceau.style = Paint.Style.FILL
-            c.drawRoundRect(panneau, 46f * k, 46f * k, pinceau)
-            pinceau.shader = null
-            pinceau.style = Paint.Style.STROKE
-            pinceau.strokeWidth = 1.5f * k
-            pinceau.color = Color.argb((22 * p).toInt(), 255, 255, 255)
-            c.drawRoundRect(panneau, 46f * k, 46f * k, pinceau)
-            pinceau.style = Paint.Style.FILL
-            texte.color = Color.argb((235 * p).toInt(), 247, 239, 236)
-            c.drawText(nom, titreX + 22f * k, panneau.top + 54f * k, texte)
-            // la ligne sous le titre : les infos (« 5 apps · 2 open »), ou le mode d'emploi en mode édition
-            texte.typeface = Typeface.DEFAULT
-            texte.textSize = 17f * k
-            val ligne = if (edition) "Drag to move  ·  tap outside when done" else resume()
-            texte.color = if (edition) Teinte.avecAlpha(teinte.consigne, 200 * p) else Color.argb((150 * p).toInt(), 247, 239, 236)
-            c.drawText(ligne, panneau.centerX() - texte.measureText(ligne) / 2, panneau.top + 84f * k, texte)
-            // LE POINT MULTICOLORE : un petit anneau arc-en-ciel qui tourne doucement, avec au centre la
-            // couleur du dossier. Le toucher ouvre la roue.
-            c.save()
-            c.translate(pointX(), pointY())
-            c.rotate(t * 40f)
-            pinceau.style = Paint.Style.STROKE
-            pinceau.strokeWidth = 5f * k
-            pinceau.shader = arcEnCiel
-            pinceau.color = Color.argb((255 * p).toInt(), 255, 255, 255)
-            c.drawCircle(0f, 0f, 14f * k, pinceau)
-            pinceau.shader = null
-            pinceau.style = Paint.Style.FILL
-            pinceau.color = Teinte.avecAlpha(teinte.logo[1], 255 * p)
-            c.drawCircle(0f, 0f, 7.5f * k, pinceau)
-            c.restore()
-            // les petits points des pages, en bas du cadre
-            if (pages > 1) for (q in 0 until pages) {
-                val proche = (1 - abs(page - q)).coerceIn(0f, 1f)
-                pinceau.color = Teinte.avecAlpha(teinte.clair, (60 + 160 * proche) * p)
-                c.drawCircle(panneau.centerX() + (q - (pages - 1) / 2f) * 16f * k, panneau.bottom - 18f * k, (3f + 1.2f * proche) * k, pinceau)
+            val ef = effet
+            if (ef != null && ef.deplie) {
+                deplier(c, p, t, fer, titreX)
+            } else {
+                val e = 0.25f + 0.75f * freine(p)
+                c.save()
+                c.scale(e, e, sx, sy)          // agrandi depuis le widget : il « sort » de la boîte
+                dessinerPanneau(c, p, t, titreX)
+                c.restore()
             }
-            c.restore()
         }
         texte.typeface = Typeface.DEFAULT
+        // les décors de la transition du dossier (sous les apps)
+        effet?.avantApps(c, t, fer, p)
 
         // 3) LES TRAÎÎNÉES DE POUSSIÈRE puis LES APPS QUI ÉCLOSENT (dans le cadre : les pages voisines sont cachées)
         c.save()
@@ -487,9 +484,16 @@ class DossierVue(
             val ax = case.dx; val ay = case.dy
             if (ax < panneau.left - celluleL || ax > panneau.right + celluleL) continue      // page pas visible
             val d = if (i < parPage) 0.2f + pas * i else 0.3f
-            // la traînée (seulement pour la page 1, pendant l'ouverture)
+            // la transition du dossier (s'il en a une) décide de l'apparition des apps de la 1re page
+            if (effet != null && i < parPage && !edition && case !== presse && case.retireeA < 0) {
+                val arr = effet.arrivee(i, t)
+                if (arr.alpha <= 0.004f && arr.nv <= 0f) continue
+                dessinerCase(c, case, i, ax, ay, 1f, fer, t, arr = arr)
+                continue
+            }
+            // la traînée (seulement pour la page 1, pendant l'ouverture, et sans transition propre au dossier)
             val tr = ((t - d) / 0.25f).coerceIn(0f, 1f)
-            if (i < parPage && tr > 0 && tr < 1 && fer == 0f && page < 0.5f) {
+            if (effet == null && i < parPage && tr > 0 && tr < 1 && fer == 0f && page < 0.5f) {
                 for (q in 0 until 10) {
                     val u = lisse((tr - q * 0.04f).coerceIn(0f, 1f))
                     val x = mix(panneau.centerX(), ax, u)
@@ -523,6 +527,7 @@ class DossierVue(
         var x = mix(sx, titreX, u)
         var y = mix(sy, titreY, u) - 60f * k * sin(PI.toFloat() * u)
         var r = mix(r0, 19f * k, u) * (1 + 0.35f * sin(PI.toFloat() * u))      // elle grossit un peu en route
+        r *= effet?.battementLogo(t) ?: 1f          // Health : le cœur bat à côté du titre
         // l'étoile de l'IA tourne doucement sans fin ; les autres logos (11/11 : bulle, vinyle, carte…) font un tour
         // complet pendant le vol et s'arrêtent bien droits (sinon on les verrait la tête en bas)
         val etoileIA = LogosDossier.tours(groupe) == null
@@ -559,19 +564,99 @@ class DossierVue(
         postInvalidateOnAnimation()
     }
 
+    // LA FENÊTRE DU DOSSIER : le fond, son liseré, la transition (la carte de Maps), le titre, le point multicolore…
+    private fun dessinerPanneau(c: Canvas, p: Float, t: Float, titreX: Float) {
+        texte.typeface = gras
+        texte.textSize = 28f * k
+        pinceau.shader = LinearGradient(0f, panneau.top, 0f, panneau.bottom,
+            Teinte.avecAlpha(teinte.haut, 235 * p), Teinte.avecAlpha(teinte.bas, 235 * p), Shader.TileMode.CLAMP)
+        pinceau.style = Paint.Style.FILL
+        c.drawRoundRect(panneau, 46f * k, 46f * k, pinceau)
+        pinceau.shader = null
+        pinceau.style = Paint.Style.STROKE
+        pinceau.strokeWidth = 1.5f * k
+        pinceau.color = Color.argb((22 * p).toInt(), 255, 255, 255)
+        c.drawRoundRect(panneau, 46f * k, 46f * k, pinceau)
+        pinceau.style = Paint.Style.FILL
+        effet?.dansPanneau(c, t, p)
+        texte.color = Color.argb((235 * p).toInt(), 247, 239, 236)
+        c.drawText(nom, titreX + 22f * k, panneau.top + 54f * k, texte)
+        // la ligne sous le titre : les infos (« 5 apps · 2 open »), ou le mode d'emploi en mode édition
+        texte.typeface = Typeface.DEFAULT
+        texte.textSize = 17f * k
+        val ligne = if (edition) "Drag to move  ·  tap outside when done" else resume()
+        texte.color = if (edition) Teinte.avecAlpha(teinte.consigne, 200 * p) else Color.argb((150 * p).toInt(), 247, 239, 236)
+        c.drawText(ligne, panneau.centerX() - texte.measureText(ligne) / 2, panneau.top + 84f * k, texte)
+        // LE POINT MULTICOLORE : un petit anneau arc-en-ciel qui tourne doucement, avec au centre la
+        // couleur du dossier. Le toucher ouvre la roue.
+        c.save()
+        c.translate(pointX(), pointY())
+        c.rotate(t * 40f)
+        pinceau.style = Paint.Style.STROKE
+        pinceau.strokeWidth = 5f * k
+        pinceau.shader = arcEnCiel
+        pinceau.color = Color.argb((255 * p).toInt(), 255, 255, 255)
+        c.drawCircle(0f, 0f, 14f * k, pinceau)
+        pinceau.shader = null
+        pinceau.style = Paint.Style.FILL
+        pinceau.color = Teinte.avecAlpha(teinte.logo[1], 255 * p)
+        c.drawCircle(0f, 0f, 7.5f * k, pinceau)
+        c.restore()
+        // les petits points des pages, en bas du cadre
+        if (pages > 1) for (q in 0 until pages) {
+            val proche = (1 - abs(page - q)).coerceIn(0f, 1f)
+            pinceau.color = Teinte.avecAlpha(teinte.clair, (60 + 160 * proche) * p)
+            c.drawCircle(panneau.centerX() + (q - (pages - 1) / 2f) * 16f * k, panneau.bottom - 18f * k, (3f + 1.2f * proche) * k, pinceau)
+        }
+    }
+
+    // MAPS : la fenêtre se DÉPLIE comme une carte routière en 3 volets. Le volet du milieu s'ouvre depuis le centre,
+    // puis les deux volets de côté se déplient depuis ses bords (ils sont un peu dans l'ombre tant qu'ils sont pliés).
+    // À la fermeture, tout se replie.
+    private fun deplier(c: Canvas, p: Float, t: Float, fer: Float, titreX: Float) {
+        val tiers = panneau.width() / 3
+        val g = panneau.left; val cx = panneau.centerX()
+        val s0 = freine(seg(t, 0.05f, 0.28f)) * (1 - fer)      // le volet du milieu
+        val s1 = freine(seg(t, 0.2f, 0.46f)) * (1 - fer)       // les volets de côté
+        // pour chaque volet : son morceau de fenêtre (début, fin), son bord intérieur, où se colle ce bord, son ouverture
+        val volets = arrayOf(
+            floatArrayOf(g + tiers, g + 2 * tiers, cx, cx, s0),
+            floatArrayOf(g, g + tiers, g + tiers, cx - tiers / 2 * s0, s1),
+            floatArrayOf(g + 2 * tiers, panneau.right, g + 2 * tiers, cx + tiers / 2 * s0, s1))
+        val forme = Path().apply { addRoundRect(panneau, 46f * k, 46f * k, Path.Direction.CW) }
+        for (v in volets) {
+            val s = v[4]
+            if (s <= 0.01f) continue
+            c.save()
+            c.translate(v[3], 0f); c.scale(s, 1f); c.translate(-v[2], 0f)
+            c.clipRect(v[0], panneau.top - 10f * k, v[1], panneau.bottom + 10f * k)
+            dessinerPanneau(c, p, t, titreX)
+            // l'ombre du pli
+            c.clipPath(forme)
+            pinceau.shader = null
+            pinceau.style = Paint.Style.FILL
+            pinceau.color = Color.argb((128 * (1 - s)).toInt(), 0, 0, 0)
+            c.drawRect(v[0], panneau.top, v[1], panneau.bottom, pinceau)
+            c.restore()
+        }
+    }
+
     // UNE CASE : l'onde d'éclosion, l'icône (qui tremble doucement en mode édition), la petite croix pour
     // la retirer (mode édition), puis le nom et l'info en dessous.
-    private fun dessinerCase(c: Canvas, case: Case, i: Int, ax: Float, ay: Float, v: Float, fer: Float, t: Float, souleve: Boolean = false) {
+    // arr = l'apparition donnée par la transition du dossier (null = l'éclosion d'origine, réglée par v).
+    private fun dessinerCase(c: Canvas, case: Case, i: Int, ax: Float, ay0: Float, v: Float, fer: Float, t: Float,
+                             souleve: Boolean = false, arr: Arrivee? = null) {
+        val ay = ay0 + (arr?.decalY ?: 0f)               // Finance : les apps montent depuis un peu plus bas
         val retrait = if (case.retireeA >= 0) 1 - ((t - case.retireeA) / 0.25f).coerceIn(0f, 1f) else 1f
         val attenue = 1 - 0.75f * ouvertureRoue           // les apps s'estompent sous la roue
-        val alpha = (v / 0.25f).coerceIn(0f, 1f) * (1 - fer) * retrait * attenue
+        val alpha = (arr?.alpha ?: (v / 0.25f).coerceIn(0f, 1f)) * (1 - fer) * retrait * attenue
         val flot = if (edition) 0f else 4f * k * sin(t * 2f + i * 1.6f)
         val appui = if (case === presse) 1 - 0.08f * sin(PI.toFloat() * ((t - presseA) / 0.15f).coerceIn(0f, 1f)) else 1f
-        val e = (0.2f + 0.8f * ressort(v)) * appui * retrait * (if (souleve) 1.12f else 1f)
-        var penche = -14f * (1 - freine(v))
+        val e = (arr?.echelle ?: (0.2f + 0.8f * ressort(v))) * appui * retrait * (if (souleve) 1.12f else 1f)
+        var penche = arr?.penche ?: (-14f * (1 - freine(v)))
         if (edition && !souleve) penche += 2.5f * sin(t * 18f + i * 2.1f)      // le petit tremblement
         // l'onde fine qui s'écarte autour de l'app au moment où elle éclot (très discrète)
-        if (v < 1) {
+        if (arr == null && v < 1) {
             pinceau.style = Paint.Style.STROKE
             pinceau.strokeWidth = 1.6f * k
             pinceau.color = Teinte.avecAlpha(teinte.onde, 70 * (1 - v) * alpha)
@@ -584,7 +669,16 @@ class DossierVue(
         case.image?.let { b ->
             pinceau.color = Color.WHITE
             pinceau.alpha = (255 * alpha).toInt()
+            // Photos : l'icône commence en noir et blanc, assombrie, et se « développe » vers la couleur
+            val gris = arr?.gris ?: 0f
+            if (gris > 0.01f) {
+                val filtre = android.graphics.ColorMatrix().apply { setSaturation(1 - gris) }
+                val l = 1 - 0.7f * gris
+                filtre.postConcat(android.graphics.ColorMatrix().apply { setScale(l, l, l, 1f) })
+                pinceau.colorFilter = android.graphics.ColorMatrixColorFilter(filtre)
+            }
             c.drawBitmap(b, ax - b.width / 2f, ay + flot - b.height / 2f, pinceau)
+            pinceau.colorFilter = null
             pinceau.alpha = 255
         }
         // la petite croix (mode édition), en haut à gauche de l'icône
@@ -604,7 +698,7 @@ class DossierVue(
         if (souleve) return
         // le nom, puis l'info en dessous, glissent doucement en place un peu après
         val d = if (i < parPage) 0.2f + min(0.04f, 0.3f / max(1, min(cases.size, parPage))) * i else 0.3f
-        val nv = (if (edition) 1f else ((t - (d + 0.3f)) / 0.3f).coerceIn(0f, 1f)) * (1 - fer) * retrait * attenue
+        val nv = (if (edition) 1f else arr?.nv ?: ((t - (d + 0.3f)) / 0.3f).coerceIn(0f, 1f)) * (1 - fer) * retrait * attenue
         if (nv > 0) {
             val glisse = 8f * k * (1 - freine(nv))
             texte.textSize = 19f * k
