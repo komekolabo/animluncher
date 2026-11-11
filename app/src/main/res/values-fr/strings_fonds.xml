@@ -34,4 +34,7 @@
     <string name="fd_service_video">AnimLauncher · Vidéo</string>
     <string name="fd_desc_dessin">Fonds d’écran animés dessinés par AnimLauncher, ou tes propres GIF et images. S’arrête quand il est caché.</string>
     <string name="fd_desc_video">Ta propre vidéo en fond d’écran, muette et en boucle. S’arrête quand elle est cachée.</string>
+    <string name="fd_diag_titre">Diagnostic (à envoyer à Claude si quelque chose cloche)</string>
+    <string name="fd_diag_dessin">Dessin : visible %1$s · %2$d images (il y a %3$s) · économie %4$s · chaud %5$s</string>
+    <string name="fd_diag_video">Vidéo : visible %1$s · lecteur %2$s (il y a %3$s) · économie %4$s · chaud %5$s</string>
 </resources>

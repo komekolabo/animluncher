@@ -42,17 +42,25 @@ import kotlin.math.min
 //  2) 30 images par seconde par défaut (« Éco »), 60 seulement si on choisit « Fluide » ;
 //  3) option « figer » : après 10 s sans toucher l'accueil, le mouvement ralentit puis s'arrête ;
 //     il repart dès qu'on touche l'écran ou qu'on change de page ;
-//  4) en mode économie d'énergie, ou si le téléphone chauffe beaucoup, le fond se fige tout seul ;
+//  4) en mode économie d'énergie, le fond RALENTIT (15 images/s) ; il ne se fige que si le téléphone
+//     est en surchauffe (avant le 12/11, l'économie d'énergie le figeait : Will voyait une image fixe) ;
 //  5) une image fixe n'est dessinée qu'UNE fois (et redessinée seulement si Android le demande) ;
 //  6) le dessin se fait avec la carte graphique (lockHardwareCanvas), plus économe que le processeur.
 
 // ---------------------------------------------------------------------------------------------
-// LE GARDIEN : surveille le mode économie d'énergie et la chaleur du téléphone.
-// « economie » vaut true quand il faut figer le fond. Il prévient le moteur quand ça change.
+// LE GARDIEN : surveille le mode économie d'énergie, la chaleur du téléphone et l'écran (allumé / éteint).
+//  - economie : mode économie d'énergie, ou téléphone chaud -> on RALENTIT (moins d'images par seconde) ;
+//  - surchauffe : téléphone brûlant (niveau « critique » d'Android) -> on FIGE le fond ;
+//  - ecranAllume : sert de secours si Android ne nous dit jamais si le fond est visible (voir plus bas).
+// Il prévient le moteur dès que quelque chose change.
 // ---------------------------------------------------------------------------------------------
 class GardienBatterie(private val c: Context, private val quandChange: () -> Unit) {
     private val pm = c.getSystemService(PowerManager::class.java)
     var economie = false
+        private set
+    var surchauffe = false
+        private set
+    var ecranAllume = true
         private set
     private var ecouteChaleur: Any? = null          // l'écouteur de chaleur (Android 10 et plus)
     private val recepteur = object : BroadcastReceiver() {
@@ -60,9 +68,12 @@ class GardienBatterie(private val c: Context, private val quandChange: () -> Uni
     }
 
     fun demarrer() {
-        val filtre = IntentFilter(PowerManager.ACTION_POWER_SAVE_MODE_CHANGED)
-        // Android 13+ veut qu'on précise si d'autres apps peuvent nous envoyer ce message : non.
-        // (Les messages du système, comme celui-ci, arrivent quand même.)
+        val filtre = IntentFilter(PowerManager.ACTION_POWER_SAVE_MODE_CHANGED).apply {
+            addAction(Intent.ACTION_SCREEN_ON)
+            addAction(Intent.ACTION_SCREEN_OFF)
+        }
+        // Android 13+ veut qu'on précise si d'autres apps peuvent nous envoyer ces messages : non.
+        // (Les messages du système, comme ceux-ci, arrivent quand même.)
         if (Build.VERSION.SDK_INT >= 33) c.registerReceiver(recepteur, filtre, Context.RECEIVER_NOT_EXPORTED)
         else c.registerReceiver(recepteur, filtre)
         if (Build.VERSION.SDK_INT >= 29) {
@@ -82,10 +93,32 @@ class GardienBatterie(private val c: Context, private val quandChange: () -> Uni
     }
 
     private fun calculer() {
-        val avant = economie
-        val chaud = Build.VERSION.SDK_INT >= 29 && pm.currentThermalStatus >= PowerManager.THERMAL_STATUS_SEVERE
-        economie = pm.isPowerSaveMode || chaud
-        if (avant != economie) quandChange()
+        val avant = Triple(economie, surchauffe, ecranAllume)
+        val chaleur = if (Build.VERSION.SDK_INT >= 29) pm.currentThermalStatus else 0
+        economie = pm.isPowerSaveMode || chaleur >= PowerManager.THERMAL_STATUS_SEVERE
+        surchauffe = chaleur >= PowerManager.THERMAL_STATUS_CRITICAL
+        ecranAllume = pm.isInteractive
+        if (avant != Triple(economie, surchauffe, ecranAllume)) quandChange()
+    }
+}
+
+// ---------------------------------------------------------------------------------------------
+// LE DIAGNOSTIC (12/11) : chaque moteur note ce qu'il vit dans un petit carnet « fond_diag »
+// (visible ou non, images dessinées, état de la vidéo…). L'écran « Fonds d'écran » l'affiche en bas :
+// Will peut ainsi dire à Claude ce qui se passe sur son téléphone.
+// ---------------------------------------------------------------------------------------------
+object DiagFond {
+    fun carnet(c: Context): SharedPreferences = c.getSharedPreferences("fond_diag", Context.MODE_PRIVATE)
+
+    fun noter(c: Context, vararg paires: Pair<String, Any>) {
+        val e = carnet(c).edit()
+        for ((cle, v) in paires) when (v) {
+            is Boolean -> e.putBoolean(cle, v)
+            is Int -> e.putInt(cle, v)
+            is Long -> e.putLong(cle, v)
+            else -> e.putString(cle, v.toString())
+        }
+        e.apply()
     }
 }
 
@@ -171,8 +204,19 @@ class FondDessinService : WallpaperService() {
         private var vitesse = 1f                 // 1 = normal, 0 = figé (pour ralentir en douceur)
         private var dernierContact = SystemClock.uptimeMillis()
         private var toileMateriel = true         // dessiner avec la carte graphique (sinon : processeur)
-        private val gardien = GardienBatterie(ctx) { relancer() }
+        private val gardien = GardienBatterie(ctx) { quandLeGardienChange() }
         private val voile = Paint()
+
+        // SECOURS : normalement Android dit au moteur quand le fond devient visible (onVisibilityChanged).
+        // Si ce signal n'arrive jamais (lanceurs capricieux), au bout de 1,5 s on considère le fond
+        // visible tant que l'écran est allumé.
+        private var signalRecu = false
+        private val minuteur = Handler(Looper.getMainLooper())
+        private val secours = Runnable {
+            if (!signalRecu) { visible = gardien.ecranAllume; noterVisible(); relancer() }
+        }
+        private var images = 0                   // images dessinées (pour le diagnostic)
+        private var dernierDiag = 0L
 
         override fun onCreate(holder: SurfaceHolder) {
             super.onCreate(holder)
@@ -182,7 +226,24 @@ class FondDessinService : WallpaperService() {
             charger()
         }
 
+        override fun onSurfaceCreated(holder: SurfaceHolder) {
+            super.onSurfaceCreated(holder)
+            minuteur.postDelayed(secours, 1500L)
+        }
+
+        private fun quandLeGardienChange() {
+            if (!signalRecu) visible = gardien.ecranAllume      // mode secours : on suit l'écran
+            noterVisible()
+            relancer()
+        }
+
+        private fun noterVisible() {
+            DiagFond.noter(ctx, "d_vis" to visible, "d_vis_ms" to System.currentTimeMillis(),
+                "d_signal" to signalRecu, "d_eco" to gardien.economie, "d_chaud" to gardien.surchauffe)
+        }
+
         override fun onDestroy() {
+            minuteur.removeCallbacks(secours)
             Choreographer.getInstance().removeFrameCallback(this)
             CarnetFond.carnet(ctx).unregisterOnSharedPreferenceChangeListener(this)
             gardien.arreter()
@@ -232,7 +293,9 @@ class FondDessinService : WallpaperService() {
         }
 
         override fun onVisibilityChanged(v: Boolean) {
+            signalRecu = true
             visible = v
+            noterVisible()
             if (v) {
                 dernierContact = SystemClock.uptimeMillis()
                 derniereImageNs = 0L
@@ -278,8 +341,13 @@ class FondDessinService : WallpaperService() {
         override fun doFrame(ns: Long) {
             imageDemandee = false
             if (!visible) return
-            // Éco = 30 images/s : on saute les images en trop (tolérance de 4 ms pour rester régulier)
-            val periodeNs = if (choix.fluide) 16_600_000L else 33_300_000L
+            // Éco = 30 images/s : on saute les images en trop (tolérance de 4 ms pour rester régulier).
+            // En économie d'énergie : 15 images/s (ça bouge toujours, mais deux fois moins de travail).
+            val periodeNs = when {
+                gardien.economie -> 66_600_000L
+                choix.fluide -> 16_600_000L
+                else -> 33_300_000L
+            }
             if (derniereImageNs != 0L && ns - derniereImageNs < periodeNs - 4_000_000L) {
                 relancer()
                 return
@@ -288,11 +356,18 @@ class FondDessinService : WallpaperService() {
             derniereImageNs = ns
             // l'option « figer » : après 10 s sans contact, on ralentit sur 1,5 s jusqu'à l'arrêt ;
             // au réveil, on réaccélère sur 0,6 s (pas de démarrage brusque)
-            val doitFiger = gardien.economie || (choix.figer && SystemClock.uptimeMillis() - dernierContact > 10_000L)
+            val doitFiger = gardien.surchauffe || (choix.figer && SystemClock.uptimeMillis() - dernierContact > 10_000L)
             vitesse = if (doitFiger) max(0f, vitesse - dt / 1.5f) else min(1f, vitesse + dt / 0.6f)
-            if (gardien.economie) vitesse = 0f     // économie d'énergie : arrêt immédiat
+            if (gardien.surchauffe) vitesse = 0f   // téléphone brûlant : arrêt immédiat
             t += dt * vitesse
             dessinerImage()
+            images++
+            // le diagnostic : au plus une note toutes les 2 s (écrire à chaque image coûterait de la batterie)
+            val maintenant = SystemClock.uptimeMillis()
+            if (maintenant - dernierDiag > 2000L) {
+                dernierDiag = maintenant
+                DiagFond.noter(ctx, "d_images" to images, "d_img_ms" to System.currentTimeMillis())
+            }
             // on redemande une image seulement si ça bouge encore
             if (anime() && (vitesse > 0f || !doitFiger)) relancer()
         }
@@ -305,6 +380,7 @@ class FondDessinService : WallpaperService() {
                 if (toileMateriel) surface.lockHardwareCanvas() else surfaceHolder.lockCanvas()
             } catch (e: Exception) {
                 // si la carte graphique refuse (rare), on passe au processeur pour toujours
+                DiagFond.noter(ctx, "d_erreur" to (e.javaClass.simpleName + " " + (e.message ?: "")).take(80))
                 if (toileMateriel) { toileMateriel = false; dessinerImage() }
                 return
             } ?: return
@@ -342,7 +418,26 @@ class FondVideoService : WallpaperService() {
         private var fige = false                 // figé par l'option « figer » (10 s sans contact)
         private val minuteur = Handler(Looper.getMainLooper())
         private val figer = Runnable { fige = true; mettreAJour() }
-        private val gardien = GardienBatterie(ctx) { mettreAJour() }
+        private val gardien = GardienBatterie(ctx) { quandLeGardienChange() }
+
+        // SECOURS : même principe que pour les dessins (voir FondDessinService)
+        private var signalRecu = false
+        private val secours = Runnable {
+            if (!signalRecu) { visible = gardien.ecranAllume; noterVisible(); mettreAJour() }
+        }
+
+        private fun quandLeGardienChange() {
+            if (!signalRecu) visible = gardien.ecranAllume
+            noterVisible()
+            mettreAJour()
+        }
+
+        private fun noterVisible() {
+            DiagFond.noter(ctx, "v_vis" to visible, "v_vis_ms" to System.currentTimeMillis(),
+                "v_signal" to signalRecu, "v_eco" to gardien.economie, "v_chaud" to gardien.surchauffe)
+        }
+
+        private fun noterEtat(etat: String) = DiagFond.noter(ctx, "v_etat" to etat, "v_etat_ms" to System.currentTimeMillis())
 
         override fun onCreate(holder: SurfaceHolder) {
             super.onCreate(holder)
@@ -353,6 +448,7 @@ class FondVideoService : WallpaperService() {
 
         override fun onDestroy() {
             minuteur.removeCallbacks(figer)
+            minuteur.removeCallbacks(secours)
             CarnetFond.carnet(ctx).unregisterOnSharedPreferenceChangeListener(this)
             gardien.arreter()
             liberer()
@@ -362,6 +458,7 @@ class FondVideoService : WallpaperService() {
         override fun onSurfaceCreated(holder: SurfaceHolder) {
             super.onSurfaceCreated(holder)
             preparer(holder)
+            minuteur.postDelayed(secours, 1500L)
         }
 
         override fun onSurfaceDestroyed(holder: SurfaceHolder) {
@@ -381,7 +478,8 @@ class FondVideoService : WallpaperService() {
         private fun preparer(holder: SurfaceHolder) {
             liberer()
             val f = File(choix.id)
-            if (!f.exists()) return
+            if (!f.exists()) { noterEtat("absent"); return }
+            noterEtat("chargement")
             val mp = MediaPlayer()
             try {
                 mp.setDataSource(f.path)
@@ -395,10 +493,11 @@ class FondVideoService : WallpaperService() {
                     pret = true
                     mettreAJour()
                 }
-                mp.setOnErrorListener { _, _, _ -> pret = false; true }
+                mp.setOnErrorListener { _, quoi, extra -> pret = false; noterEtat("erreur $quoi/$extra"); true }
                 mp.prepareAsync()                      // prépare sans bloquer l'écran
                 lecteur = mp
-            } catch (_: Exception) {
+            } catch (e: Exception) {
+                noterEtat("illisible " + e.javaClass.simpleName)
                 mp.release()                           // fichier illisible : on abandonne proprement
             }
         }
@@ -413,17 +512,20 @@ class FondVideoService : WallpaperService() {
         private fun mettreAJour() {
             val mp = lecteur ?: return
             if (!pret) return
-            val doitJouer = visible && !gardien.economie && !fige
+            // (l'économie d'énergie ne met PAS la vidéo en pause : c'est la puce vidéo qui travaille, très peu coûteux)
+            val doitJouer = visible && !gardien.surchauffe && !fige
             try {
-                if (doitJouer && !mp.isPlaying) mp.start()
-                else if (!doitJouer && mp.isPlaying) mp.pause()
-            } catch (_: Exception) {}
+                if (doitJouer && !mp.isPlaying) { mp.start(); noterEtat("lecture") }
+                else if (!doitJouer && mp.isPlaying) { mp.pause(); noterEtat("pause") }
+            } catch (e: Exception) { noterEtat("erreur " + e.javaClass.simpleName) }
             minuteur.removeCallbacks(figer)
             if (doitJouer && choix.figer) minuteur.postDelayed(figer, 10_000L)
         }
 
         override fun onVisibilityChanged(v: Boolean) {
+            signalRecu = true
             visible = v
+            noterVisible()
             if (v) fige = false
             mettreAJour()
         }

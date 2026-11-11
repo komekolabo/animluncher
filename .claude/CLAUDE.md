@@ -17,8 +17,14 @@ de chaque fichier envoyé). Au prochain passage tranquille, ces notes pourront �
   l'écran d'Android ne change pas le fond actuel. Même service déjà actif -> changement INSTANTANÉ (écouteur du
   carnet), sinon `ACTION_CHANGE_LIVE_WALLPAPER` (confirmation d'Android obligatoire).
 - Économies : rien quand caché (onVisibilityChanged), Éco 30 i/s par défaut (Fluide 60), option « figer après
-  10 s sans toucher l'accueil » (ralentit sur 1,5 s, repart au toucher / changement de page), figé en économie
-  d'énergie ou si THERMAL_STATUS_SEVERE (`GardienBatterie`), image fixe dessinée une seule fois.
+  10 s sans toucher l'accueil » (ralentit sur 1,5 s, repart au toucher / changement de page), image fixe dessinée
+  une seule fois. `GardienBatterie` : économie d'énergie ou THERMAL_STATUS_SEVERE -> RALENTIR (dessins à 15 i/s,
+  vidéo continue) ; seul THERMAL_STATUS_CRITICAL fige.
+- 12/11 00h30 : Will a vu les 3 fonds (Nuit, Galets, sa vidéo) TOUJOURS FIGÉS sur l'accueil. Cause la plus
+  probable : l'économie d'énergie figeait tout (corrigé ci-dessus). Ajouté aussi : un SECOURS si Android n'envoie
+  jamais onVisibilityChanged (après 1,5 s, visible = écran allumé), et un DIAGNOSTIC : chaque moteur note dans le
+  carnet « fond_diag » (visible ✓/✗, signal reçu, images dessinées, état du lecteur vidéo, économie, chaleur,
+  erreur de dessin) ; affiché en bas de l'écran Fonds d'écran (texte copiable). Demander à Will de le recopier.
 - Import (sélecteur de photos, sans permission) : vidéo = piste vidéo seule recopiée par MediaExtractor/MediaMuxer
   (SON RETIRÉ, sinon `isMusicActive` allumerait la réaction sonore) ; image réduite à l'écran (JPEG) ; GIF copié et
   lu avec `Movie` peint dans une petite image puis agrandie. Appui long sur un fond importé = le supprimer.

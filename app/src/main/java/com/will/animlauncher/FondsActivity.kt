@@ -97,6 +97,44 @@ class FondsActivity : Activity() {
             setLineSpacing(0f, 1.2f)
             setPadding(px(4f), px(18f), px(4f), 0)
         })
+        // 4) le diagnostic (12/11) : ce que les fonds d'écran ont vécu la dernière fois qu'ils étaient affichés
+        liste.addView(Style.texte(this, diagnostic(), 11f, Color.rgb(110, 110, 118)).apply {
+            setLineSpacing(0f, 1.25f)
+            setPadding(px(4f), px(14f), px(4f), 0)
+            setTextIsSelectable(true)                // on peut le copier pour l'envoyer
+        })
+    }
+
+    // Le texte du diagnostic, lu dans le carnet « fond_diag » rempli par les services (FondService.kt).
+    //  visible : ✓ / ✗ + depuis combien de temps ; « ? » = Android n'a jamais envoyé le signal (mode secours)
+    //  dessin : nombre d'images dessinées par le dernier moteur ; vidéo : ▶ lecture, ⏸ pause, … chargement
+    private fun diagnostic(): String {
+        val d = DiagFond.carnet(this)
+        val maintenant = System.currentTimeMillis()
+        fun depuis(cle: String): String {
+            val ms = d.getLong(cle, 0L)
+            if (ms == 0L) return "—"
+            val s = (maintenant - ms) / 1000
+            return if (s < 120) "$s s" else "${s / 60} min"
+        }
+        fun visible(p: String): String {
+            if (!d.contains(p + "_vis")) return "—"
+            val v = if (d.getBoolean(p + "_vis", false)) "✓" else "✗"
+            val signal = if (d.getBoolean(p + "_signal", false)) "" else "?"
+            return "$v$signal (${depuis(p + "_vis_ms")})"
+        }
+        fun oui(cle: String) = if (d.getBoolean(cle, false)) "✓" else "✗"
+        val etat = when (val e = d.getString("v_etat", null)) {
+            null -> "—"
+            "lecture" -> "▶"
+            "pause" -> "⏸"
+            "chargement" -> "…"
+            else -> "⚠ $e"
+        }
+        val erreur = d.getString("d_erreur", null)?.let { "\n⚠ $it" } ?: ""
+        return getString(R.string.fd_diag_titre) + "\n" +
+            getString(R.string.fd_diag_dessin, visible("d"), d.getInt("d_images", 0), depuis("d_img_ms"), oui("d_eco"), oui("d_chaud")) + erreur + "\n" +
+            getString(R.string.fd_diag_video, visible("v"), etat, depuis("v_etat_ms"), oui("v_eco"), oui("v_chaud"))
     }
 
     private fun nomDe(sorte: String) = getString(when (sorte) {
