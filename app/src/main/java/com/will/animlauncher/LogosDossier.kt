@@ -2,6 +2,7 @@ package com.will.animlauncher
 
 import android.graphics.Canvas
 import android.graphics.Color
+import android.graphics.DashPathEffect
 import android.graphics.LinearGradient
 import android.graphics.Paint
 import android.graphics.Path
@@ -13,63 +14,92 @@ import kotlin.math.PI
 import kotlin.math.abs
 import kotlin.math.cos
 import kotlin.math.hypot
+import kotlin.math.max
 import kotlin.math.min
 import kotlin.math.sin
 
-// LES LOGOS DES DOSSIERS ANIMÉS (11/11, validés par Will sur l'aperçu dossiers_reel.mp4).
-// Chaque catégorie a son logo, dans le même esprit que l'étoile de l'IA : une forme pleine et simple
-// (lisible même à la taille d'une icône), un dégradé de 3 couleurs à elle, et un petit GESTE :
+// LES LOGOS DES DOSSIERS ANIMÉS (v2 du 11/11, après l'avis honnête demandé par Will : la v1 faisait trop
+// « pictogrammes génériques », trop de roses, et certains rappelaient des marques).
+// Chaque catégorie a son logo, une forme pleine et lisible même à la taille d'une icône, et un petit GESTE
+// qui raconte quelque chose :
 //   AI            l'étoile (inchangée)
-//   Social        une bulle de discussion ; 3 points « en train d'écrire » sautent l'un après l'autre
-//   Music & Video le triangle « lecture », qui bat au rythme
-//   Photos        un diaphragme d'appareil photo, qui se ferme et se rouvre (« clic »)
-//   Finance       une pièce avec une flèche qui monte ; elle fait un tour sur elle-même
-//   Maps & Travel une épingle de carte qui fait un petit bond, avec son ombre
-//   Productivity  une case cochée : la coche s'efface puis se redessine
-//   Health        un cœur traversé par la ligne d'un électrocardiogramme ; il bat quand la ligne passe le pic
-//   Shopping      un sac qui se balance, accroché à sa poignée
-//   Settings      deux engrenages qui s'entraînent (le petit tourne dans l'autre sens, plus vite)
-//   News          un point « en direct » et des ondes qui s'allument vers l'extérieur
+//   Social        deux bulles : celle de devant « écrit » (3 points qui sautent), celle du fond arrive en rebondissant
+//   Music & Video un vinyle qui tourne, avec son reflet ; le bras de la platine vient se poser dessus
+//   Photos        un diaphragme d'appareil photo qui se ferme et se rouvre (« clic »)
+//   Finance       une courbe de bourse qui se trace en montant, avec l'aire dessous
+//   Maps & Travel une carte pliée en 3 ; un itinéraire se trace en pointillés, puis une épingle tombe à l'arrivée
+//   Productivity  une liste de tâches dont les 3 cases se cochent l'une après l'autre
+//   Health        un cœur traversé par un électrocardiogramme ; il bat quand la ligne passe le pic
+//   Shopping      l'étincelle tombe dans le sac, qui l'attrape en s'écrasant puis se balance
+//   Settings      3 réglettes dont les curseurs glissent puis reviennent (le curseur du milieu est l'étincelle)
+//   News          un journal au coin plié, dont les lignes s'écrivent
+//
+// L'ÉTINCELLE : une petite étoile à 4 branches, comme celle de l'IA, se retrouve dans CHAQUE logo (en haut à
+// droite, ou à un endroit qui a du sens : le reflet de l'objectif, le sommet de la courbe, le curseur…).
+// C'est la signature commune d'AnimLauncher : les logos sont de la même famille que l'étoile.
+//
+// LES COULEURS (v2) sont réparties sur toute la roue (un dossier = une teinte : rouge, ambre, vert, turquoise,
+// bleu, indigo, violet…), et le galet du widget prend un sombre assorti (voir hsvGalet).
 //
 // LE REPÈRE : comme dans WidgetDossier.kt, on dessine dans un carré de 100 x 100 (tout le galet) et le
 // logo est centré en (50, 48), d'un « rayon » d'environ 26 (celui de l'étoile).
 // LE GESTE : « g » est l'horloge du geste, en secondes. Au repos, g = 0,3 (c'est la pose du logo quand il
 // apparaît et quand il renaît) ; WidgetDossier la fait avancer pendant que le logo est affiché.
-// LES TROUS (les points de la bulle, le centre de l'épingle, la ligne du cœur…) sont « découpés » dans le
-// logo : on voit le galet au travers. Pour ça, le logo est dessiné sur un calque à part (saveLayer), puis
-// on efface ces zones avec un pinceau spécial (mode CLEAR = « rendre transparent »).
+// LES TROUS (les points de la bulle, la route, les lignes du journal…) sont « découpés » dans le logo : on
+// voit le galet au travers. Pour ça, le logo est dessiné sur un calque à part (saveLayer), puis on efface
+// ces zones avec un pinceau spécial (mode CLEAR = « rendre transparent »).
+// L'aperçu Python de ces logos (logos2.py) dessine exactement la même chose.
 object LogosDossier {
     private const val CX = 50f
     private const val CY = 48f
 
-    // Les 3 couleurs du dégradé de chaque logo (du haut-gauche vers le bas-droite).
+    // Les 3 couleurs du dégradé de chaque logo (clair -> moyen -> profond).
     private fun c(hex: Int) = Color.rgb((hex shr 16) and 255, (hex shr 8) and 255, hex and 255)
     private val COULEURS = mapOf(
         "ia" to intArrayOf(c(0xFF8C5B), c(0xFF6B9B), c(0xC4D13F)),
-        "social" to intArrayOf(c(0x6CF0C2), c(0x3FD3E0), c(0x3F9BFF)),
-        "musique" to intArrayOf(c(0xFF7AC8), c(0xFF4F7A), c(0xFF9F4F)),
-        "photo" to intArrayOf(c(0xFFD86B), c(0xFF8A5C), c(0xFF5C93)),
-        "finance" to intArrayOf(c(0xFFE58A), c(0xF5B43C), c(0xD9862B)),
-        "trajets" to intArrayOf(c(0xC2F06A), c(0x5ED68A), c(0x2FBFA0)),
-        "travail" to intArrayOf(c(0xC29BFF), c(0x7C6CFF), c(0x5E8BFF)),
-        "sante" to intArrayOf(c(0xFF9E7A), c(0xFF4D5E), c(0xE8457F)),
-        "shopping" to intArrayOf(c(0xFFB27A), c(0xFF7FA8), c(0xC98BFF)),
-        "reglages" to intArrayOf(c(0xEAF1FB), c(0x93B4E4), c(0x5E80D2)),
-        "infos" to intArrayOf(c(0xEAF5FF), c(0xA9D4FF), c(0x7FA8FF)),
+        "social" to intArrayOf(c(0x8FD3FF), c(0x4AA8F0), c(0x2F78D6)),       // bleu ciel
+        "musique" to intArrayOf(c(0xF2A0F5), c(0xD05CE6), c(0x9E3CC4)),      // violet
+        "photo" to intArrayOf(c(0xFFD978), c(0xF5B342), c(0xE08A2E)),        // ambre
+        "finance" to intArrayOf(c(0x8EEBB0), c(0x3FCF86), c(0x1E9E6E)),      // émeraude
+        "trajets" to intArrayOf(c(0x7FEDE0), c(0x2FCFC0), c(0x1A9AA0)),      // turquoise
+        "travail" to intArrayOf(c(0xC0A6FF), c(0x8C6CF0), c(0x6446C8)),      // indigo
+        "sante" to intArrayOf(c(0xFF8A8A), c(0xF2545F), c(0xC9364F)),        // rouge
+        "shopping" to intArrayOf(c(0xD6E86E), c(0xA6CC44), c(0x6FA836)),     // vert tilleul
+        "reglages" to intArrayOf(c(0xC9D2E0), c(0x8E9BB3), c(0x647089)),     // ardoise (assombri)
+        "infos" to intArrayOf(c(0xA9BDF2), c(0x6F8EE0), c(0x4A63B8)),        // bleu acier (assombri)
     )
+
+    // LE DÉCALAGE DU DÉPART de chaque dossier (en secondes, 11/11). Sans lui, tous les widgets posés sur le même
+    // écran joueraient leur boucle en même temps : tous les logos partiraient et reviendraient ensemble, et tout
+    // l'écran « pulserait ». Chaque dossier commence donc sa boucle un peu plus tôt ou plus tard.
+    // Les décalages restent entre -0,7 et +2 s : la première image montrée est toujours une image où l'on ne
+    // voit QUE le logo (avant les points). C'est important pour les dossiers de plus de 9 apps : quand la page
+    // suivante arrive, la boucle repart de cette image, et le changement d'apps ne se voit pas.
+    private val DECALAGES = mapOf("ia" to 0.0, "social" to 0.9, "musique" to 1.8, "photo" to -0.5, "finance" to 0.45,
+        "trajets" to 1.35, "travail" to -0.25, "sante" to 0.7, "shopping" to 1.6, "reglages" to 0.2, "infos" to 1.1)
+    fun decalage(groupe: String): Double = DECALAGES[groupe] ?: 0.0
 
     // Une catégorie qu'on sait dessiner ? (sinon : l'étoile)
     fun connu(groupe: String) = groupe in COULEURS
 
     fun couleurs(groupe: String): IntArray = COULEURS[groupe] ?: COULEURS.getValue("ia")
 
+    // LA COULEUR DU GALET (et de la fenêtre du dossier) quand on n'en a pas choisi avec la roue : la teinte
+    // moyenne du logo (au format de la roue : teinte, intensité, luminosité). null = l'IA, qui garde son brun.
+    fun hsvGalet(groupe: String): FloatArray? {
+        if (groupe == "ia" || !connu(groupe)) return null
+        val hsv = FloatArray(3)
+        Color.colorToHSV(couleurs(groupe)[1], hsv)
+        return hsv
+    }
+
     // LA ROTATION quand le logo part (en degrés) et le petit recul avec lequel il revient.
     // null = l'étoile, qui garde exactement ses mouvements d'origine (voir WidgetDossier.Boucle.logo).
-    // Les logos ronds (diaphragme, pièce, « en direct ») peuvent faire un demi-tour sans paraître à l'envers ;
-    // les autres ne tournent que de 40 degrés, pour qu'on ne les voie jamais tête en bas.
+    // Seul le diaphragme (rond) fait un demi-tour ; les autres ne tournent que de 40 degrés, pour qu'on ne les
+    // voie jamais tête en bas.
     fun tours(groupe: String): Pair<Double, Double>? = when (groupe) {
         "ia" -> null
-        "photo", "finance", "infos" -> 180.0 to 90.0
+        "photo" -> 180.0 to 90.0
         else -> if (connu(groupe)) 40.0 to 25.0 else null
     }
 
@@ -78,7 +108,9 @@ object LogosDossier {
     private val efface = Paint(Paint.ANTI_ALIAS_FLAG).apply { xfermode = PorterDuffXfermode(PorterDuff.Mode.CLEAR) }
     private val calque = RectF(4f, 2f, 96f, 94f)            // la zone du calque (un peu plus grande que les logos)
     private val chemin = Path()
+    private val chemin2 = Path()
     private val rect = RectF()
+    private val pointilles = DashPathEffect(floatArrayOf(3.2f, 3.0f), 0f)
 
     // Le dégradé du logo, dans le repère 100 x 100 (on le garde pour ne pas le refaire à chaque image).
     private var degradeCle: IntArray? = null
@@ -91,24 +123,33 @@ object LogosDossier {
         return degrade!!
     }
 
+    // La couleur de l'étincelle (et de l'épingle, du coin du journal) : la plus claire du logo, adoucie vers le
+    // blanc, sans aller jusqu'au blanc pur (pas d'éblouissement).
+    private fun clair(cols: IntArray): Int {
+        val c = cols[0]
+        fun m(v: Int) = (v + (255 - v) * 0.45f).toInt()
+        return Color.rgb(m(Color.red(c)), m(Color.green(c)), m(Color.blue(c)))
+    }
+
     // LE LOGO, dans le repère 100 x 100. « cols » = les 3 couleurs (celles de la catégorie, ou de la roue).
     // « alpha » : pour le faire disparaître en fondu (0 à 255).
     // (synchronisé : le widget le dessine en fond pendant que le dossier peut le dessiner à l'écran)
     @Synchronized
     fun dessiner(cv: Canvas, groupe: String, g: Double, cols: IntArray, alpha: Int = 255) {
         val src = degradePour(cols)
+        val lum = clair(cols)
         cv.saveLayerAlpha(calque, alpha.coerceIn(0, 255))
         when (groupe) {
-            "social" -> social(cv, g, src)
-            "musique" -> musique(cv, g, src)
-            "photo" -> photo(cv, g, src)
-            "finance" -> finance(cv, g, src)
-            "trajets" -> trajets(cv, g, src)
-            "travail" -> travail(cv, g, src)
-            "sante" -> sante(cv, g, src)
-            "shopping" -> shopping(cv, g, src)
-            "reglages" -> reglages(cv, g, src)
-            "infos" -> infos(cv, g, src)
+            "social" -> social(cv, g, src, lum)
+            "musique" -> musique(cv, g, src, lum)
+            "photo" -> photo(cv, g, src, lum)
+            "finance" -> finance(cv, g, src, lum)
+            "trajets" -> trajets(cv, g, src, lum)
+            "travail" -> travail(cv, g, src, lum)
+            "sante" -> sante(cv, g, src, lum)
+            "shopping" -> shopping(cv, g, src, lum)
+            "reglages" -> reglages(cv, g, src, lum)
+            "infos" -> infos(cv, g, src, lum)
             else -> etoile(cv, src)
         }
         cv.restore()
@@ -163,6 +204,12 @@ object LogosDossier {
         cv.drawPath(path, p)
     }
 
+    // remplir d'une couleur unie
+    private fun uni(couleur: Int): Paint {
+        p.reset(); p.isAntiAlias = true; p.style = Paint.Style.FILL; p.color = couleur
+        return p
+    }
+
     // un trait avec le dégradé
     private fun trait(epaisseur: Float, src: Shader): Paint {
         p.reset(); p.isAntiAlias = true; p.style = Paint.Style.STROKE; p.shader = src
@@ -174,10 +221,14 @@ object LogosDossier {
     private fun gomme(epaisseur: Float = 0f): Paint {
         efface.style = if (epaisseur > 0) Paint.Style.STROKE else Paint.Style.FILL
         efface.strokeWidth = epaisseur; efface.strokeCap = Paint.Cap.ROUND; efface.strokeJoin = Paint.Join.ROUND
+        efface.pathEffect = null
         return efface
     }
 
-    // Une ligne brisée tracée seulement en partie (« part » de 0 à 1) : pour la coche et l'électrocardiogramme.
+    // Une ligne brisée tracée seulement en partie (« part » de 0 à 1) : pour la coche, l'électrocardiogramme,
+    // la courbe de bourse et l'itinéraire. On retient aussi où elle s'arrête (finX, finY).
+    private var finX = 0f
+    private var finY = 0f
     private fun lignePartielle(points: Array<FloatArray>, part: Double): Path? {
         val longueurs = (0 until points.size - 1).map { hypot(points[it + 1][0] - points[it][0], points[it + 1][1] - points[it][1]) }
         var reste = part * longueurs.sum()
@@ -185,11 +236,32 @@ object LogosDossier {
         chemin.reset(); chemin.moveTo(points[0][0], points[0][1])
         for (k in longueurs.indices) {
             val f = min(1.0, reste / longueurs[k]).toFloat()
-            chemin.lineTo(points[k][0] + (points[k + 1][0] - points[k][0]) * f, points[k][1] + (points[k + 1][1] - points[k][1]) * f)
+            finX = points[k][0] + (points[k + 1][0] - points[k][0]) * f
+            finY = points[k][1] + (points[k + 1][1] - points[k][1]) * f
+            chemin.lineTo(finX, finY)
             reste -= longueurs[k]
             if (reste <= 0) break
         }
         return chemin
+    }
+
+    // L'ÉTINCELLE : une petite étoile à 4 branches (la signature commune). « eclat » (0 à 1) la fait grossir
+    // et tourner d'un huitième de tour, le temps d'un scintillement.
+    private fun etincelle(cv: Canvas, x: Float, y: Float, r: Float, couleur: Int, eclat: Double = 0.0, alpha: Float = 1f) {
+        if (r <= 0.05f || alpha <= 0.01f) return
+        val s = (r * (1 + 0.45 * eclat)).toFloat()
+        val q = s * 0.2f
+        cv.save()
+        cv.translate(x, y)
+        cv.rotate((eclat * 45).toFloat())
+        chemin2.reset()
+        chemin2.moveTo(0f, -s)
+        chemin2.quadTo(q, -q, s, 0f); chemin2.quadTo(q, q, 0f, s)
+        chemin2.quadTo(-q, q, -s, 0f); chemin2.quadTo(-q, -q, 0f, -s); chemin2.close()
+        val pinceau = uni(couleur)
+        pinceau.alpha = (alpha.coerceIn(0f, 1f) * 255).toInt()
+        cv.drawPath(chemin2, pinceau)
+        cv.restore()
     }
 
     // ---------------- LES LOGOS ----------------
@@ -203,34 +275,71 @@ object LogosDossier {
         remplir(cv, chemin, src)
     }
 
-    // SOCIAL : la bulle, puis sa queue en bas à gauche (dessinées séparément : si on les mettait dans le même
-    // chemin, la partie où elles se chevauchent pourrait devenir un trou), puis les 3 points découpés.
-    private fun social(cv: Canvas, g: Double, src: Shader) {
-        chemin.reset(); chemin.addRoundRect(25f, 26f, 75f, 63f, 15f, 15f, Path.Direction.CW)
-        remplirArrondi(cv, chemin, src, 2.5f)
-        chemin.reset(); chemin.moveTo(31f, 56f); chemin.lineTo(27.5f, 71.5f); chemin.lineTo(44f, 61f); chemin.close()
-        remplirArrondi(cv, chemin, src, 2.5f)
-        for (i in 0..2) {
-            val saut = bosse(g, 0.55 + 0.16 * i, 0.17) + bosse(g, 1.75 + 0.16 * i, 0.17)
-            cv.drawCircle(38f + 12f * i, (44.5 - 3.2 * saut).toFloat(), 3.7f, gomme())
-        }
-    }
-
-    // MUSIQUE : le triangle « lecture » grossit un peu sur chaque temps (plus fort sur les temps forts)
-    private fun musique(cv: Canvas, g: Double, src: Shader) {
-        val temps = doubleArrayOf(0.45, 0.9, 1.35, 1.8, 2.25)
-        var bat = 0.0
-        for ((k, c) in temps.withIndex()) bat += bosse(g, c, 0.13) * (if (k % 2 == 0) 1.0 else 0.55)
-        val s = (1 + 0.07 * bat).toFloat()
+    // SOCIAL : la bulle du fond (plus pâle) fait un petit rebond quand le message « arrive » ; celle de devant
+    // est séparée d'elle par un fin liseré découpé, et ses 3 points sautent comme quand quelqu'un écrit.
+    private fun social(cv: Canvas, g: Double, src: Shader, lum: Int) {
+        val recu = bosse(g, 1.75, 0.2)
+        val s = (1 + 0.12 * recu).toFloat()
         cv.save()
-        cv.scale(s, s, 46f, CY)
-        chemin.reset(); chemin.moveTo(35f, 27f); chemin.lineTo(35f, 69f); chemin.lineTo(69f, 48f); chemin.close()
-        remplirArrondi(cv, chemin, src, 7f)
+        cv.scale(s, s, 59f, 34f)
+        cv.saveLayerAlpha(calque, 153)                     // la bulle du fond, à 60 %
+        chemin.reset(); chemin.addRoundRect(42f, 22f, 76f, 47f, 11f, 11f, Path.Direction.CW)
+        remplir(cv, chemin, src)
         cv.restore()
+        cv.restore()
+        // la bulle de devant : d'abord on découpe son contour un peu plus large (le liseré), puis on la remplit.
+        // La bulle et sa queue sont remplies séparément (dans un seul chemin, l'endroit où elles se chevauchent
+        // pourrait devenir un trou).
+        chemin.reset()
+        chemin.addRoundRect(24f, 34f, 64f, 64f, 12f, 12f, Path.Direction.CW)
+        chemin2.reset(); chemin2.moveTo(29f, 58f); chemin2.lineTo(25.5f, 72f); chemin2.lineTo(41f, 63f); chemin2.close()
+        cv.drawPath(chemin, gomme(5f)); cv.drawPath(chemin2, gomme(5f))
+        remplirArrondi(cv, chemin, src, 2f); remplirArrondi(cv, chemin2, src, 2f)
+        for (i in 0..2) {
+            val saut = bosse(g, 0.55 + 0.15 * i, 0.16) + bosse(g, 1.15 + 0.15 * i, 0.16)
+            cv.drawCircle(34f + 10f * i, (49 - 3 * saut).toFloat(), 3.2f, gomme())
+        }
+        etincelle(cv, 74f, 22f, 5.5f, lum, recu)
     }
 
-    // PHOTOS : un disque, avec au milieu l'ouverture en hexagone et les 6 lamelles (des fentes fines)
-    private fun photo(cv: Canvas, g: Double, src: Shader) {
+    // MUSIC & VIDEO : un vinyle (2 sillons et le trou du milieu découpés) qui tourne ; son reflet tourne avec
+    // lui. Le bras de la platine, d'abord à côté, vient se poser sur le disque.
+    private fun musique(cv: Canvas, g: Double, src: Shader, lum: Int) {
+        val cx = 46f; val cy = 50f; val r = 22f
+        val rot = cle(g, 0.3 to 0.0 by LIN, 2.6 to 300.0 by DOUX).toFloat()
+        chemin.reset(); chemin.addCircle(cx, cy, r, Path.Direction.CW)
+        remplir(cv, chemin, src)
+        // le reflet : une part de tarte blanche très transparente, qui tourne
+        cv.save()
+        chemin.reset(); chemin.addCircle(cx, cy, r - 1, Path.Direction.CW)
+        cv.clipPath(chemin)
+        rect.set(cx - r, cy - r, cx + r, cy + r)
+        cv.drawArc(rect, rot - 20f, 40f, true, uni(Color.argb(56, 255, 255, 255)))
+        cv.restore()
+        // les sillons et le trou
+        cv.drawCircle(cx, cy, 17f, gomme(1.3f))
+        cv.drawCircle(cx, cy, 12.5f, gomme(1.3f))
+        cv.drawCircle(cx, cy, 2.2f, gomme())
+        // le bras : un liseré découpé autour, puis le bras lui-même
+        val pose = cle(g, 0.4 to 0.0 by LIN, 0.85 to 1.0 by DOUX)
+        val th = Math.toRadians(95 + 23 * pose)
+        val px = 73f; val py = 25f; val l = 22f
+        val hx = (px + l * cos(th)).toFloat(); val hy = (py + l * sin(th)).toFloat()
+        cv.drawLine(px, py, hx, hy, gomme(6.2f))
+        cv.drawCircle(hx, hy, 5f, gomme()); cv.drawCircle(px, py, 5.8f, gomme())
+        cv.drawLine(px, py, hx, hy, trait(2.6f, src))
+        remplirCercle(cv, hx, hy, 3.2f, src); remplirCercle(cv, px, py, 4f, src)
+        etincelle(cv, 28f, 30f, 5f, lum, bosse(g, 0.9, 0.2))
+    }
+
+    private fun remplirCercle(cv: Canvas, x: Float, y: Float, r: Float, src: Shader) {
+        p.reset(); p.isAntiAlias = true; p.style = Paint.Style.FILL; p.shader = src
+        cv.drawCircle(x, y, r, p)
+    }
+
+    // PHOTOS : un disque, avec au milieu l'ouverture en hexagone et les 6 lamelles (des fentes fines) ;
+    // l'étincelle est le reflet de l'objectif, qui brille au moment du « clic »
+    private fun photo(cv: Canvas, g: Double, src: Shader, lum: Int) {
         chemin.reset(); chemin.addCircle(CX, CY, 25f, Path.Direction.CW)
         remplir(cv, chemin, src)
         val ouv = cle(g, 1.15 to 9.5 by LIN, 1.32 to 2.6 by ACC, 1.7 to 9.5 by RESSORT)
@@ -242,9 +351,8 @@ object LogosDossier {
         cv.drawPath(chemin, gomme())
         // les lamelles : chaque côté de l'hexagone, prolongé vers l'extérieur (sans dépasser du disque)
         cv.save()
-        rect.set(CX - 20.5f, CY - 20.5f, CX + 20.5f, CY + 20.5f)
-        val disque = Path().apply { addOval(rect, Path.Direction.CW) }
-        cv.clipPath(disque)
+        chemin.reset(); chemin.addCircle(CX, CY, 20.5f, Path.Direction.CW)
+        cv.clipPath(chemin)
         val gm = gomme(1.7f)
         for (k in 0..5) {
             val a = pts[(k + 5) % 6]; val b = pts[k]
@@ -252,62 +360,110 @@ object LogosDossier {
             cv.drawLine(b[0], b[1], b[0] + dx / l * 40f, b[1] + dy / l * 40f, gm)
         }
         cv.restore()
+        etincelle(cv, 33f, 31f, 5.5f, lum, bosse(g, 1.4, 0.22))
     }
 
-    // FINANCE : la pièce se tourne (on l'écrase à l'horizontale), avec son anneau et sa flèche découpés
-    private fun finance(cv: Canvas, g: Double, src: Shader) {
-        val tour = cle(g, 1.0 to 0.0 by LIN, 1.9 to 1.0 by DOUX)
-        var sx = cos(2 * PI * tour).toFloat()
-        if (abs(sx) < 0.08f) sx = if (sx >= 0) 0.08f else -0.08f      // jamais tout à fait plate
-        cv.save()
-        cv.scale(sx, 1f, CX, CY)
-        chemin.reset(); chemin.addCircle(CX, CY, 24.5f, Path.Direction.CW)
+    // FINANCE : une courbe de bourse qui s'efface puis se retrace en montant, avec l'aire dessous (à 35 %) et un
+    // point au bout ; arrivée en haut, l'étincelle apparaît au sommet et brille
+    private val BOURSE = arrayOf(floatArrayOf(24f, 63f), floatArrayOf(33f, 55f), floatArrayOf(42f, 59f),
+        floatArrayOf(52f, 45f), floatArrayOf(61f, 49f), floatArrayOf(73f, 32f))
+    private fun finance(cv: Canvas, g: Double, src: Shader, lum: Int) {
+        val prog = cle(g, 0.45 to 1.0 by LIN, 0.58 to 0.0 by ACC, 1.6 to 1.0 by DOUX)
+        val ligne = lignePartielle(BOURSE, prog)
+        if (ligne != null) {
+            // l'aire sous la courbe : la même ligne, refermée jusqu'en bas
+            chemin2.set(ligne)
+            chemin2.lineTo(finX, 70f); chemin2.lineTo(BOURSE[0][0], 70f); chemin2.close()
+            cv.saveLayerAlpha(calque, 89)
+            remplir(cv, chemin2, src)
+            cv.restore()
+            cv.drawPath(ligne, trait(4.4f, src))
+            remplirCercle(cv, finX, finY, 3.6f, src)
+        }
+        val vu = cle(g, 0.45 to 1.0 by LIN, 0.55 to 0.0 by LIN, 1.5 to 0.0 by LIN, 1.7 to 1.0 by DOUX)
+        etincelle(cv, 76f, 23f, (6 * vu).toFloat(), lum, bosse(g, 1.8, 0.25))
+    }
+
+    // MAPS & TRAVEL : une carte pliée en 3 (le panneau du milieu plus sombre, les plis découpés). Un itinéraire
+    // s'efface puis se trace en pointillés depuis le point de départ ; quand il arrive, une épingle claire tombe
+    // (avec un rebond) et l'étincelle brille. Ensuite le logo part et laisse place aux apps du dossier.
+    private val ROUTE: Array<FloatArray> = Array(31) { i ->
+        // une courbe de Bézier (départ, 2 points qui la « tirent », arrivée), découpée en 30 petits segments
+        val u = i / 30f; val v = 1 - u
+        val p0 = floatArrayOf(29f, 61f); val p1 = floatArrayOf(36f, 36f); val p2 = floatArrayOf(55f, 70f); val p3 = floatArrayOf(66f, 40f)
+        floatArrayOf(v * v * v * p0[0] + 3 * v * v * u * p1[0] + 3 * v * u * u * p2[0] + u * u * u * p3[0],
+                     v * v * v * p0[1] + 3 * v * v * u * p1[1] + 3 * v * u * u * p2[1] + u * u * u * p3[1])
+    }
+    private val PANNEAUX = arrayOf(
+        floatArrayOf(24f, 28f, 41f, 25f, 41f, 67f, 24f, 70f),
+        floatArrayOf(41f, 25f, 59f, 28f, 59f, 70f, 41f, 67f),
+        floatArrayOf(59f, 28f, 76f, 25f, 76f, 67f, 59f, 70f))
+    private fun panneau(k: Int): Path {
+        val c = PANNEAUX[k]
+        chemin.reset(); chemin.moveTo(c[0], c[1]); chemin.lineTo(c[2], c[3]); chemin.lineTo(c[4], c[5]); chemin.lineTo(c[6], c[7]); chemin.close()
+        return chemin
+    }
+    private fun trajets(cv: Canvas, g: Double, src: Shader, lum: Int) {
+        for (k in 0..2) remplirArrondi(cv, panneau(k), src, 2.4f)
+        cv.drawPath(panneau(1), uni(Color.argb(56, 0, 0, 0)))          // le pli du milieu, plus sombre
+        val pli = gomme(1.1f)
+        cv.drawLine(41f, 25f, 41f, 67f, pli); cv.drawLine(59f, 28f, 59f, 70f, pli)
+        // l'itinéraire, découpé en pointillés
+        val prog = cle(g, 0.4 to 1.0 by LIN, 0.55 to 0.0 by ACC, 1.7 to 1.0 by DOUX)
+        cv.drawCircle(ROUTE[0][0], ROUTE[0][1], 3.2f, gomme())
+        lignePartielle(ROUTE, prog)?.let {
+            val route = gomme(2.6f)
+            route.pathEffect = pointilles
+            cv.drawPath(it, route)
+            route.pathEffect = null
+        }
+        // l'épingle d'arrivée
+        val tombe = cle(g, 0.45 to 1.0 by LIN, 0.55 to 0.0 by ACC, 1.65 to 0.0 by LIN, 2.0 to 1.0 by RESSORT).toFloat()
+        if (tombe > 0.02f) {
+            val ex = 66f; val ey = 40f
+            cv.save()
+            cv.translate(ex, ey); cv.scale(tombe, tombe); cv.translate(-ex, -ey + 6 * (1 - min(1f, tombe)))
+            chemin.reset()
+            chemin.moveTo(ex, ey)
+            chemin.lineTo(ex + 5.5f * cos(Math.toRadians(30.0)).toFloat(), ey - 10 + 5.5f * sin(Math.toRadians(30.0)).toFloat())
+            rect.set(ex - 5.5f, ey - 15.5f, ex + 5.5f, ey - 4.5f)
+            chemin.arcTo(rect, 30f, -240f)
+            chemin.close()
+            cv.drawPath(chemin, gomme(3.2f))                    // un liseré découpé autour de l'épingle
+            cv.drawPath(chemin, uni(lum))
+            cv.drawCircle(ex, ey - 10, 2f, gomme())
+            cv.restore()
+        }
+        etincelle(cv, 75f, 21f, 4.8f, lum, bosse(g, 2.05, 0.25))
+    }
+
+    // PRODUCTIVITY : une carte de tâches (3 lignes : une case ronde et une barre, découpées). Les cases se
+    // remplissent l'une après l'autre, avec une petite coche dedans ; l'étincelle brille à la dernière.
+    private fun travail(cv: Canvas, g: Double, src: Shader, lum: Int) {
+        chemin.reset(); chemin.addRoundRect(25f, 23f, 75f, 73f, 11f, 11f, Path.Direction.CW)
         remplir(cv, chemin, src)
-        cv.drawCircle(CX, CY, 19f, gomme(1.8f))
-        chemin.reset(); chemin.moveTo(38f, 58f); chemin.lineTo(46f, 50f); chemin.lineTo(51f, 54f); chemin.lineTo(59f, 45.5f)
-        cv.drawPath(chemin, gomme(4f))
-        chemin.reset(); chemin.moveTo(63.5f, 41f); chemin.lineTo(53.8f, 42.2f); chemin.lineTo(62.3f, 50.7f); chemin.close()
-        val pointe = gomme(1.6f); pointe.style = Paint.Style.FILL_AND_STROKE
-        cv.drawPath(chemin, pointe)
-        cv.restore()
-    }
-
-    // MAPS & TRAVEL : l'épingle saute, s'écrase un peu en retombant ; son ombre rétrécit quand elle est en l'air
-    private fun trajets(cv: Canvas, g: Double, src: Shader) {
-        val haut = cle(g, 0.8 to 0.0 by LIN, 1.12 to -7.5 by DEC, 1.42 to 0.0 by ACC).toFloat()
-        val ecr = cle(g, 1.42 to 1.0 by LIN, 1.52 to 0.88 by DEC, 1.85 to 1.0 by RESSORT).toFloat()
-        val ombre = 1 - 0.35f * (-haut / 7.5f)
-        p.reset(); p.isAntiAlias = true; p.color = Color.argb((0.32f * ombre * 255).toInt(), 0, 0, 0)
-        rect.set(CX - 9.5f * ombre, 75f - 2.4f * ombre, CX + 9.5f * ombre, 75f + 2.4f * ombre)
-        cv.drawOval(rect, p)
-        cv.save()
-        cv.translate(CX, 72f); cv.scale(2 - ecr, ecr); cv.translate(-CX, -72f + haut)
-        val cx = CX; val cy = 40f; val r = 16.5f
-        chemin.reset()
-        chemin.moveTo(CX, 72f)
-        chemin.lineTo(cx + r * cos(Math.toRadians(30.0)).toFloat(), cy + r * sin(Math.toRadians(30.0)).toFloat())
-        rect.set(cx - r, cy - r, cx + r, cy + r)
-        chemin.arcTo(rect, 30f, -240f)              // le rond du haut, en passant par le dessus
-        chemin.close()
-        remplirArrondi(cv, chemin, src, 3f)
-        cv.drawCircle(cx, cy, 6.6f, gomme())
-        cv.restore()
-    }
-
-    // PRODUCTIVITY : le cadre arrondi, et la coche qui s'efface vite puis se redessine
-    private fun travail(cv: Canvas, g: Double, src: Shader) {
-        val prog = cle(g, 1.0 to 1.0 by LIN, 1.16 to 0.0 by ACC, 1.7 to 1.0 by DOUX)
-        rect.set(27.5f, 25.5f, 72.5f, 70.5f)
-        cv.drawRoundRect(rect, 12f, 12f, trait(4.4f, src))
-        val coche = lignePartielle(arrayOf(floatArrayOf(38f, 48.5f), floatArrayOf(46.5f, 57f), floatArrayOf(63f, 39f)), prog)
-        if (coche != null) cv.drawPath(coche, trait(5.2f, src))
+        for ((k, y) in listOf(36f, 48f, 60f).withIndex()) {
+            val f = cle(g, (0.55 + 0.32 * k) to 0.0 by LIN, (0.78 + 0.32 * k) to 1.0 by RESSORT).toFloat()
+            val longueur = if (k < 2) 67f else 60f
+            cv.drawCircle(35f, y, 4.6f, gomme(2f))
+            if (f > 0.02f) cv.drawCircle(35f, y, 4.6f * min(f, 1.15f), gomme())
+            cv.drawLine(44f, y, longueur, y, gomme(3.6f))
+            if (f > 0.3f) {
+                cv.save()
+                cv.translate(35f, y); cv.scale(min(f, 1f), min(f, 1f))
+                chemin.reset(); chemin.moveTo(-2.4f, 0.1f); chemin.lineTo(-0.6f, 2f); chemin.lineTo(2.6f, -1.9f)
+                cv.drawPath(chemin, trait(1.9f, src))
+                cv.restore()
+            }
+        }
+        etincelle(cv, 74f, 24f, 5f, lum, bosse(g, 1.55, 0.22))
     }
 
     // HEALTH : un cœur, traversé par la ligne d'un électrocardiogramme (découpée) ; la ligne s'efface puis
     // se retrace de gauche à droite, et le cœur bat (« poum-poum ») au moment où elle passe le pic
     private val ECG = arrayOf(floatArrayOf(20f, 46f), floatArrayOf(35f, 46f), floatArrayOf(39.5f, 40f), floatArrayOf(45f, 57f),
         floatArrayOf(51f, 31f), floatArrayOf(56.5f, 51f), floatArrayOf(60f, 46f), floatArrayOf(80f, 46f))
-    private fun sante(cv: Canvas, g: Double, src: Shader) {
+    private fun sante(cv: Canvas, g: Double, src: Shader, lum: Int) {
         val bat = 0.12 * bosse(g, 1.02, 0.13) + 0.07 * bosse(g, 1.26, 0.13) + 0.12 * bosse(g, 2.05, 0.13) + 0.07 * bosse(g, 2.29, 0.13)
         val s = (1 + bat).toFloat()
         val trace = cle(g, 0.45 to 1.0 by LIN, 0.6 to 0.0 by ACC, 1.45 to 1.0 by DOUX)
@@ -325,12 +481,17 @@ object LogosDossier {
         remplir(cv, chemin, src)
         lignePartielle(ECG, trace)?.let { cv.drawPath(it, gomme(3.6f)) }
         cv.restore()
+        etincelle(cv, 73f, 21f, 5f, lum, bosse(g, 1.1, 0.22))
     }
 
-    // SHOPPING : le sac se balance autour du haut de sa poignée, puis s'arrête en douceur
-    private fun shopping(cv: Canvas, g: Double, src: Shader) {
-        val rot = cle(g, 0.6 to 0.0 by LIN, 0.85 to 8.0 by DEC, 1.25 to -5.5 by DOUX, 1.62 to 3.0 by DOUX, 1.95 to 0.0 by DOUX)
+    // SHOPPING : l'étincelle, posée au-dessus du sac, tombe dedans ; le sac l'attrape en s'écrasant un peu,
+    // se balance autour de sa poignée, puis une nouvelle étincelle réapparaît au-dessus
+    private fun shopping(cv: Canvas, g: Double, src: Shader, lum: Int) {
+        val chute = cle(g, 0.5 to 0.0 by LIN, 0.88 to 1.0 by ACC).toFloat()
+        val ecr = cle(g, 0.88 to 1.0 by LIN, 0.98 to 0.9 by DEC, 1.3 to 1.0 by RESSORT).toFloat()
+        val rot = cle(g, 0.95 to 0.0 by LIN, 1.15 to 6.0 by DEC, 1.5 to -4.0 by DOUX, 1.85 to 2.0 by DOUX, 2.15 to 0.0 by DOUX)
         cv.save()
+        cv.scale(2 - ecr, ecr, 50f, 71f)
         cv.rotate(rot.toFloat(), 50f, 26f)
         // la poignée (un demi-cercle et ses deux petits bouts)
         chemin.reset()
@@ -339,55 +500,62 @@ object LogosDossier {
         chemin.lineTo(59.5f, 41f)
         chemin.moveTo(40.5f, 41f); chemin.lineTo(40.5f, 38f)
         cv.drawPath(chemin, trait(3.8f, src))
-        // le sac, et les deux trous de la poignée
+        // le sac, les deux trous de la poignée et la bande du rabat
         chemin.reset(); chemin.moveTo(30.5f, 37f); chemin.lineTo(69.5f, 37f); chemin.lineTo(72f, 71f); chemin.lineTo(28f, 71f); chemin.close()
         remplirArrondi(cv, chemin, src, 5f)
         cv.drawCircle(40.5f, 43.5f, 2.3f, gomme())
         cv.drawCircle(59.5f, 43.5f, 2.3f, gomme())
+        cv.drawLine(31.5f, 50f, 68.5f, 50f, gomme(1.4f))
         cv.restore()
+        // l'étincelle
+        var x = 67 + (50 - 67) * chute; var y = 21 + (40 - 21) * chute
+        var r = 5.5f * (1 - 0.6f * chute)
+        var a = if (chute < 0.95f) 1f else 0f
+        if (g > 1.85) { x = 67f; y = 21f; r = 5.5f; a = cle(g, 1.85 to 0.0 by LIN, 2.2 to 1.0 by DOUX).toFloat() }
+        etincelle(cv, x, y, r, lum, 0.0, a)
     }
 
-    // SETTINGS : deux engrenages. Le grand (8 dents) tourne de 45 degrés ; le petit (6 dents) est entraîné
-    // dans l'autre sens, 8/6 fois plus vite (comme de vrais engrenages).
-    private fun reglages(cv: Canvas, g: Double, src: Shader) {
-        val a = Math.toRadians(cle(g, 0.3 to 0.0 by LIN, 2.4 to 45.0 by DOUX))
-        engrenage(cv, 45f, 54f, 19.5f, 15f, 8, a, src, 6.5f)
-        engrenage(cv, 65f, 34f, 11f, 8f, 6, -a * 8 / 6 + Math.toRadians(30.0), src, 3.4f)
+    // SETTINGS : 3 réglettes. La partie à gauche du curseur est pleine, le reste pâle ; chaque curseur a un liseré
+    // découpé autour. Les curseurs glissent (l'un après l'autre) puis reviennent ; celui du milieu est l'étincelle.
+    private val REPOS = floatArrayOf(0.28f, 0.66f, 0.42f)
+    private val CIBLE = floatArrayOf(0.72f, 0.30f, 0.80f)
+    private fun reglages(cv: Canvas, g: Double, src: Shader, lum: Int) {
+        for ((k, y) in listOf(33f, 48f, 63f).withIndex()) {
+            val m = cle(g, (0.45 + 0.12 * k) to 0.0 by LIN, (0.95 + 0.12 * k) to 1.0 by DOUX,
+                        (1.45 + 0.12 * k) to 1.0 by LIN, (2.0 + 0.12 * k) to 0.0 by DOUX)
+            val f = REPOS[k] + (CIBLE[k] - REPOS[k]) * m.toFloat()
+            val x = 26f + 48f * f
+            cv.saveLayerAlpha(calque, 102)                 // le rail, à 40 %
+            cv.drawLine(26f, y, 74f, y, trait(3.6f, src))
+            cv.restore()
+            cv.drawLine(26f, y, x, y, trait(3.6f, src))
+            cv.drawCircle(x, y, 7.8f, gomme())
+            if (k == 1) etincelle(cv, x, y, 7.6f, lum, m)
+            else remplirCercle(cv, x, y, 5.6f, src)
+        }
     }
 
-    // Un engrenage : chaque dent = 4 points (base, haut, haut, base). Les points sont calculés directement à
-    // leur place (sans tourner la toile) : le dégradé reste ainsi le même sur les deux roues.
-    private fun engrenage(cv: Canvas, cx: Float, cy: Float, R: Float, r: Float, dents: Int, rot: Double, src: Shader, trou: Float) {
-        val pas = 2 * PI / dents
+    // NEWS : un journal au coin plié (le coin est clair, séparé par un liseré découpé). Le gros titre et les
+    // lignes sont découpés ; les lignes s'effacent puis s'écrivent l'une après l'autre, et l'étincelle brille
+    // au coin (« dernière minute »).
+    private fun infos(cv: Canvas, g: Double, src: Shader, lum: Int) {
         chemin.reset()
-        for (k in 0 until dents) {
-            val a = k * pas
-            val l = pas * 0.25                // demi-largeur d'une dent en haut
-            val b = pas * 0.36                // demi-largeur d'une dent à la base
-            for ((rayon, ang) in listOf(r to a - b, R to a - l, R to a + l, r to a + b)) {
-                val x = (cx + rayon * cos(ang + rot)).toFloat(); val y = (cy + rayon * sin(ang + rot)).toFloat()
-                if (chemin.isEmpty) chemin.moveTo(x, y) else chemin.lineTo(x, y)
-            }
+        chemin.moveTo(25f, 24f); chemin.lineTo(63f, 24f); chemin.lineTo(75f, 36f); chemin.lineTo(75f, 72f); chemin.lineTo(25f, 72f); chemin.close()
+        remplirArrondi(cv, chemin, src, 5f)
+        chemin.reset(); chemin.moveTo(62.5f, 22f); chemin.lineTo(62.5f, 36.5f); chemin.lineTo(77f, 36.5f)
+        cv.drawPath(chemin, gomme(2.2f))
+        chemin.reset(); chemin.moveTo(64.5f, 26f); chemin.lineTo(64.5f, 34.5f); chemin.lineTo(73f, 34.5f); chemin.close()
+        val coin = uni(lum)
+        coin.style = Paint.Style.FILL_AND_STROKE; coin.strokeWidth = 1.5f; coin.strokeJoin = Paint.Join.ROUND
+        cv.drawPath(chemin, coin)
+        val pr = cle(g, 0.45 to 1.0 by LIN, 0.58 to 0.0 by ACC, 1.8 to 1.0 by LIN)
+        rect.set(31f, 30.5f, 56f, 37.5f)
+        cv.drawRoundRect(rect, 2.5f, 2.5f, gomme())
+        val lignes = arrayOf(floatArrayOf(46f, 69f), floatArrayOf(54f, 69f), floatArrayOf(62f, 58f))
+        for ((k, l) in lignes.withIndex()) {
+            val part = max(0.0, min(1.0, pr * 3 - k)).toFloat()
+            if (part > 0.02f) cv.drawLine(31f, l[0], 31f + (l[1] - 31f) * part, l[0], gomme(3.2f))
         }
-        chemin.close()
-        remplirArrondi(cv, chemin, src, 2.2f)
-        cv.drawCircle(cx, cy, trou, gomme())
-    }
-
-    // NEWS : le point grossit un peu, puis les deux ondes de chaque côté s'allument, de l'intérieur vers l'extérieur
-    private fun infos(cv: Canvas, g: Double, src: Shader) {
-        val pouls = bosse(g, 0.55, 0.22) + bosse(g, 1.75, 0.22)
-        chemin.reset(); chemin.addCircle(CX, CY, (5.8 * (1 + 0.18 * pouls)).toFloat(), Path.Direction.CW)
-        remplir(cv, chemin, src)
-        for ((k, rayon) in listOf(13f, 22f).withIndex()) {
-            val lum = bosse(g, 0.72 + 0.17 * k, 0.24) + bosse(g, 1.92 + 0.17 * k, 0.24)
-            val pinceau = trait(4.2f, src)
-            pinceau.alpha = ((0.62 + 0.38 * min(1.0, lum)) * 255).toInt()
-            val rr = (rayon + 1.2 * lum).toFloat()
-            rect.set(CX - rr, CY - rr, CX + rr, CY + rr)
-            val demi = Math.toDegrees(0.72).toFloat()
-            cv.drawArc(rect, -demi, 2 * demi, false, pinceau)              // l'onde de droite
-            cv.drawArc(rect, 180f - demi, 2 * demi, false, pinceau)        // l'onde de gauche
-        }
+        etincelle(cv, 76f, 22f, 5f, lum, bosse(g, 1.9, 0.25))
     }
 }

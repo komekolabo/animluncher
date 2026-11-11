@@ -33,7 +33,7 @@ object RetourEtoile {
     // Toutes les positions sont en pixels de l'ÉCRAN. teinte = les couleurs du dossier (roue chromatique).
     class Etat(val x: Float, val y: Float, val r: Float, val angle: Float,
                val versX: Float, val versY: Float, val versR: Float, val voile: Float,
-               val teinte: Teinte = Teinte.ORIGINE)
+               val teinte: Teinte = Teinte.ORIGINE, val groupe: String = "ia")
 
     private const val DUREE = 600L
 
@@ -166,14 +166,14 @@ object RetourEtoile {
                 pinceau.shader = null
             }
             // à la toute fin, l'étoile se fond dans celle du widget
-            pinceau.alpha = (255 * (1 - lisse(((f - 0.85f) / 0.15f).coerceIn(0f, 1f)))).toInt()
+            val fondu = (255 * (1 - lisse(((f - 0.85f) / 0.15f).coerceIn(0f, 1f)))).toInt()
+            // le logo du dossier (11/11) : l'étoile fait un demi-tour en arrière ; les autres logos un tour
+            // complet, pour arriver bien droits dans le widget
+            val tourRetour = if (LogosDossier.tours(e.groupe) == null) 180f else 360f
             c.save()
             c.translate(x, y)
-            c.rotate(e.angle - 180f * k)
-            c.scale(r, r)
-            pinceau.shader = degrade
-            c.drawPath(etoile, pinceau)
-            pinceau.shader = null
+            c.rotate(e.angle - tourRetour * k)
+            LogosDossier.dessinerAuCentre(c, e.groupe, r, e.teinte.logo, fondu)
             c.restore()
             c.restore()
             if (f < 1f) postInvalidateOnAnimation()

@@ -48,7 +48,16 @@ class Teinte(
         }
 
         // La teinte d'un dossier (retenue dans le carnet « groupes », voir Groupes.couleur).
-        fun de(c: Context, groupe: String): Teinte = Groupes.couleur(c, groupe)?.let { depuis(it) } ?: ORIGINE
+        // Sans couleur choisie (11/11) : l'IA garde la palette chaude d'origine ; les autres dossiers prennent la
+        // teinte de leur logo (la même que leur galet, voir LogosDossier.hsvGalet), et le logo garde ses propres
+        // couleurs. hsv reste null : pour la roue, c'est toujours « pas de couleur choisie ».
+        fun de(c: Context, groupe: String): Teinte {
+            Groupes.couleur(c, groupe)?.let { return depuis(it) }
+            val h = LogosDossier.hsvGalet(groupe) ?: return ORIGINE
+            val d = depuis(h)
+            val l = LogosDossier.couleurs(groupe)
+            return Teinte(l, d.haut, d.bas, d.bulle, d.clair, l[1], l[2], d.poussiere, d.onde, d.info, d.consigne, null)
+        }
 
         // Une couleur avec sa transparence (alpha de 0 à 255).
         fun avecAlpha(couleur: Int, alpha: Float): Int =
