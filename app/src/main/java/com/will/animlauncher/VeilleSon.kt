@@ -1,5 +1,6 @@
 package com.will.animlauncher
 
+import android.accessibilityservice.AccessibilityService
 import android.app.Activity
 import android.content.BroadcastReceiver
 import android.content.Context
@@ -31,10 +32,15 @@ import android.widget.TextView
 //      est éteint ;
 //   3) le tour lumineux, lui, est une fenêtre posée au-dessus de TOUT : il se dessine donc sur ce noir.
 // POUR EN SORTIR : rester appuyé un peu moins d'une seconde n'importe où (ou le bouton retour). On retombe sur
-// l'écran de verrouillage. Le mode ne se relance alors plus tant qu'on n'a pas déverrouillé le téléphone
+// l'écran de verrouillage. Le mode ne se relance alors plus tant que l'écran ne s'est pas rallumé une fois
 // (sinon il reviendrait dès que l'écran se rééteint tout seul). Appuyer sur le bouton d'allumage pendant
 // l'écran noir éteint vraiment l'écran, de la même façon.
 // Il s'arrête aussi tout seul après 10 secondes sans musique.
+// SÉCURITÉ (11/11, signalé par Will) : beaucoup de téléphones ne se VERROUILLENT vraiment que quelques secondes
+// après l'extinction de l'écran. Comme on rallume l'écran tout de suite, le téléphone restait déverrouillé
+// sous l'écran noir : en touchant la petite fenêtre flottante de YouTube, Will est arrivé dans YouTube sans
+// code ni empreinte. Maintenant, AVANT de poser l'écran noir, on demande au téléphone de se verrouiller
+// tout de suite (le service d'accessibilité en a le droit, depuis Android 9).
 // ATTENTION : l'écran reste allumé (même noir, le téléphone ne dort pas) : ça consomme plus de batterie.
 object VeilleSon {
     @Volatile var enCours = false            // l'écran noir est affiché en ce moment
@@ -42,12 +48,17 @@ object VeilleSon {
     private var branche = false
 
     // « BroadcastReceiver » = une oreille qu'on tend à Android : il nous appelle quand l'écran s'éteint
-    // (SCREEN_OFF) et quand le téléphone est déverrouillé (USER_PRESENT).
+    // (SCREEN_OFF), se rallume (SCREEN_ON) et quand le téléphone est déverrouillé (USER_PRESENT).
+    // (11/11 : avant, seul le déverrouillage réarmait le mode, et il n'arrivait pas toujours : le mode ne
+    //  marchait qu'une fois.)
     private val ecoute = object : BroadcastReceiver() {
         override fun onReceive(c: Context, intention: Intent) {
             try {
-                if (intention.action == Intent.ACTION_USER_PRESENT) suspendue = false
-                else if (intention.action == Intent.ACTION_SCREEN_OFF) ecranEteint(c)
+                when (intention.action) {
+                    // l'écran se rallume, ou le téléphone est déverrouillé : le mode pourra resservir
+                    Intent.ACTION_SCREEN_ON, Intent.ACTION_USER_PRESENT -> suspendue = false
+                    Intent.ACTION_SCREEN_OFF -> ecranEteint(c)
+                }
             } catch (e: Throwable) {
                 AnimApp.noter("veille : erreur (${e.javaClass.simpleName})")
             }
@@ -58,7 +69,7 @@ object VeilleSon {
     fun brancher(c: Context) {
         if (branche) return
         try {
-            val filtre = IntentFilter().apply { addAction(Intent.ACTION_SCREEN_OFF); addAction(Intent.ACTION_USER_PRESENT) }
+            val filtre = IntentFilter().apply { addAction(Intent.ACTION_SCREEN_OFF); addAction(Intent.ACTION_SCREEN_ON); addAction(Intent.ACTION_USER_PRESENT) }
             val app = c.applicationContext
             if (Build.VERSION.SDK_INT >= 33) app.registerReceiver(ecoute, filtre, Context.RECEIVER_NOT_EXPORTED)
             else app.registerReceiver(ecoute, filtre)
@@ -74,13 +85,17 @@ object VeilleSon {
         if (!ReactionSonore.actif(c) || !ReactionSonore.permission(c)) return
         val audio = c.getSystemService(Context.AUDIO_SERVICE) as? AudioManager ?: return
         if (!audio.isMusicActive) return                 // pas de musique : on laisse le téléphone s'éteindre normalement
+        // SÉCURITÉ : on verrouille le téléphone tout de suite (voir en haut du fichier)
+        if (Build.VERSION.SDK_INT >= 28) {
+            try { service.performGlobalAction(AccessibilityService.GLOBAL_ACTION_LOCK_SCREEN) } catch (_: Throwable) {}
+        }
         service.startActivity(Intent(service, VeilleSonActivity::class.java)
             .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_NO_ANIMATION))
         AnimApp.noter("veille : écran noir posé")
     }
 
-    // On est sorti exprès de l'écran noir : ne pas le relancer avant le prochain déverrouillage.
-    fun sortieVoulue() { suspendue = true }
+    // On est sorti exprès de l'écran noir : ne pas le relancer tant que l'écran ne s'est pas rallumé.
+    fun sortieVoulue() { suspendue = true; enCours = false }
 }
 
 // L'ÉCRAN NOIR. « Activity » = un écran de l'app.
@@ -99,7 +114,7 @@ class VeilleSonActivity : Activity() {
         override fun run() {
             val musique = try { (getSystemService(Context.AUDIO_SERVICE) as? AudioManager)?.isMusicActive == true } catch (_: Throwable) { false }
             silences = if (musique) 0 else silences + 1
-            if (silences >= 10) { finish(); return }
+            if (silences >= 10) { VeilleSon.enCours = false; finish(); return }
             minuteur.postDelayed(this, 1000)
         }
     }
