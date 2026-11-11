@@ -1,0 +1,37 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Les textes des FONDS D'ÉCRAN ANIMÉS (Deutsch) : écran « Fonds d'écran », aperçu, services. Voir FondsActivity.kt. -->
+<resources>
+    <string name="fd_de_lapp">Aus der App</string>
+    <string name="fd_mes_fonds">Meine Hintergründe</string>
+    <string name="fd_importer">Importieren</string>
+    <string name="fd_importer_expl">Ein Video, GIF oder Bild von deinem Handy</string>
+    <string name="fd_badge_video">VIDEO</string>
+    <string name="fd_nom_nuit">Nacht</string>
+    <string name="fd_nom_galets">Kiesel</string>
+    <string name="fd_nom_video">Mein Video</string>
+    <string name="fd_nom_gif">Mein GIF</string>
+    <string name="fd_nom_image">Mein Bild</string>
+    <string name="fd_astuce">Der Hintergrund läuft nur, wenn der Startbildschirm sichtbar ist. Im Energiesparmodus friert er von selbst ein.</string>
+    <string name="fd_supprimer_q">Diesen Hintergrund löschen?</string>
+    <string name="fd_supprimer">Löschen</string>
+    <string name="fd_annuler">Abbrechen</string>
+    <string name="fd_import_en_cours">Hintergrund wird vorbereitet…</string>
+    <string name="fd_import_rate">Diese Datei kann nicht gelesen werden.</string>
+    <string name="fd_fluidite">Flüssigkeit</string>
+    <string name="fd_eco">Eco · 30 fps</string>
+    <string name="fd_fluide">Flüssig · 60 fps</string>
+    <string name="fd_figer">Nach 10 s ohne Berührung des Startbildschirms einfrieren</string>
+    <string name="fd_assombrir">Abdunkeln</string>
+    <string name="fd_appliquer">Anwenden</string>
+    <string name="fd_toucher_masquer">Tippe auf die Vorschau, um die Einstellungen auszublenden</string>
+    <string name="fd_conso_tres_legere">Verbrauch: sehr gering</string>
+    <string name="fd_conso_legere">Verbrauch: gering</string>
+    <string name="fd_conso_moyenne">Verbrauch: mittel</string>
+    <string name="fd_applique">Hintergrund angewendet ✓</string>
+    <string name="fd_choisir_ecran">Android fragt dich: wähle „Startbildschirm“ oder „Start- und Sperrbildschirm“.</string>
+    <string name="fd_pas_possible">Dieses Handy unterstützt keine Live-Hintergründe.</string>
+    <string name="fd_service_dessin">AnimLauncher · Hintergründe</string>
+    <string name="fd_service_video">AnimLauncher · Video</string>
+    <string name="fd_desc_dessin">Animierte Hintergründe von AnimLauncher, oder deine eigenen GIFs und Bilder. Stoppt, wenn verdeckt.</string>
+    <string name="fd_desc_video">Dein eigenes Video als Hintergrund, stumm und in Schleife. Stoppt, wenn verdeckt.</string>
+</resources>

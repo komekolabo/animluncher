@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- La « fiche » d'un de nos fonds d'écran animés, affichée par Android dans sa liste des fonds animés :
+     une image (le logo de l'app) et une phrase d'explication. Voir FondService.kt. -->
+<wallpaper xmlns:android="http://schemas.android.com/apk/res/android"
+    android:thumbnail="@mipmap/ic_launcher"
+    android:description="@string/fd_desc_dessin" />

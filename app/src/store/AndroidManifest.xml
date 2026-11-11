@@ -1,0 +1,45 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- VERSION STORE uniquement : ajouté au manifeste commun (src/main) au moment de la compilation.
+     Les FONDS D'ÉCRAN ANIMÉS (12/11) sont déclarés ici ET dans src/perso/AndroidManifest.xml (le même bloc),
+     pour ne pas toucher au gros manifeste commun. -->
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+
+    <!-- FONDS D'ÉCRAN ANIMÉS : l'app en propose, mais elle reste installable sur un appareil qui ne sait
+         pas les afficher (required="false"). -->
+    <uses-feature android:name="android.software.live_wallpaper" android:required="false" />
+
+    <application>
+        <!-- L'aperçu plein écran d'un fond d'écran (avec « Appliquer »). Voir FondApercuActivity.kt. -->
+        <activity
+            android:name="com.will.animlauncher.FondApercuActivity"
+            android:exported="false" />
+
+        <!-- LES FONDS D'ÉCRAN ANIMÉS (voir FondService.kt) : deux services qu'Android appelle pour dessiner
+             le fond de l'écran. permission BIND_WALLPAPER : seul Android peut s'y brancher.
+             Ils apparaissent dans la liste des fonds animés du téléphone. -->
+        <service
+            android:name="com.will.animlauncher.FondDessinService"
+            android:exported="true"
+            android:label="@string/fd_service_dessin"
+            android:permission="android.permission.BIND_WALLPAPER">
+            <intent-filter>
+                <action android:name="android.service.wallpaper.WallpaperService" />
+            </intent-filter>
+            <meta-data
+                android:name="android.service.wallpaper"
+                android:resource="@xml/fond_dessin" />
+        </service>
+        <service
+            android:name="com.will.animlauncher.FondVideoService"
+            android:exported="true"
+            android:label="@string/fd_service_video"
+            android:permission="android.permission.BIND_WALLPAPER">
+            <intent-filter>
+                <action android:name="android.service.wallpaper.WallpaperService" />
+            </intent-filter>
+            <meta-data
+                android:name="android.service.wallpaper"
+                android:resource="@xml/fond_video" />
+        </service>
+    </application>
+</manifest>

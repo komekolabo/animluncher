@@ -1,0 +1,37 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Les textes des FONDS D'ÉCRAN ANIMÉS (français) : écran « Fonds d'écran », aperçu, services. Voir FondsActivity.kt. -->
+<resources>
+    <string name="fd_de_lapp">Proposés par l’app</string>
+    <string name="fd_mes_fonds">Mes fonds</string>
+    <string name="fd_importer">Importer</string>
+    <string name="fd_importer_expl">Une vidéo, un GIF ou une image de ton téléphone</string>
+    <string name="fd_badge_video">VIDÉO</string>
+    <string name="fd_nom_nuit">Nuit</string>
+    <string name="fd_nom_galets">Galets</string>
+    <string name="fd_nom_video">Ma vidéo</string>
+    <string name="fd_nom_gif">Mon GIF</string>
+    <string name="fd_nom_image">Mon image</string>
+    <string name="fd_astuce">Le fond ne tourne que quand l’écran d’accueil est visible. En mode économie d’énergie, il se fige tout seul.</string>
+    <string name="fd_supprimer_q">Supprimer ce fond ?</string>
+    <string name="fd_supprimer">Supprimer</string>
+    <string name="fd_annuler">Annuler</string>
+    <string name="fd_import_en_cours">Préparation du fond…</string>
+    <string name="fd_import_rate">Impossible de lire ce fichier.</string>
+    <string name="fd_fluidite">Fluidité</string>
+    <string name="fd_eco">Éco · 30 i/s</string>
+    <string name="fd_fluide">Fluide · 60 i/s</string>
+    <string name="fd_figer">Figer après 10 s sans toucher l’accueil</string>
+    <string name="fd_assombrir">Assombrir</string>
+    <string name="fd_appliquer">Appliquer</string>
+    <string name="fd_toucher_masquer">Touche l’aperçu pour masquer les réglages</string>
+    <string name="fd_conso_tres_legere">Consommation : très légère</string>
+    <string name="fd_conso_legere">Consommation : légère</string>
+    <string name="fd_conso_moyenne">Consommation : moyenne</string>
+    <string name="fd_applique">Fond appliqué ✓</string>
+    <string name="fd_choisir_ecran">Android va te demander : choisis « Écran d’accueil » ou « Écrans d’accueil et de verrouillage ».</string>
+    <string name="fd_pas_possible">Ce téléphone ne permet pas les fonds d’écran animés.</string>
+    <string name="fd_service_dessin">AnimLauncher · Fonds</string>
+    <string name="fd_service_video">AnimLauncher · Vidéo</string>
+    <string name="fd_desc_dessin">Fonds d’écran animés dessinés par AnimLauncher, ou tes propres GIF et images. S’arrête quand il est caché.</string>
+    <string name="fd_desc_video">Ta propre vidéo en fond d’écran, muette et en boucle. S’arrête quand elle est cachée.</string>
+</resources>

@@ -1,0 +1,37 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Les textes des FONDS D'ÉCRAN ANIMÉS (English (default)) : écran « Fonds d'écran », aperçu, services. Voir FondsActivity.kt. -->
+<resources>
+    <string name="fd_de_lapp">From the app</string>
+    <string name="fd_mes_fonds">My wallpapers</string>
+    <string name="fd_importer">Import</string>
+    <string name="fd_importer_expl">A video, GIF or image from your phone</string>
+    <string name="fd_badge_video">VIDEO</string>
+    <string name="fd_nom_nuit">Night</string>
+    <string name="fd_nom_galets">Pebbles</string>
+    <string name="fd_nom_video">My video</string>
+    <string name="fd_nom_gif">My GIF</string>
+    <string name="fd_nom_image">My image</string>
+    <string name="fd_astuce">The wallpaper only runs while the home screen is visible. In battery saver mode, it freezes on its own.</string>
+    <string name="fd_supprimer_q">Delete this wallpaper?</string>
+    <string name="fd_supprimer">Delete</string>
+    <string name="fd_annuler">Cancel</string>
+    <string name="fd_import_en_cours">Preparing the wallpaper…</string>
+    <string name="fd_import_rate">Couldn\'t read this file.</string>
+    <string name="fd_fluidite">Smoothness</string>
+    <string name="fd_eco">Eco · 30 fps</string>
+    <string name="fd_fluide">Smooth · 60 fps</string>
+    <string name="fd_figer">Freeze after 10 s without touching the home screen</string>
+    <string name="fd_assombrir">Dim</string>
+    <string name="fd_appliquer">Apply</string>
+    <string name="fd_toucher_masquer">Tap the preview to hide the settings</string>
+    <string name="fd_conso_tres_legere">Battery use: very low</string>
+    <string name="fd_conso_legere">Battery use: low</string>
+    <string name="fd_conso_moyenne">Battery use: medium</string>
+    <string name="fd_applique">Wallpaper applied ✓</string>
+    <string name="fd_choisir_ecran">Android will ask you: choose “Home screen” or “Home and lock screens”.</string>
+    <string name="fd_pas_possible">This phone doesn\'t support live wallpapers.</string>
+    <string name="fd_service_dessin">AnimLauncher · Wallpapers</string>
+    <string name="fd_service_video">AnimLauncher · Video</string>
+    <string name="fd_desc_dessin">Animated wallpapers drawn by AnimLauncher, or your own GIFs and images. Stops when hidden.</string>
+    <string name="fd_desc_video">Your own video as a wallpaper, silent and looping. Stops when hidden.</string>
+</resources>

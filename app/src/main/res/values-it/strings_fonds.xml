@@ -1,0 +1,37 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Les textes des FONDS D'ÉCRAN ANIMÉS (italiano) : écran « Fonds d'écran », aperçu, services. Voir FondsActivity.kt. -->
+<resources>
+    <string name="fd_de_lapp">Dall’app</string>
+    <string name="fd_mes_fonds">I miei sfondi</string>
+    <string name="fd_importer">Importa</string>
+    <string name="fd_importer_expl">Un video, una GIF o un’immagine dal telefono</string>
+    <string name="fd_badge_video">VIDEO</string>
+    <string name="fd_nom_nuit">Notte</string>
+    <string name="fd_nom_galets">Ciottoli</string>
+    <string name="fd_nom_video">Il mio video</string>
+    <string name="fd_nom_gif">La mia GIF</string>
+    <string name="fd_nom_image">La mia immagine</string>
+    <string name="fd_astuce">Lo sfondo funziona solo quando la schermata Home è visibile. Con il risparmio energetico si blocca da solo.</string>
+    <string name="fd_supprimer_q">Eliminare questo sfondo?</string>
+    <string name="fd_supprimer">Elimina</string>
+    <string name="fd_annuler">Annulla</string>
+    <string name="fd_import_en_cours">Preparazione dello sfondo…</string>
+    <string name="fd_import_rate">Impossibile leggere questo file.</string>
+    <string name="fd_fluidite">Fluidità</string>
+    <string name="fd_eco">Eco · 30 fps</string>
+    <string name="fd_fluide">Fluido · 60 fps</string>
+    <string name="fd_figer">Blocca dopo 10 s senza toccare la Home</string>
+    <string name="fd_assombrir">Scurisci</string>
+    <string name="fd_appliquer">Applica</string>
+    <string name="fd_toucher_masquer">Tocca l’anteprima per nascondere le impostazioni</string>
+    <string name="fd_conso_tres_legere">Consumo: molto basso</string>
+    <string name="fd_conso_legere">Consumo: basso</string>
+    <string name="fd_conso_moyenne">Consumo: medio</string>
+    <string name="fd_applique">Sfondo applicato ✓</string>
+    <string name="fd_choisir_ecran">Android ti chiederà: scegli «Schermata Home» o «Schermate Home e di blocco».</string>
+    <string name="fd_pas_possible">Questo telefono non supporta gli sfondi animati.</string>
+    <string name="fd_service_dessin">AnimLauncher · Sfondi</string>
+    <string name="fd_service_video">AnimLauncher · Video</string>
+    <string name="fd_desc_dessin">Sfondi animati disegnati da AnimLauncher, o le tue GIF e immagini. Si ferma quando è nascosto.</string>
+    <string name="fd_desc_video">Il tuo video come sfondo, muto e in loop. Si ferma quando è nascosto.</string>
+</resources>

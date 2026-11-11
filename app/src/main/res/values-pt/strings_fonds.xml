@@ -1,0 +1,37 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Les textes des FONDS D'ÉCRAN ANIMÉS (português) : écran « Fonds d'écran », aperçu, services. Voir FondsActivity.kt. -->
+<resources>
+    <string name="fd_de_lapp">Do app</string>
+    <string name="fd_mes_fonds">Meus fundos</string>
+    <string name="fd_importer">Importar</string>
+    <string name="fd_importer_expl">Um vídeo, GIF ou imagem do seu celular</string>
+    <string name="fd_badge_video">VÍDEO</string>
+    <string name="fd_nom_nuit">Noite</string>
+    <string name="fd_nom_galets">Seixos</string>
+    <string name="fd_nom_video">Meu vídeo</string>
+    <string name="fd_nom_gif">Meu GIF</string>
+    <string name="fd_nom_image">Minha imagem</string>
+    <string name="fd_astuce">O fundo só funciona quando a tela inicial está visível. No modo de economia de bateria, ele congela sozinho.</string>
+    <string name="fd_supprimer_q">Excluir este fundo?</string>
+    <string name="fd_supprimer">Excluir</string>
+    <string name="fd_annuler">Cancelar</string>
+    <string name="fd_import_en_cours">Preparando o fundo…</string>
+    <string name="fd_import_rate">Não foi possível ler este arquivo.</string>
+    <string name="fd_fluidite">Fluidez</string>
+    <string name="fd_eco">Eco · 30 fps</string>
+    <string name="fd_fluide">Fluido · 60 fps</string>
+    <string name="fd_figer">Congelar após 10 s sem tocar na tela inicial</string>
+    <string name="fd_assombrir">Escurecer</string>
+    <string name="fd_appliquer">Aplicar</string>
+    <string name="fd_toucher_masquer">Toque na prévia para ocultar as configurações</string>
+    <string name="fd_conso_tres_legere">Consumo: muito baixo</string>
+    <string name="fd_conso_legere">Consumo: baixo</string>
+    <string name="fd_conso_moyenne">Consumo: médio</string>
+    <string name="fd_applique">Fundo aplicado ✓</string>
+    <string name="fd_choisir_ecran">O Android vai perguntar: escolha “Tela inicial” ou “Telas inicial e de bloqueio”.</string>
+    <string name="fd_pas_possible">Este celular não suporta fundos animados.</string>
+    <string name="fd_service_dessin">AnimLauncher · Fundos</string>
+    <string name="fd_service_video">AnimLauncher · Vídeo</string>
+    <string name="fd_desc_dessin">Fundos animados desenhados pelo AnimLauncher, ou seus próprios GIFs e imagens. Para quando está oculto.</string>
+    <string name="fd_desc_video">Seu próprio vídeo como fundo, sem som e em loop. Para quando está oculto.</string>
+</resources>

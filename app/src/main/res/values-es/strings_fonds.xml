@@ -1,0 +1,37 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Les textes des FONDS D'ÉCRAN ANIMÉS (español) : écran « Fonds d'écran », aperçu, services. Voir FondsActivity.kt. -->
+<resources>
+    <string name="fd_de_lapp">De la app</string>
+    <string name="fd_mes_fonds">Mis fondos</string>
+    <string name="fd_importer">Importar</string>
+    <string name="fd_importer_expl">Un vídeo, GIF o imagen de tu teléfono</string>
+    <string name="fd_badge_video">VÍDEO</string>
+    <string name="fd_nom_nuit">Noche</string>
+    <string name="fd_nom_galets">Guijarros</string>
+    <string name="fd_nom_video">Mi vídeo</string>
+    <string name="fd_nom_gif">Mi GIF</string>
+    <string name="fd_nom_image">Mi imagen</string>
+    <string name="fd_astuce">El fondo solo funciona cuando la pantalla de inicio está visible. En modo ahorro de batería, se congela solo.</string>
+    <string name="fd_supprimer_q">¿Eliminar este fondo?</string>
+    <string name="fd_supprimer">Eliminar</string>
+    <string name="fd_annuler">Cancelar</string>
+    <string name="fd_import_en_cours">Preparando el fondo…</string>
+    <string name="fd_import_rate">No se pudo leer este archivo.</string>
+    <string name="fd_fluidite">Fluidez</string>
+    <string name="fd_eco">Eco · 30 fps</string>
+    <string name="fd_fluide">Fluido · 60 fps</string>
+    <string name="fd_figer">Congelar tras 10 s sin tocar la pantalla de inicio</string>
+    <string name="fd_assombrir">Oscurecer</string>
+    <string name="fd_appliquer">Aplicar</string>
+    <string name="fd_toucher_masquer">Toca la vista previa para ocultar los ajustes</string>
+    <string name="fd_conso_tres_legere">Consumo: muy bajo</string>
+    <string name="fd_conso_legere">Consumo: bajo</string>
+    <string name="fd_conso_moyenne">Consumo: medio</string>
+    <string name="fd_applique">Fondo aplicado ✓</string>
+    <string name="fd_choisir_ecran">Android te preguntará: elige «Pantalla de inicio» o «Pantallas de inicio y bloqueo».</string>
+    <string name="fd_pas_possible">Este teléfono no admite fondos animados.</string>
+    <string name="fd_service_dessin">AnimLauncher · Fondos</string>
+    <string name="fd_service_video">AnimLauncher · Vídeo</string>
+    <string name="fd_desc_dessin">Fondos animados dibujados por AnimLauncher, o tus propios GIF e imágenes. Se detiene cuando está oculto.</string>
+    <string name="fd_desc_video">Tu propio vídeo como fondo, sin sonido y en bucle. Se detiene cuando está oculto.</string>
+</resources>
