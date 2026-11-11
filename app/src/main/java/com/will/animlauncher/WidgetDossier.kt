@@ -24,6 +24,7 @@ import java.util.concurrent.Executors
 import kotlin.math.ceil
 import kotlin.math.cos
 import kotlin.math.min
+import kotlin.math.roundToInt
 import kotlin.math.sin
 import kotlin.math.sqrt
 
@@ -36,6 +37,8 @@ import kotlin.math.sqrt
 //      logo      0 -> 2,3 s, puis il renaît de 10,9 à 11,6 s   (avant : jusqu'à 3,6 s, retour à 10,4 s)
 //      points    2,0 -> 5,4 s                                    (avant : 3,2 -> 7,4 s)
 //      icônes    4,8 -> 10,8 s                                   (avant : 6,8 -> 10,4 s)
+//  - (11/11, v2) LE GALET prend un sombre assorti au logo, et CHAQUE DOSSIER DÉMARRE SA BOUCLE À UN MOMENT
+//    DIFFÉRENT (voir LogosDossier.decalage) : plusieurs dossiers posés côte à côte ne « pulsent » plus ensemble.
 //  En plus :
 //  - il y a AUTANT DE POINTS QUE D'APPS (1 à 9), chacun de la couleur de son app ;
 //  - chaque point file vers sa place et devient L'ICÔNE de son app (les tuiles = les vraies icônes) ;
@@ -104,8 +107,11 @@ object WidgetDossier {
         // la couleur choisie avec la roue : sur le galet seulement (l'étoile est dessinée avec la couleur,
         // voir couleursEtoile ; les icônes des apps gardent leurs vraies couleurs)
         val hsv = Groupes.couleur(c, groupe)
-        if (hsv != null && Build.VERSION.SDK_INT >= 31) {
-            val sombre = Teinte.avecAlpha(Teinte.depuis(hsv).haut, 175f)
+        // (11/11) sans couleur choisie, le galet prend la teinte sombre assortie au logo du dossier
+        // (l'IA garde son brun d'origine : hsvGalet renvoie null pour elle)
+        val hsvGalet = hsv ?: LogosDossier.hsvGalet(groupe)
+        if (hsvGalet != null && Build.VERSION.SDK_INT >= 31) {
+            val sombre = Teinte.avecAlpha(Teinte.depuis(hsvGalet).haut, 175f)
             v.setColorStateList(R.id.dossier_galet, "setImageTintList", ColorStateList.valueOf(sombre))
             v.setBlendMode(R.id.dossier_galet, "setImageTintBlendMode", BlendMode.SRC_ATOP)
         }
@@ -117,10 +123,14 @@ object WidgetDossier {
             v.setColorStateList(R.id.dossier_lueur, "setIndeterminateTintList", ColorStateList.valueOf(lueur))
             v.setBlendMode(R.id.dossier_lueur, "setIndeterminateTintBlendMode", BlendMode.SRC_IN)
         }
+        // LE DÉPART DÉCALÉ (11/11) : la visionneuse commence toujours par sa 1re image. On lui donne donc les
+        // images dans un ordre qui commence au bon moment de la boucle (par exemple à 0,9 s pour Social),
+        // puis on continue jusqu'au bout et on reprend au début.
+        val premiere = (LogosDossier.decalage(groupe) * 1000.0 / PAS).roundToInt().mod(images.size.coerceAtLeast(1))
         v.removeAllViews(R.id.dossier_film)
-        for (b in images) {
+        for (k in images.indices) {
             val img = RemoteViews(c.packageName, R.layout.widget_top_image)
-            img.setImageViewBitmap(R.id.top_image, b)
+            img.setImageViewBitmap(R.id.top_image, images[(premiere + k) % images.size])
             v.addView(R.id.dossier_film, img)
         }
         v.setOnClickPendingIntent(R.id.dossier_racine, WidgetGroupe.clic(c, id, groupe))

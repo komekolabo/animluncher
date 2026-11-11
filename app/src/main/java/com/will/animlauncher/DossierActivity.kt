@@ -382,7 +382,7 @@ class DossierVue(
         if (width == 0) return null
         val ici = IntArray(2); getLocationOnScreen(ici)
         return RetourEtoile.Etat(etoileX + ici[0], etoileY + ici[1], etoileR, etoileA,
-            sx + ici[0], sy + ici[1], r0, voile, teinte)
+            sx + ici[0], sy + ici[1], r0, voile, teinte, groupe)
     }
 
     // La forme du galet du widget (62 dp = 3,875 fois le rayon de l'étoile du widget) : quand l'étoile rentre,
@@ -472,7 +472,7 @@ class DossierVue(
         }
         texte.typeface = Typeface.DEFAULT
 
-        // 3) LES TRAÎNÉES DE POUSSIÈRE puis LES APPS QUI ÉCLOSENT (dans le cadre : les pages voisines sont cachées)
+        // 3) LES TRAÎÎNÉES DE POUSSIÈRE puis LES APPS QUI ÉCLOSENT (dans le cadre : les pages voisines sont cachées)
         c.save()
         c.clipRect(panneau.left + 4f * k, haut - 12f * k, panneau.right - 4f * k, panneau.bottom - 4f * k)
         val premiere = min(n, parPage)                 // les apps de la page 1 éclosent l'une après l'autre
@@ -523,8 +523,11 @@ class DossierVue(
         var x = mix(sx, titreX, u)
         var y = mix(sy, titreY, u) - 60f * k * sin(PI.toFloat() * u)
         var r = mix(r0, 19f * k, u) * (1 + 0.35f * sin(PI.toFloat() * u))      // elle grossit un peu en route
-        var angle = t * 18f + 180f * u
-        if (fer > 0) { x = mix(x, sx, fer); y = mix(y, sy + 0.6f * r0, fer); r = mix(r, r0 * 0.8f, fer); angle -= 180f * fer }
+        // l'étoile de l'IA tourne doucement sans fin ; les autres logos (11/11 : bulle, vinyle, carte…) font un tour
+        // complet pendant le vol et s'arrêtent bien droits (sinon on les verrait la tête en bas)
+        val etoileIA = LogosDossier.tours(groupe) == null
+        var angle = if (etoileIA) t * 18f + 180f * u else 360f * u
+        if (fer > 0) { x = mix(x, sx, fer); y = mix(y, sy + 0.6f * r0, fer); r = mix(r, r0 * 0.8f, fer); angle -= (if (etoileIA) 180f else 360f) * fer }
         etoileX = x; etoileY = y; etoileR = r; etoileA = angle
         val lueur = 55f * (1 - u * 0.35f) * (1 - fer)
         c.save()
@@ -540,13 +543,11 @@ class DossierVue(
             c.drawCircle(x, y, r * 2.6f, pinceau)
             pinceau.shader = null
         }
+        // le logo du dossier (l'étoile pour l'IA, voir LogosDossier), centré en (x, y), de rayon r
         c.save()
         c.translate(x, y)
         c.rotate(angle)
-        c.scale(r, r)
-        pinceau.shader = degradeEtoile
-        c.drawPath(etoile, pinceau)
-        pinceau.shader = null
+        LogosDossier.dessinerAuCentre(c, groupe, r, teinte.logo)
         c.restore()
         c.restore()
 
