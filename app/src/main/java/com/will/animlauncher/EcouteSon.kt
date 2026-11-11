@@ -95,7 +95,8 @@ object EcouteSon {
     // Le téléphone lit des basses plus faibles qu'une simulation sur ordinateur (environ x 0,7) : ne se fier
     // qu'aux chiffres du téléphone. Les paliers 1 à 3 n'ont pas encore été vérifiés sur le téléphone.
     // (11/11 : la frontière bleu / vert est descendue de 0,42 à 0,34, Will trouvait le bleu trop fréquent.)
-    val SEUILS = floatArrayOf(0.13f, 0.34f, 0.52f, 0.62f)
+    // Les valeurs sont rangées dans ReglagesSon.kt (un tout petit fichier, facile à retoucher).
+    val SEUILS: FloatArray get() = ReglagesSon.SEUILS
     @Volatile var palier = 3
         private set
     @Volatile var energieVue = 0                   // pour le diagnostic : l'énergie du moment x 100
