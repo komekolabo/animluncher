@@ -17,6 +17,11 @@ object Usage {
     private var app: String? = null               // l'app à l'écran en ce moment (null = accueil, écran éteint…)
     private var debut = 0L                        // depuis quand
 
+    // L'app à l'écran en ce moment (null = accueil, écran éteint…). Lu par la réaction sonore (AppsSon.kt)
+    // pour savoir de quelle app vient la musique qui démarre.
+    val devant: String?
+        @Synchronized get() = app
+
     // Une nouvelle app passe au premier plan (ou null : on est sur l'accueil, ou l'écran s'éteint).
     @Synchronized
     fun auPremierPlan(c: Context, nouvelle: String?) {

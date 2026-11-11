@@ -81,5 +81,21 @@ object OptionsSon {
         }
         rangee(R.string.son_confettis, R.string.son_confettis_desc, confettis) { definirConfettis(a, it) }
         rangee(R.string.son_veille, R.string.son_veille_desc, veille) { definirVeille(a, it) }
+        // LES APPLICATIONS (11/11) : une ligne qui ouvre la fenêtre où l'on choisit pour quelles apps le tour
+        // s'allume (voir AppsSon.kt). Pas d'interrupteur ici : une petite flèche « › » à droite.
+        val versApps = LinearLayout(a).apply {
+            orientation = LinearLayout.HORIZONTAL
+            gravity = Gravity.CENTER_VERTICAL
+            background = Style.arrondi(a, Color.argb(14, 255, 255, 255), 14f, Style.BORD)
+            setPadding(px(14f), px(9f), px(14f), px(9f))
+            addView(LinearLayout(a).apply {
+                orientation = LinearLayout.VERTICAL
+                addView(Style.texte(a, a.getString(R.string.son_apps), 15f, Style.TEXTE, gras = true))
+                addView(Style.texte(a, a.getString(R.string.son_apps_desc), 12.5f, Style.MUET))
+            }, LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f))
+            addView(Style.texte(a, "›", 22f, Style.MUET))
+            setOnClickListener { AppsSon.ouvrir(a) }
+        }
+        colonne.addView(versApps, LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT).apply { topMargin = px(6f) })
     }
 }

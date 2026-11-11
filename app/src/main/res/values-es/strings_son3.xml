@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Les textes de la fenêtre « Applications » de la réaction sonore (voir AppsSon.kt). -->
+<resources>
+    <string name="son_apps">Aplicaciones</string>
+    <string name="son_apps_desc">Elige con qué apps se enciende el anillo</string>
+    <string name="son_apps_expl">El anillo se enciende cuando el sonido empieza en una app marcada. Las apps de música y vídeo están marcadas de serie.</string>
+    <string name="son_apps_toutes">Todas las aplicaciones</string>
+    <string name="son_apps_toutes_desc">El anillo se enciende con cualquier sonido</string>
+</resources>

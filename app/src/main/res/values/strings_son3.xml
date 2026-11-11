@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Les textes de la fenêtre « Applications » de la réaction sonore (voir AppsSon.kt). -->
+<resources>
+    <string name="son_apps">Apps</string>
+    <string name="son_apps_desc">Choose which apps light up the ring</string>
+    <string name="son_apps_expl">The ring lights up when the sound starts in a ticked app. Music and video apps are ticked by default.</string>
+    <string name="son_apps_toutes">All apps</string>
+    <string name="son_apps_toutes_desc">The ring lights up for any sound</string>
+</resources>

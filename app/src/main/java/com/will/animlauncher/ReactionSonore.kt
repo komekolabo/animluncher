@@ -505,7 +505,10 @@ class VueSonore(context: Context) : View(context) {
         val plein = pleinEcran()
         silences = if (musique) 0 else silences + 1
         // 3 s sans musique : on arrête (sauf pendant l'aperçu d'une couleur : là on montre le tour même en silence)
-        val voulu = !paysage && !plein && (silences < 3 || ReactionSonore.apercu >= 0)
+        // LES APPLICATIONS CHOISIES (11/11) : le tour ne s'allume que si le son vient d'une app cochée dans la
+        // fenêtre « Applications » (de base : les apps de musique et de vidéo). Voir AppsSon.kt.
+        val permis = AppsSon.permis(context, musique)
+        val voulu = !paysage && !plein && ((silences < 3 && permis) || ReactionSonore.apercu >= 0)
         // pour le diagnostic, et une ligne dans le journal quand quelque chose change
         if (musique != ReactionSonore.musique || plein != ReactionSonore.pleinEcran) {
             AnimApp.noter("son : musique ${if (musique) "oui" else "non"}, plein écran ${if (plein) "oui" else "non"} (${ReactionSonore.sourcePleinEcran})")

@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Les textes de la fenêtre « Applications » de la réaction sonore (voir AppsSon.kt). -->
+<resources>
+    <string name="son_apps">Applicazioni</string>
+    <string name="son_apps_desc">Scegli per quali app si accende l’anello</string>
+    <string name="son_apps_expl">L’anello si accende quando l’audio parte in un’app selezionata. Le app di musica e video sono selezionate di base.</string>
+    <string name="son_apps_toutes">Tutte le applicazioni</string>
+    <string name="son_apps_toutes_desc">L’anello si accende con qualsiasi suono</string>
+</resources>

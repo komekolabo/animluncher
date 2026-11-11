@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Les textes de la fenêtre « Applications » de la réaction sonore (voir AppsSon.kt). -->
+<resources>
+    <string name="son_apps">Applications</string>
+    <string name="son_apps_desc">Choisir pour quelles apps le tour s’allume</string>
+    <string name="son_apps_expl">Le tour s’allume quand le son démarre dans une app cochée. Les apps de musique et de vidéo sont cochées de base.</string>
+    <string name="son_apps_toutes">Toutes les applications</string>
+    <string name="son_apps_toutes_desc">Le tour s’allume pour n’importe quel son</string>
+</resources>

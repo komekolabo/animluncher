@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Les textes de la fenêtre « Applications » de la réaction sonore (voir AppsSon.kt). -->
+<resources>
+    <string name="son_apps">Apps</string>
+    <string name="son_apps_desc">Wähle, bei welchen Apps der Ring leuchtet</string>
+    <string name="son_apps_expl">Der Ring leuchtet, wenn der Ton in einer aktivierten App startet. Musik- und Video-Apps sind standardmäßig aktiviert.</string>
+    <string name="son_apps_toutes">Alle Apps</string>
+    <string name="son_apps_toutes_desc">Der Ring leuchtet bei jedem Ton</string>
+</resources>
