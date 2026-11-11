@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Les textes de la feuille « Ajouter une app » d'un dossier (ChoixAppActivity, 11/11). Un fichier par langue. -->
+<resources>
+    <string name="ajout_titre">Ajouter à %1$s</string>
+    <string name="ajout_sous">Touche une app pour l’ajouter</string>
+    <string name="ajout_suggestions">Suggestions pour %1$s</string>
+    <string name="ajout_toutes">Toutes les apps</string>
+    <string name="ajout_vide">Aucune app trouvée</string>
+</resources>

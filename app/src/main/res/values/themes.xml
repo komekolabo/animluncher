@@ -8,4 +8,16 @@
         <item name="android:statusBarColor">@android:color/transparent</item>
         <item name="android:navigationBarColor">@android:color/transparent</item>
     </style>
+
+    <!-- Le style de la feuille « Ajouter une app » (ChoixAppActivity, 11/11) : transparent comme le dossier,
+         mais basé sur le thème Material de l'app (pour que la barre de recherche ait un curseur moderne).
+         colorAccent = la couleur du curseur et de la sélection de texte (blanc cassé). -->
+    <style name="Theme.Feuille" parent="@android:style/Theme.Material.NoActionBar">
+        <item name="android:windowIsTranslucent">true</item>
+        <item name="android:windowBackground">@android:color/transparent</item>
+        <item name="android:windowAnimationStyle">@null</item>
+        <item name="android:statusBarColor">@android:color/transparent</item>
+        <item name="android:navigationBarColor">@android:color/transparent</item>
+        <item name="android:colorAccent">#E8E8EE</item>
+    </style>
 </resources>
