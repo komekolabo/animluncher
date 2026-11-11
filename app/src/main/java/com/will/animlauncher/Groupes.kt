@@ -100,7 +100,16 @@ object Groupes {
         Categorie("infos", "News", setOf("com.samsung.android.app.spage"), setOf(ApplicationInfo.CATEGORY_NEWS), setOf("news", "actu")),
     )
 
-    fun categorie(id: String): Categorie? = CATEGORIES.firstOrNull { it.id == id }
+    // UN DOSSIER, par son identifiant : une catégorie (avec le NOM que l'utilisateur lui a donné, s'il l'a renommée),
+    // ou un dossier PERSO (créé par l'utilisateur, 11/11). null = inconnu.
+    // (Les écrans et les widgets l'appellent sans avoir de « contexte » : on prend celui de l'app, voir AnimApp.)
+    fun categorie(id: String): Categorie? {
+        val base = CATEGORIES.firstOrNull { it.id == id }
+        val c = AnimApp.contexte ?: return base
+        val nom = nomPerso(c, id)
+        if (base != null) return if (nom == null) base else Categorie(base.id, nom, base.connues, base.android, base.mots)
+        return if (id in persos(c)) Categorie(id, nom ?: "Folder", emptySet()) else null
+    }
 
     // LA CATÉGORIE D'UNE APP (les 3 tests expliqués en haut du fichier), ou null si aucun ne marche.
     // « code » = la catégorie qu'Android connaît pour l'app ; « nom » = son nom affiché (« Samsung Health »).
@@ -238,8 +247,66 @@ object Groupes {
     }
 
     // LE CARNET « groupes » : pour chaque groupe, les apps décochées (« sans_… ») et les apps
-    // ajoutées à la main (« avec_… »).
+    // ajoutées à la main (« avec_… »). Depuis le 11/11 aussi : le nom donné (« nom_… »), le logo choisi
+    // (« logo_… ») et la liste des dossiers perso (« persos »).
     private const val CARNET = "groupes"
+
+    // ---------------- LES DOSSIERS PERSO, LE NOM ET LE LOGO (11/11, demande de Will) ----------------
+    // Un dossier perso n'a pas d'apps trouvées automatiquement : seulement celles qu'on y ajoute avec le « + ».
+    // Tout le reste (widget, couleur, ordre, apps décochées) marche comme pour les dossiers de catégorie,
+    // parce que tout est retenu par identifiant (« perso_1731340000000 »).
+    fun persos(c: Context): List<String> =
+        (c.getSharedPreferences(CARNET, Context.MODE_PRIVATE).getString("persos", "") ?: "").split(",").filter { it.isNotBlank() }
+
+    // Crée un dossier perso et renvoie son identifiant (fait de l'heure de création : il ne peut pas se répéter).
+    fun creer(c: Context, nom: String, logo: String): String {
+        val id = "perso_" + System.currentTimeMillis()
+        c.getSharedPreferences(CARNET, Context.MODE_PRIVATE).edit()
+            .putString("persos", (persos(c) + id).joinToString(","))
+            .putString("nom_$id", nom.trim().ifEmpty { "Folder" })
+            .putString("logo_$id", logo)
+            .apply()
+        LogosDossier.oublierChoix()
+        return id
+    }
+
+    // Supprime un dossier perso (et tout ce qu'on avait retenu pour lui). Les apps, elles, ne bougent pas.
+    fun supprimer(c: Context, id: String) {
+        if (id !in persos(c)) return
+        c.getSharedPreferences(CARNET, Context.MODE_PRIVATE).edit()
+            .putString("persos", persos(c).filter { it != id }.joinToString(","))
+            .remove("nom_$id").remove("logo_$id").remove("avec_$id").remove("sans_$id").remove("ordre_$id").remove("couleur_$id")
+            .apply()
+        LogosDossier.oublierChoix()
+    }
+
+    // Le nom donné à un dossier (null = jamais renommé : on garde le nom de la catégorie).
+    fun nomPerso(c: Context, id: String): String? =
+        c.getSharedPreferences(CARNET, Context.MODE_PRIVATE).getString("nom_$id", null)?.takeIf { it.isNotBlank() }
+
+    // Renomme un dossier. Un nom vide rend son nom d'origine à une catégorie (un dossier perso garde son ancien nom).
+    fun renommer(c: Context, id: String, nom: String) {
+        val carnet = c.getSharedPreferences(CARNET, Context.MODE_PRIVATE)
+        val propre = nom.trim().take(30)
+        if (propre.isEmpty()) { if (id !in persos(c)) carnet.edit().remove("nom_$id").apply() }
+        else carnet.edit().putString("nom_$id", propre).apply()
+    }
+
+    // Le logo choisi pour un dossier (« nuit », « cafe »… voir LogosDossier.LISTE), ou null = celui de sa catégorie.
+    fun logo(c: Context, id: String): String? =
+        c.getSharedPreferences(CARNET, Context.MODE_PRIVATE).getString("logo_$id", null)
+
+    fun definirLogo(c: Context, id: String, logo: String) {
+        c.getSharedPreferences(CARNET, Context.MODE_PRIVATE).edit().putString("logo_$id", logo).apply()
+        LogosDossier.oublierChoix()
+    }
+
+    // Tous les logos choisis, d'un coup (pour LogosDossier, qui les garde en mémoire) : dossier -> logo.
+    fun logosChoisis(c: Context): Map<String, String> =
+        c.getSharedPreferences(CARNET, Context.MODE_PRIVATE).all
+            .filter { it.key.startsWith("logo_") && it.value is String }
+            .map { it.key.removePrefix("logo_") to it.value as String }.toMap()
+
     fun retirees(c: Context, id: String): Set<String> =
         c.getSharedPreferences(CARNET, Context.MODE_PRIVATE).getStringSet("sans_$id", emptySet()) ?: emptySet()
 

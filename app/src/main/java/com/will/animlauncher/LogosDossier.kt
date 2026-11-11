@@ -35,7 +35,15 @@ import kotlin.math.sin
 //   Health        un cœur traversé par un électrocardiogramme ; il bat quand la ligne passe le pic
 //   Shopping      l'étincelle tombe dans le sac, qui l'attrape en s'écrasant puis se balance
 //   Settings      3 réglettes dont les curseurs glissent puis reviennent (le curseur du milieu est l'étincelle)
-//   News          un journal au coin plié, dont les lignes s'écrivent
+//   News          un journal au coin plié : le gros titre tombe sur la page comme un tampon, le journal se tasse
+//                 sous le choc, puis les lignes s'écrivent (« B · Une », choisi par Will le 11/11)
+//   + 14 logos « vie quotidienne » (manette, maison, casserole, café, haltère, voiture, avion, livre, patte, plante,
+//     météo, lune, flûtes, tirelire) : voir LogosQuotidien.kt. La manette est aussi le logo du dossier Games.
+//
+// LE LOGO CHOISI (11/11) : chaque dossier peut prendre N'IMPORTE QUEL logo de la liste (écran « Dossiers animés »).
+// Le choix est retenu par Groupes (carnet « groupes », « logo_<dossier> »). Toutes les fonctions ci-dessous reçoivent
+// le dossier (« groupe ») et cherchent d'abord son logo choisi (voir cleDe). Pour dessiner un logo PRÉCIS, sans
+// passer par un dossier (la grille de choix), on écrit « logo:nuit ».
 //
 // L'ÉTINCELLE : une petite étoile à 4 branches, comme celle de l'IA, se retrouve dans CHAQUE logo (en haut à
 // droite, ou à un endroit qui a du sens : le reflet de l'objectif, le sommet de la courbe, le curseur…).
@@ -71,7 +79,38 @@ object LogosDossier {
         "shopping" to intArrayOf(c(0xD6E86E), c(0xA6CC44), c(0x6FA836)),     // vert tilleul
         "reglages" to intArrayOf(c(0xC9D2E0), c(0x8E9BB3), c(0x647089)),     // ardoise (assombri)
         "infos" to intArrayOf(c(0xA9BDF2), c(0x6F8EE0), c(0x4A63B8)),        // bleu acier (assombri)
+        // les logos « vie quotidienne » (11/11, voir LogosQuotidien.kt)
+        "jeux" to intArrayOf(c(0xFF9AD5), c(0xF0569E), c(0xC2337A)),         // rose
+        "maison" to intArrayOf(c(0xFFC29A), c(0xF28F5C), c(0xCC6640)),       // pêche
+        "cuisine" to intArrayOf(c(0xFF9B8A), c(0xF06A5A), c(0xC84444)),      // corail
+        "cafe" to intArrayOf(c(0xE8C4A0), c(0xC48E62), c(0x8E5E3C)),         // moka
+        "sport" to intArrayOf(c(0xFFC46B), c(0xFF9A3D), c(0xE0701F)),        // orange vif
+        "voiture" to intArrayOf(c(0x9FD0FF), c(0x5A9CF2), c(0x3466C9)),      // bleu
+        "voyage" to intArrayOf(c(0xA0E9FF), c(0x4CC3F0), c(0x2391C9)),       // azur
+        "ecole" to intArrayOf(c(0xFFE38A), c(0xF2C23E), c(0xCF9420)),        // jaune crayon
+        "animaux" to intArrayOf(c(0xD9B8FF), c(0xA77CF2), c(0x7A52CC)),      // lavande
+        "plante" to intArrayOf(c(0xA8F0A0), c(0x5ACF6A), c(0x2E9E4E)),       // vert feuille
+        "meteo" to intArrayOf(c(0xBFE3FF), c(0x7FB8F2), c(0x4F86CC)),        // ciel
+        "nuit" to intArrayOf(c(0xB8C2FF), c(0x7C86E8), c(0x4E55B8)),         // nuit
+        "fete" to intArrayOf(c(0xFFB0E8), c(0xE77CF0), c(0xA84FD1)),         // fuchsia
+        "tirelire" to intArrayOf(c(0xFFC0D0), c(0xF28AA6), c(0xC85C7E)),     // rose bonbon
     )
+
+    // TOUS LES LOGOS qu'on peut choisir pour un dossier, dans l'ordre de la grille de choix.
+    val LISTE = listOf("ia", "social", "musique", "photo", "jeux", "finance", "trajets", "travail", "sante", "shopping",
+        "reglages", "infos", "maison", "cuisine", "cafe", "sport", "voiture", "voyage", "ecole", "animaux", "plante",
+        "meteo", "nuit", "fete", "tirelire")
+
+    // LE LOGO D'UN DOSSIER : celui qu'on a choisi pour lui, sinon celui de sa catégorie (« ia » -> l'étoile…).
+    // Les choix sont lus une fois dans le carnet, puis gardés en mémoire (relus après chaque changement).
+    @Volatile private var choix: Map<String, String> = emptyMap()
+    @Volatile private var choixLus = false
+    fun oublierChoix() { choixLus = false }
+    fun cleDe(groupe: String): String {
+        if (groupe.startsWith("logo:")) return groupe.substring(5)
+        if (!choixLus) AnimApp.contexte?.let { choix = Groupes.logosChoisis(it); choixLus = true }
+        return choix[groupe] ?: groupe
+    }
 
     // LE DÉCALAGE DU DÉPART de chaque dossier (en secondes, 11/11). Sans lui, tous les widgets posés sur le même
     // écran joueraient leur boucle en même temps : tous les logos partiraient et reviendraient ensemble, et tout
@@ -81,17 +120,18 @@ object LogosDossier {
     // suivante arrive, la boucle repart de cette image, et le changement d'apps ne se voit pas.
     private val DECALAGES = mapOf("ia" to 0.0, "social" to 0.9, "musique" to 1.8, "photo" to -0.5, "finance" to 0.45,
         "trajets" to 1.35, "travail" to -0.25, "sante" to 0.7, "shopping" to 1.6, "reglages" to 0.2, "infos" to 1.1)
-    fun decalage(groupe: String): Double = DECALAGES[groupe] ?: 0.0
+    // (un dossier perso, qui n'a pas de décalage à lui, en reçoit un tiré de son identifiant, entre -0,5 et +1,9 s)
+    fun decalage(groupe: String): Double = DECALAGES[groupe] ?: ((groupe.hashCode() and 0x7fffffff) % 25) / 10.0 - 0.5
 
     // Une catégorie qu'on sait dessiner ? (sinon : l'étoile)
-    fun connu(groupe: String) = groupe in COULEURS
+    fun connu(groupe: String) = cleDe(groupe) in COULEURS
 
-    fun couleurs(groupe: String): IntArray = COULEURS[groupe] ?: COULEURS.getValue("ia")
+    fun couleurs(groupe: String): IntArray = COULEURS[cleDe(groupe)] ?: COULEURS.getValue("ia")
 
     // LA COULEUR DU GALET (et de la fenêtre du dossier) quand on n'en a pas choisi avec la roue : la teinte
     // moyenne du logo (au format de la roue : teinte, intensité, luminosité). null = l'IA, qui garde son brun.
     fun hsvGalet(groupe: String): FloatArray? {
-        if (groupe == "ia" || !connu(groupe)) return null
+        if (cleDe(groupe) == "ia" || !connu(groupe)) return null
         val hsv = FloatArray(3)
         Color.colorToHSV(couleurs(groupe)[1], hsv)
         return hsv
@@ -101,7 +141,7 @@ object LogosDossier {
     // null = l'étoile, qui garde exactement ses mouvements d'origine (voir WidgetDossier.Boucle.logo).
     // Tous ne tournent que de 40 degrés, pour qu'on ne les voie jamais tête en bas (11/11 : l'appareil photo
     // n'est plus un diaphragme rond, il ne fait donc plus de demi-tour).
-    fun tours(groupe: String): Pair<Double, Double>? = when (groupe) {
+    fun tours(groupe: String): Pair<Double, Double>? = when (cleDe(groupe)) {
         "ia" -> null
         else -> if (connu(groupe)) 40.0 to 25.0 else null
     }
@@ -111,18 +151,20 @@ object LogosDossier {
     // refont. Dans le widget, quand le logo revient après les apps, on démarre donc directement à ce moment
     // « vide » : le logo se dessine pendant qu'il revient, au lieu d'apparaître plein, s'effacer, et se redessiner.
     // null = les autres logos (leur geste n'efface rien).
-    fun debutTrace(groupe: String): Double? = when (groupe) {
+    // (11/11 : News « Une » repart du moment où le titre va tomber ; l'avion et la plante, du dessin vide.)
+    fun debutTrace(groupe: String): Double? = when (cleDe(groupe)) {
         "finance" -> 0.58
         "trajets" -> 0.55
         "sante" -> 0.6
-        "infos" -> 0.58
+        "infos" -> 0.45
+        "voyage", "plante" -> 0.5
         else -> null
     }
 
     // ---------------- les pinceaux ----------------
     private val p = Paint(Paint.ANTI_ALIAS_FLAG)
     private val efface = Paint(Paint.ANTI_ALIAS_FLAG).apply { xfermode = PorterDuffXfermode(PorterDuff.Mode.CLEAR) }
-    private val calque = RectF(4f, 2f, 96f, 94f)            // la zone du calque (un peu plus grande que les logos)
+    internal val calque = RectF(4f, 2f, 96f, 94f)            // la zone du calque (un peu plus grande que les logos)
     private val chemin = Path()
     private val chemin2 = Path()
     private val rect = RectF()
@@ -155,7 +197,9 @@ object LogosDossier {
         val src = degradePour(cols)
         val lum = clair(cols)
         cv.saveLayerAlpha(calque, alpha.coerceIn(0, 255))
-        when (groupe) {
+        // le logo de ce dossier : d'abord les 14 « vie quotidienne » (LogosQuotidien.kt), sinon ceux d'ici
+        val logo = cleDe(groupe)
+        if (!LogosQuotidien.dessiner(cv, logo, g, src, lum)) when (logo) {
             "social" -> social(cv, g, src, lum)
             "musique" -> musique(cv, g, src, lum)
             "photo" -> photo(cv, g, src, lum)
@@ -185,14 +229,14 @@ object LogosDossier {
 
     // Les façons d'arriver à une valeur et les « clés » (les mêmes que dans WidgetDossier.kt) :
     // une clé = (seconde, valeur, façon d'y arriver), écrite « 1.2 to 8.0 by DOUX ».
-    private val LIN: (Double) -> Double = { it }
-    private val ACC: (Double) -> Double = { it * it }                                  // démarre doucement puis accélère
-    private val DEC: (Double) -> Double = { 1 - (1 - it) * (1 - it) }                  // arrive vite puis ralentit
-    private val DOUX: (Double) -> Double = { cos((it + 1) * PI) / 2 + 0.5 }           // départ et arrivée en douceur
-    private val RESSORT: (Double) -> Double = { val u = it - 1; u * u * (3 * u + 2) + 1 }   // dépasse un peu puis revient
-    private class CleLogo(val t: Double, val v: Double, val f: (Double) -> Double)
+    internal val LIN: (Double) -> Double = { it }
+    internal val ACC: (Double) -> Double = { it * it }                                  // démarre doucement puis accélère
+    internal val DEC: (Double) -> Double = { 1 - (1 - it) * (1 - it) }                  // arrive vite puis ralentit
+    internal val DOUX: (Double) -> Double = { cos((it + 1) * PI) / 2 + 0.5 }           // départ et arrivée en douceur
+    internal val RESSORT: (Double) -> Double = { val u = it - 1; u * u * (3 * u + 2) + 1 }   // dépasse un peu puis revient
+    internal class CleLogo(val t: Double, val v: Double, val f: (Double) -> Double)
     private infix fun Pair<Double, Double>.by(f: (Double) -> Double) = CleLogo(first, second, f)
-    private fun cle(t: Double, vararg cles: CleLogo): Double {
+    internal fun cle(t: Double, vararg cles: CleLogo): Double {
         if (t <= cles[0].t) return cles[0].v
         for (k in 1 until cles.size) {
             val a = cles[k - 1]; val b = cles[k]
@@ -202,39 +246,39 @@ object LogosDossier {
     }
 
     // une petite bosse douce (0 -> 1 -> 0) autour de « centre »
-    private fun bosse(t: Double, centre: Double, demi: Double): Double {
+    internal fun bosse(t: Double, centre: Double, demi: Double): Double {
         val u = (t - centre) / demi
         return if (abs(u) >= 1) 0.0 else 0.5 + 0.5 * cos(u * PI)
     }
 
     // remplir avec le dégradé
-    private fun remplir(cv: Canvas, path: Path, src: Shader) {
+    internal fun remplir(cv: Canvas, path: Path, src: Shader) {
         p.reset(); p.isAntiAlias = true; p.style = Paint.Style.FILL; p.shader = src
         cv.drawPath(path, p)
     }
 
     // remplir en arrondissant les coins (un trait épais de la même couleur tout autour)
-    private fun remplirArrondi(cv: Canvas, path: Path, src: Shader, epaisseur: Float) {
+    internal fun remplirArrondi(cv: Canvas, path: Path, src: Shader, epaisseur: Float) {
         p.reset(); p.isAntiAlias = true; p.style = Paint.Style.FILL_AND_STROKE; p.shader = src
         p.strokeJoin = Paint.Join.ROUND; p.strokeWidth = epaisseur
         cv.drawPath(path, p)
     }
 
     // remplir d'une couleur unie
-    private fun uni(couleur: Int): Paint {
+    internal fun uni(couleur: Int): Paint {
         p.reset(); p.isAntiAlias = true; p.style = Paint.Style.FILL; p.color = couleur
         return p
     }
 
     // un trait avec le dégradé
-    private fun trait(epaisseur: Float, src: Shader): Paint {
+    internal fun trait(epaisseur: Float, src: Shader): Paint {
         p.reset(); p.isAntiAlias = true; p.style = Paint.Style.STROKE; p.shader = src
         p.strokeWidth = epaisseur; p.strokeCap = Paint.Cap.ROUND; p.strokeJoin = Paint.Join.ROUND
         return p
     }
 
     // le pinceau qui « découpe » (en trait ou en remplissage)
-    private fun gomme(epaisseur: Float = 0f): Paint {
+    internal fun gomme(epaisseur: Float = 0f): Paint {
         efface.style = if (epaisseur > 0) Paint.Style.STROKE else Paint.Style.FILL
         efface.strokeWidth = epaisseur; efface.strokeCap = Paint.Cap.ROUND; efface.strokeJoin = Paint.Join.ROUND
         efface.pathEffect = null
@@ -243,9 +287,11 @@ object LogosDossier {
 
     // Une ligne brisée tracée seulement en partie (« part » de 0 à 1) : pour la coche, l'électrocardiogramme,
     // la courbe de bourse et l'itinéraire. On retient aussi où elle s'arrête (finX, finY).
-    private var finX = 0f
-    private var finY = 0f
-    private fun lignePartielle(points: Array<FloatArray>, part: Double): Path? {
+    internal var finX = 0f
+        private set
+    internal var finY = 0f
+        private set
+    internal fun lignePartielle(points: Array<FloatArray>, part: Double): Path? {
         val longueurs = (0 until points.size - 1).map { hypot(points[it + 1][0] - points[it][0], points[it + 1][1] - points[it][1]) }
         var reste = part * longueurs.sum()
         if (reste <= 0.3) return null
@@ -263,7 +309,7 @@ object LogosDossier {
 
     // L'ÉTINCELLE : une petite étoile à 4 branches (la signature commune). « eclat » (0 à 1) la fait grossir
     // et tourner d'un huitième de tour, le temps d'un scintillement.
-    private fun etincelle(cv: Canvas, x: Float, y: Float, r: Float, couleur: Int, eclat: Double = 0.0, alpha: Float = 1f) {
+    internal fun etincelle(cv: Canvas, x: Float, y: Float, r: Float, couleur: Int, eclat: Double = 0.0, alpha: Float = 1f) {
         if (r <= 0.05f || alpha <= 0.01f) return
         val s = (r * (1 + 0.45 * eclat)).toFloat()
         val q = s * 0.2f
@@ -404,7 +450,7 @@ object LogosDossier {
         }
     }
 
-    private fun remplirCercle(cv: Canvas, x: Float, y: Float, r: Float, src: Shader) {
+    internal fun remplirCercle(cv: Canvas, x: Float, y: Float, r: Float, src: Shader) {
         p.reset(); p.isAntiAlias = true; p.style = Paint.Style.FILL; p.shader = src
         cv.drawCircle(x, y, r, p)
     }
@@ -639,10 +685,14 @@ object LogosDossier {
         }
     }
 
-    // NEWS : un journal au coin plié (le coin est clair, séparé par un liseré découpé). Le gros titre et les
-    // lignes sont découpés ; les lignes s'effacent puis s'écrivent l'une après l'autre, et l'étincelle brille
-    // au coin (« dernière minute »).
+    // NEWS (« B · Une », 11/11) : un journal au coin plié (le coin est clair, séparé par un liseré découpé).
+    // Le geste : les lignes s'effacent, le gros titre (découpé) TOMBE sur la page comme un tampon (il arrive plus grand
+    // et plus haut, puis se pose en accélérant), le journal encaisse le choc en se tassant un peu, puis les lignes
+    // s'écrivent l'une après l'autre sous le titre. L'étincelle brille au coin au moment du choc.
     private fun infos(cv: Canvas, g: Double, src: Shader, lum: Int) {
+        val choc = cle(g, 0.75 to 0.0 by LIN, 0.8 to 1.0 by ACC, 1.15 to 0.0 by DOUX).toFloat()
+        cv.save()
+        cv.scale(1 + 0.05f * choc, 1 - 0.06f * choc, 50f, 72f)
         chemin.reset()
         chemin.moveTo(25f, 24f); chemin.lineTo(63f, 24f); chemin.lineTo(75f, 36f); chemin.lineTo(75f, 72f); chemin.lineTo(25f, 72f); chemin.close()
         remplirArrondi(cv, chemin, src, 5f)
@@ -652,14 +702,26 @@ object LogosDossier {
         val coin = uni(lum)
         coin.style = Paint.Style.FILL_AND_STROKE; coin.strokeWidth = 1.5f; coin.strokeJoin = Paint.Join.ROUND
         cv.drawPath(chemin, coin)
-        val pr = cle(g, 0.45 to 1.0 by LIN, 0.58 to 0.0 by ACC, 1.8 to 1.0 by LIN)
-        rect.set(31f, 30.5f, 56f, 37.5f)
-        cv.drawRoundRect(rect, 2.5f, 2.5f, gomme())
+        // le gros titre : il disparaît un instant (0,4 -> 0,45 s), puis tombe de plus haut et plus grand
+        val tombe = cle(g, 0.4 to 1.0 by LIN, 0.45 to 0.0 by LIN, 0.8 to 1.0 by ACC).toFloat()
+        val vu = cle(g, 0.4 to 1.0 by LIN, 0.45 to 0.0 by LIN, 0.55 to 1.0 by LIN)
+        if (vu > 0.02) {
+            val e = 1 + 0.6f * (1 - tombe)
+            cv.save()
+            cv.translate(0f, -10f * (1 - tombe))
+            cv.scale(e, e, 43.5f, 34f)
+            rect.set(31f, 30.5f, 56f, 37.5f)
+            cv.drawRoundRect(rect, 2.5f, 2.5f, gomme())
+            cv.restore()
+        }
+        // les lignes : elles s'effacent vite, attendent que le titre soit posé, puis s'écrivent
+        val pr = cle(g, 0.4 to 1.0 by LIN, 0.5 to 0.0 by ACC, 0.95 to 0.0 by LIN, 1.9 to 1.0 by LIN)
         val lignes = arrayOf(floatArrayOf(46f, 69f), floatArrayOf(54f, 69f), floatArrayOf(62f, 58f))
         for ((k, l) in lignes.withIndex()) {
             val part = max(0.0, min(1.0, pr * 3 - k)).toFloat()
             if (part > 0.02f) cv.drawLine(31f, l[0], 31f + (l[1] - 31f) * part, l[0], gomme(3.2f))
         }
-        etincelle(cv, 76f, 22f, 5f, lum, bosse(g, 1.9, 0.25))
+        cv.restore()
+        etincelle(cv, 76f, 22f, 5f, lum, bosse(g, 0.85, 0.22))
     }
 }

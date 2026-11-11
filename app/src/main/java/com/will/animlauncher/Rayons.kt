@@ -13,7 +13,8 @@ object Rayons {
     const val AUTRES = "autres"
 
     // Le nom d'une catégorie, dans la langue de l'app (fichiers res/values*/categories.xml).
-    fun nom(c: Context, id: String): String = c.getString(when (id) {
+    // (11/11) Un dossier renommé, ou un dossier perso, garde le nom que l'utilisateur lui a donné.
+    fun nom(c: Context, id: String): String = Groupes.nomPerso(c, id) ?: c.getString(when (id) {
         "ia" -> R.string.cat_ia
         "social" -> R.string.cat_social
         "musique" -> R.string.cat_musique
