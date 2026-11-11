@@ -7,13 +7,11 @@ import android.graphics.BlendMode
 import android.graphics.Bitmap
 import android.graphics.Canvas
 import android.graphics.Color
-import android.graphics.LinearGradient
 import android.graphics.Paint
 import android.graphics.Path
 import android.graphics.PathMeasure
 import android.graphics.Point
 import android.graphics.RectF
-import android.graphics.Shader
 import android.hardware.display.DisplayManager
 import android.os.Build
 import android.os.Handler
@@ -30,8 +28,15 @@ import kotlin.math.sin
 import kotlin.math.sqrt
 
 // LE WIDGET « DOSSIER ANIMÉ » AVEC LES VRAIES ICÔNES (10/11, validé par Will sur l'aperçu dossier_1a9.mp4).
-// La boucle de 12 s est la même qu'avant (étoile qui respire -> points qui tournent en traçant un anneau ->
-// tuiles qui ondulent -> l'étoile renaît), mais :
+// La boucle de 12 s : le logo respire et fait son geste -> points qui tournent en traçant un anneau ->
+// tuiles qui ondulent -> le logo renaît. Mais :
+//  - (11/11) CHAQUE DOSSIER A SON LOGO (bulle pour Social, cœur pour Health, engrenages pour Settings…,
+//    voir LogosDossier.kt) ; l'étoile reste celle de l'IA ;
+//  - (11/11, demande de Will) LE RYTHME : on voit moins le logo et plus longtemps les apps.
+//      logo      0 -> 2,3 s, puis il renaît de 10,9 à 11,6 s   (avant : jusqu'à 3,6 s, retour à 10,4 s)
+//      points    2,0 -> 5,4 s                                    (avant : 3,2 -> 7,4 s)
+//      icônes    4,8 -> 10,8 s                                   (avant : 6,8 -> 10,4 s)
+//  En plus :
 //  - il y a AUTANT DE POINTS QUE D'APPS (1 à 9), chacun de la couleur de son app ;
 //  - chaque point file vers sa place et devient L'ICÔNE de son app (les tuiles = les vraies icônes) ;
 //  - la grille s'adapte : 1 app = une grande icône, 2 à 4 = 2 colonnes, 5 à 9 = 3 colonnes
@@ -104,6 +109,14 @@ object WidgetDossier {
             v.setColorStateList(R.id.dossier_galet, "setImageTintList", ColorStateList.valueOf(sombre))
             v.setBlendMode(R.id.dossier_galet, "setImageTintBlendMode", BlendMode.SRC_ATOP)
         }
+        // LA LUEUR derrière le logo (11/11) : de la couleur du logo (celle du milieu de son dégradé).
+        // Mode SRC_IN : on garde la forme et la transparence de la lueur, seule sa couleur change.
+        // L'IA sans couleur choisie garde sa lueur rose d'origine.
+        if (Build.VERSION.SDK_INT >= 31 && (hsv != null || groupe != "ia")) {
+            val lueur = couleursLogo(groupe, hsv)[1]
+            v.setColorStateList(R.id.dossier_lueur, "setIndeterminateTintList", ColorStateList.valueOf(lueur))
+            v.setBlendMode(R.id.dossier_lueur, "setIndeterminateTintBlendMode", BlendMode.SRC_IN)
+        }
         v.removeAllViews(R.id.dossier_film)
         for (b in images) {
             val img = RemoteViews(c.packageName, R.layout.widget_top_image)
@@ -147,7 +160,7 @@ object WidgetDossier {
         for (essai in 0 until 3) {
             try {
                 val debut = SystemClock.uptimeMillis()
-                val images = dessinerPage(c, px, pages[0], hsv)
+                val images = dessinerPage(c, px, groupe, pages[0], hsv)
                 envoyer(c, groupe, ids, images)
                 val etat = Etat(signature, pages, 0, px)
                 etats[groupe] = etat
@@ -170,22 +183,22 @@ object WidgetDossier {
 
     // LES 300 IMAGES d'une page, dessinées dans la RÉSERVE : 300 images créées une fois, qu'on efface et qu'on
     // redessine à chaque page. (Une fois envoyées au widget, Android en a sa propre copie : on peut les réutiliser.)
-    // Les images où l'on ne voit que l'étoile (avant 3,2 s et après 11 s) sont les mêmes pour toutes les pages :
-    // si la réserve les contient déjà (même taille, mêmes couleurs d'étoile), on ne les redessine pas.
+    // Les images où l'on ne voit que le logo (avant 2 s et après 11,3 s) sont les mêmes pour toutes les pages :
+    // si la réserve les contient déjà (même taille, même dossier, mêmes couleurs), on ne les redessine pas.
     private var reserve: Array<Bitmap>? = null
     private var reservePx = 0
-    private var reserveCle = ""                  // les couleurs de l'étoile déjà dessinée dans la réserve
-    private fun dessinerPage(c: Context, px: Int, apps: List<String>, hsv: FloatArray?): List<Bitmap> {
-        val etoile = couleursEtoile(hsv)
+    private var reserveCle = ""                  // le dossier et les couleurs du logo déjà dessiné dans la réserve
+    private fun dessinerPage(c: Context, px: Int, groupe: String, apps: List<String>, hsv: FloatArray?): List<Bitmap> {
+        val etoile = couleursLogo(groupe, hsv)
         // la réserve : on garde celle qu'on a si elle est à la bonne taille, sinon on en crée une neuve
         val images: Array<Bitmap> = reserve?.takeIf { reservePx == px }
             ?: Array(N) { Bitmap.createBitmap(px, px, Bitmap.Config.ARGB_8888) }.also { reserve = it; reservePx = px; reserveCle = "" }
-        val cle = etoile.joinToString(",")
+        val cle = groupe + ":" + etoile.joinToString(",")      // (le logo dépend du dossier ET des couleurs)
         val etoileDejaLa = cle == reserveCle
-        val dessin = Boucle(apps.map { icone(c, it, px) }, etoile)
+        val dessin = Boucle(apps.map { icone(c, it, px) }, etoile, groupe)
         for (i in 0 until N) {
             val t = i * PAS / 1000.0
-            if (etoileDejaLa && (t < 3.2 || t >= 11.0)) continue
+            if (etoileDejaLa && (t < 2.0 || t >= 11.3)) continue
             images[i].eraseColor(Color.TRANSPARENT)          // on efface l'ancienne image…
             dessin.dessiner(Canvas(images[i]), px, t)        // …et on dessine la nouvelle par-dessus
         }
@@ -205,9 +218,9 @@ object WidgetDossier {
         return b
     }
 
-    // LES 3 COULEURS DE L'ÉTOILE : la palette chaude d'origine, ou des voisines de la couleur choisie avec la roue.
-    private fun couleursEtoile(hsv: FloatArray?): IntArray {
-        if (hsv == null) return intArrayOf(Color.rgb(255, 140, 91), Color.rgb(255, 107, 155), Color.rgb(196, 209, 63))
+    // LES 3 COULEURS DU LOGO : celles de sa catégorie (voir LogosDossier), ou des voisines de la couleur choisie avec la roue.
+    private fun couleursLogo(groupe: String, hsv: FloatArray?): IntArray {
+        if (hsv == null) return LogosDossier.couleurs(groupe)
         val (h, s, v) = Triple(hsv[0], hsv[1], hsv[2].coerceAtLeast(0.6f))
         return intArrayOf(Color.HSVToColor(floatArrayOf((h + 335f) % 360f, s, v)), Color.HSVToColor(floatArrayOf(h, s, v)),
                           Color.HSVToColor(floatArrayOf((h + 40f) % 360f, s * 0.8f, v)))
@@ -260,7 +273,7 @@ object WidgetDossier {
             if (ids.isEmpty()) continue
             val hsv = Groupes.couleur(c, groupe)
             etat.page = (etat.page + 1) % etat.pages.size
-            val images = dessinerPage(c, etat.px, etat.pages[etat.page], hsv)
+            val images = dessinerPage(c, etat.px, groupe, etat.pages[etat.page], hsv)
             etat.envoyeA = SystemClock.uptimeMillis()
             try { envoyer(c, groupe, ids, images) }
             catch (e: IllegalArgumentException) { Journal.noter(c, "widget dossier $groupe : page refusée (${e.message})") }
@@ -269,7 +282,7 @@ object WidgetDossier {
 
     // ---------------- LE DESSIN DE LA BOUCLE (même chose que l'aperçu Python dossier_n.py) ----------------
     // On dessine dans un repère de 100 x 100 (tout le galet), centre (50, 48), comme l'ancienne animation.
-    private class Boucle(val icones: List<Bitmap>, val teintes: IntArray) {
+    private class Boucle(val icones: List<Bitmap>, val teintes: IntArray, val groupe: String) {
         val n = icones.size
         val couleurs = icones.map { couleurMoyenne(it) }
         val places: List<FloatArray>
@@ -294,13 +307,7 @@ object WidgetDossier {
         }
 
         val p = Paint(Paint.ANTI_ALIAS_FLAG or Paint.FILTER_BITMAP_FLAG)
-        val forme = Path().apply {                          // l'étoile à 4 branches (la même qu'avant)
-            val r = 26f; val q = r * 0.085f
-            moveTo(CX, CY - r)
-            quadTo(CX + q, CY - q, CX + r, CY); quadTo(CX + q, CY + q, CX, CY + r)
-            quadTo(CX - q, CY + q, CX - r, CY); quadTo(CX - q, CY - q, CX, CY - r); close()
-        }
-        val degradeEtoile = LinearGradient(24f, 22f, 76f, 74f, teintes, floatArrayOf(0f, 0.5f, 1f), Shader.TileMode.CLAMP)
+        val tours = LogosDossier.tours(groupe)
         val cercle = Path().apply { addCircle(CX, CY, 22f, Path.Direction.CW) }
         val mesure = PathMeasure(cercle, false)
 
@@ -309,39 +316,49 @@ object WidgetDossier {
             // on ne dessine que la boîte du milieu : on agrandit, puis on décale pour que son coin soit en (0, 0)
             cv.scale(px / BOITE, px / BOITE)
             cv.translate(-BOITE_X, -BOITE_Y)
-            etoile(cv, t)
+            logo(cv, t)
             anneau(cv, t)
             points(cv, t)
             tuiles(cv, t)
             cv.restore()
         }
 
-        // l'étoile : elle respire, rétrécit en tournant vite (3 s), renaît avec un ressort (10,4 s)
-        fun etoile(cv: Canvas, t: Double) {
-            val taille = cle(t, 0.0 to 1.0 by LIN, 1.5 to 1.06 by DOUX, 3.0 to 1.0 by DOUX, 3.6 to 0.0 by ACC,
-                             10.4 to 0.0 by LIN, 11.2 to 1.0 by RESSORT)
+        // LE LOGO : il respire et fait son geste (jusqu'à 1,8 s), rétrécit en tournant (2,3 s),
+        // puis renaît avec un ressort (10,9 -> 11,6 s)
+        fun logo(cv: Canvas, t: Double) {
+            val taille = cle(t, 0.0 to 1.0 by LIN, 0.9 to 1.06 by DOUX, 1.8 to 1.0 by DOUX, 2.3 to 0.0 by ACC,
+                             10.9 to 0.0 by LIN, 11.6 to 1.0 by RESSORT)
             if (taille <= 0.001) return
-            val tour = cle(t, 0.0 to 0.0 by LIN, 3.0 to 45.0 by LIN, 3.6 to 225.0 by ACC, 3.61 to -105.0 by LIN,
-                           10.4 to -105.0 by LIN, 11.2 to -15.0 by DEC, 12.0 to 0.0 by LIN)
+            // l'étoile tourne comme avant ; les autres logos tournent moins (voir LogosDossier.tours)
+            val tour = if (tours == null)
+                cle(t, 0.0 to 0.0 by LIN, 1.8 to 45.0 by LIN, 2.3 to 225.0 by ACC, 2.31 to -105.0 by LIN,
+                    10.9 to -105.0 by LIN, 11.6 to -15.0 by DEC, 12.0 to 0.0 by LIN)
+            else {
+                val (sortie, recul) = tours
+                cle(t, 0.0 to 0.0 by LIN, 1.8 to 0.0 by LIN, 2.3 to sortie by ACC, 2.31 to -recul by LIN,
+                    10.9 to -recul by LIN, 11.6 to -recul * 0.14 by DEC, 12.0 to 0.0 by LIN)
+            }
+            // l'horloge du geste : un peu plus rapide que le temps (1,15 x) pour tenir avant la sortie ;
+            // en dehors, le logo est au repos (0,3)
+            val geste = if (t < 2.3) min(0.3 + t * 1.15, 2.9) else 0.3
             cv.save()
             cv.rotate(tour.toFloat(), CX, CY)
             cv.scale(taille.toFloat(), taille.toFloat(), CX, CY)
-            p.reset(); p.isAntiAlias = true; p.shader = degradeEtoile
-            cv.drawPath(forme, p)
+            LogosDossier.dessiner(cv, groupe, geste, teintes)
             cv.restore()
         }
 
         // l'anneau : il se trace (3,8 s) puis s'efface (5,4 s) derrière les points
         fun anneau(cv: Canvas, t: Double) {
             if (t >= 11.9) return
-            val fin = cle(t, 3.8 to 0.0 by LIN, 5.0 to 1.0 by DOUX)
-            val debut = cle(t, 5.4 to 0.0 by LIN, 6.4 to 1.0 by DOUX)
+            val fin = cle(t, 2.4 to 0.0 by LIN, 3.4 to 1.0 by DOUX)
+            val debut = cle(t, 3.7 to 0.0 by LIN, 4.5 to 1.0 by DOUX)
             if (fin <= debut) return
             val morceau = Path()
             val L = mesure.length
             mesure.getSegment((debut * L).toFloat(), (fin * L).toFloat(), morceau, true)
             cv.save()
-            cv.rotate(cle(t, 3.6 to -90.0 by LIN, 6.4 to 180.0 by DOUX).toFloat(), CX, CY)
+            cv.rotate(cle(t, 2.3 to -90.0 by LIN, 4.5 to 180.0 by DOUX).toFloat(), CX, CY)
             p.reset(); p.isAntiAlias = true
             p.style = Paint.Style.STROKE; p.strokeWidth = 1.4f; p.strokeCap = Paint.Cap.ROUND
             p.color = Color.argb(150, 255, 255, 255)
@@ -352,11 +369,11 @@ object WidgetDossier {
         // LES POINTS : autant que d'apps, répartis régulièrement sur l'anneau, chacun de la couleur de son app.
         // Ils jaillissent du centre, font trois quarts de tour, puis filent vers la place de leur icône.
         fun points(cv: Canvas, t: Double) {
-            if (t <= 3.2 || t >= 7.4 || n == 0) return
-            val orbite = cle(t, 3.6 to 0.0 by LIN, 6.4 to 270.0 by DOUX)
-            val sortie = cle(t, 3.2 to 0.0 by LIN, 3.8 to 1.0 by RESSORT)
-            val vol = cle(t, 6.4 to 0.0 by LIN, 7.1 to 1.0 by DOUX)
-            val fondu = 1 - cle(t, 6.9 to 0.0 by LIN, 7.3 to 1.0 by LIN)
+            if (t <= 2.0 || t >= 5.4 || n == 0) return
+            val orbite = cle(t, 2.3 to 0.0 by LIN, 4.5 to 270.0 by DOUX)
+            val sortie = cle(t, 2.0 to 0.0 by LIN, 2.5 to 1.0 by RESSORT)
+            val vol = cle(t, 4.5 to 0.0 by LIN, 5.1 to 1.0 by DOUX)
+            val fondu = 1 - cle(t, 4.9 to 0.0 by LIN, 5.3 to 1.0 by LIN)
             val depart = if (n == 4) -135.0 else -90.0      // 4 apps : sur les diagonales, comme l'ancienne animation
             p.reset(); p.isAntiAlias = true
             for (i in 0 until n) {
@@ -370,20 +387,21 @@ object WidgetDossier {
             }
         }
 
-        // LES ICÔNES : elles éclosent (ressort), une vague passe deux fois, puis elles rentrent au centre
+        // LES ICÔNES : elles éclosent (ressort) à 4,8 s, une vague passe deux fois (espacées : 6,9 et 8,6 s),
+        // et elles restent jusqu'à 10,3 s avant de rentrer au centre
         fun tuiles(cv: Canvas, t: Double) {
             if (t >= 11.9) return
             p.reset(); p.isAntiAlias = true; p.isFilterBitmap = true
             val zone = RectF()
             for (i in 0 until n) {
                 val d = 0.06 * i
-                val vague1 = 7.6 + 0.12 * i; val vague2 = 8.7 + 0.12 * i
-                val sc = cle(t, (6.8 + d) to 0.0 by LIN, (7.3 + d) to 1.0 by RESSORT,
+                val vague1 = 6.9 + 0.12 * i; val vague2 = 8.6 + 0.12 * i
+                val sc = cle(t, (4.8 + d) to 0.0 by LIN, (5.3 + d) to 1.0 by RESSORT,
                              vague1 to 1.0 by LIN, (vague1 + 0.25) to 1.10 by DOUX, (vague1 + 0.5) to 1.0 by DOUX,
                              vague2 to 1.0 by LIN, (vague2 + 0.25) to 1.10 by DOUX, (vague2 + 0.5) to 1.0 by DOUX,
-                             (9.8 + d) to 1.0 by LIN, (10.4 + d) to 0.0 by ACC)
+                             (10.3 + d) to 1.0 by LIN, (10.8 + d) to 0.0 by ACC)
                 if (sc <= 0.001) continue
-                val rentre = cle(t, (9.8 + d) to 0.0 by LIN, (10.4 + d) to 1.0 by ACC)
+                val rentre = cle(t, (10.3 + d) to 0.0 by LIN, (10.8 + d) to 1.0 by ACC)
                 val x = (places[i][0] + (CX - places[i][0]) * rentre).toFloat()
                 val y = (places[i][1] + (CY - places[i][1]) * rentre).toFloat()
                 val h = (cote * sc / 2).toFloat()

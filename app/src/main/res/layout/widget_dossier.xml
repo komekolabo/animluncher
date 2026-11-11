@@ -24,8 +24,10 @@
             android:scaleType="fitXY"
             android:src="@drawable/widget_galet_chaud" />
 
-        <!-- la lueur rose qui respire, derrière l'étoile -->
+        <!-- la lueur qui respire, derrière le logo (rose pour l'IA ; de la couleur du logo pour les autres
+             dossiers, voir WidgetDossier.vues) -->
         <ProgressBar
+            android:id="@+id/dossier_lueur"
             style="@android:style/Widget.ProgressBar"
             android:layout_width="match_parent"
             android:layout_height="match_parent"
