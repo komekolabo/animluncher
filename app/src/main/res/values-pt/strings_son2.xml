@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Les textes des options de la réaction sonore (voir OptionsSon.kt et VeilleSon.kt). -->
+<resources>
+    <string name="son_options">Opções</string>
+    <string name="son_confettis">Confetes</string>
+    <string name="son_confettis_desc">Nos momentos mais intensos</string>
+    <string name="son_veille">Ecrã desligado, anel ligado</string>
+    <string name="son_veille_desc">Se desligares o ecrã com música a tocar, ele fica preto com o anel luminoso. Gasta mais bateria.</string>
+    <string name="son_veille_aide">Mantém premido para sair</string>
+</resources>

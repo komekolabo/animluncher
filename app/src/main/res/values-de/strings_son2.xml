@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Les textes des options de la réaction sonore (voir OptionsSon.kt et VeilleSon.kt). -->
+<resources>
+    <string name="son_options">Optionen</string>
+    <string name="son_confettis">Konfetti</string>
+    <string name="son_confettis_desc">In den intensivsten Momenten</string>
+    <string name="son_veille">Bildschirm aus, Ring an</string>
+    <string name="son_veille_desc">Wenn du den Bildschirm bei laufender Musik ausschaltest, bleibt er schwarz mit dem leuchtenden Ring. Verbraucht mehr Akku.</string>
+    <string name="son_veille_aide">Gedrückt halten zum Beenden</string>
+</resources>

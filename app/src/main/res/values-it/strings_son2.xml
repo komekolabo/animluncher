@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Les textes des options de la réaction sonore (voir OptionsSon.kt et VeilleSon.kt). -->
+<resources>
+    <string name="son_options">Opzioni</string>
+    <string name="son_confettis">Coriandoli</string>
+    <string name="son_confettis_desc">Nei momenti più intensi</string>
+    <string name="son_veille">Schermo spento, anello acceso</string>
+    <string name="son_veille_desc">Se spegni lo schermo mentre c’è musica, resta nero con l’anello luminoso. Consuma più batteria.</string>
+    <string name="son_veille_aide">Tieni premuto per uscire</string>
+</resources>

@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Les textes des options de la réaction sonore (voir OptionsSon.kt et VeilleSon.kt). -->
+<resources>
+    <string name="son_options">Options</string>
+    <string name="son_confettis">Confetti</string>
+    <string name="son_confettis_desc">On the most intense moments</string>
+    <string name="son_veille">Screen off, ring on</string>
+    <string name="son_veille_desc">When you turn the screen off while music plays, it stays black with the glowing ring. Uses more battery.</string>
+    <string name="son_veille_aide">Press and hold to exit</string>
+</resources>

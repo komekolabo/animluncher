@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Les textes des options de la réaction sonore (voir OptionsSon.kt et VeilleSon.kt). -->
+<resources>
+    <string name="son_options">Options</string>
+    <string name="son_confettis">Confettis</string>
+    <string name="son_confettis_desc">Sur les moments les plus forts</string>
+    <string name="son_veille">Écran éteint, tour allumé</string>
+    <string name="son_veille_desc">Quand tu éteins l’écran pendant une musique, il reste noir avec le tour lumineux. Consomme plus de batterie.</string>
+    <string name="son_veille_aide">Reste appuyé pour quitter</string>
+</resources>

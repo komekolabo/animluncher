@@ -226,6 +226,8 @@ object FenetreSon {
         colonne.addView(reglage, LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT))
         // les deux paliers extrêmes n'ont pas de couleur à eux : on dit ce qu'ils ajoutent
         ligne(a.getString(R.string.son_extremes), Style.MUET, haut = 8f)
+        // LES OPTIONS (11/11) : confettis oui / non, et l'écran noir qui garde le tour allumé (voir OptionsSon.kt)
+        OptionsSon.ajouter(a, colonne)
         // la roue tourne : on change la couleur de la ligne ouverte (« fini » = le doigt est levé : on enregistre)
         roue.quandChange = { teinte, fini ->
             if (choisie >= 0) {
@@ -303,7 +305,7 @@ object FenetreSon {
             l(EcouteSon.enMarche, ecoute),
             l(ReactionSonore.dessine, a.getString(R.string.son_diag_dessine, if (ReactionSonore.dessine) oui else non)),
             a.getString(R.string.son_diag_niveaux, (EcouteSon.grave * 100).toInt(), (EcouteSon.medium * 100).toInt(), (EcouteSon.aigu * 100).toInt()),
-            // le palier du moment (1 à 5) et l'énergie mesurée (les frontières sont à 30, 44, 63 et 80)
+            // le palier du moment (1 à 5) et l'énergie mesurée (les frontières sont dans ReglagesSon.kt)
             a.getString(R.string.son_diag_moment, a.getString(PALIERS[(EcouteSon.palier - 1).coerceIn(0, 4)]), EcouteSon.energieVue)
         ).joinToString("\n")
     }

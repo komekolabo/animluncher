@@ -92,6 +92,17 @@
             android:name=".GuideDeblocage"
             android:exported="false" />
 
+        <!-- RÉACTION SONORE, option « Écran éteint, tour allumé » : un écran tout noir qui se pose quand on
+             éteint le téléphone pendant une musique (le tour lumineux se dessine par-dessus). Il vit dans sa
+             propre tâche et n'apparaît pas dans les apps récentes. Voir VeilleSon.kt. -->
+        <activity
+            android:name=".VeilleSonActivity"
+            android:exported="false"
+            android:excludeFromRecents="true"
+            android:launchMode="singleTask"
+            android:screenOrientation="portrait"
+            android:taskAffinity="" />
+
         <!-- Le service qui détecte l'app ouverte et joue l'animation. -->
         <service
             android:name=".AppWatcherService"

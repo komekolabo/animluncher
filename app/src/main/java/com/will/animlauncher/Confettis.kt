@@ -78,6 +78,7 @@ object Confettis {
     //   ptX, ptY, lumiere : les repères du tour et leur lumière du moment ; couleurs : les 4 couleurs « ça envoie »
     fun suivre(coupTombe: Boolean, forceCoup: Float, ptX: FloatArray, ptY: FloatArray, lumiere: FloatArray,
                couleurs: IntArray, w: Float, ht: Float, d: Float) {
+        if (!OptionsSon.confettis) return            // l'option « Confettis » est décochée : on n'en lance aucun
         val n = ptX.size
         if (n < 16 || couleurs.isEmpty()) return
         reperesX = ptX; reperesY = ptY; palette = couleurs; dp = d
@@ -205,6 +206,9 @@ object Confettis {
 
     // Fait avancer et dessine les confettis encore en vie (à appeler à chaque image). presence : 0 (invisible) … 1.
     fun dessiner(c: Canvas, dt: Float, d: Float, presence: Float) {
+        // (la première fois que le tour dessine, on lit les options et on prépare le mode « écran éteint » :
+        //  voir OptionsSon.kt. Les fois suivantes, cette ligne ne fait rien.)
+        OptionsSon.preparer()
         depuisCoup += dt
         // les tirs programmés dont l'heure est arrivée
         for (i in 0 until FILE) {

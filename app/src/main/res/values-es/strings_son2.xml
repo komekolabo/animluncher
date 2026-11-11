@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Les textes des options de la réaction sonore (voir OptionsSon.kt et VeilleSon.kt). -->
+<resources>
+    <string name="son_options">Opciones</string>
+    <string name="son_confettis">Confeti</string>
+    <string name="son_confettis_desc">En los momentos más intensos</string>
+    <string name="son_veille">Pantalla apagada, anillo encendido</string>
+    <string name="son_veille_desc">Si apagas la pantalla mientras suena música, se queda en negro con el anillo luminoso. Gasta más batería.</string>
+    <string name="son_veille_aide">Mantén pulsado para salir</string>
+</resources>
