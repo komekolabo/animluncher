@@ -43,7 +43,7 @@ object FabriqueFond3D {
 
     // Ce qui peut mal tourner, pour afficher le bon message.
     class Echec(val raison: Raison) : Exception()
-    enum class Raison { ILLISIBLE, PAS_DE_SUJET, MODULE_ABSENT }
+    enum class Raison { ILLISIBLE, PAS_DE_SUJET, SUJET_TROP_GRAND, MODULE_ABSENT }
 
     // Fabrique le fond 3D de la photo « uri ». Renvoie son dossier, ou lance un Echec.
     fun fabriquer(c: Context, uri: Uri): File {
@@ -68,7 +68,11 @@ object FabriqueFond3D {
             try { outil.close() } catch (_: Exception) {}
         }
         // pas de sujet trouvé (moins de 2 % de l'image) : un fond 3D n'aurait pas de sens
-        if (confiance.count { it > 0.5f } < w * h / 50) throw Echec(Raison.PAS_DE_SUJET)
+        val part = confiance.count { it > 0.5f }.toFloat() / (w * h)
+        if (part < 0.02f) throw Echec(Raison.PAS_DE_SUJET)
+        // (13/11, vu par Will sur une capture de manga) le « sujet » couvre presque toute l'image : l'outil n'a pas
+        // su séparer le sujet de son fond (dessin noir et blanc, capture d'écran…). Le fond 3D n'aurait aucun relief.
+        if (part > 0.6f) throw Echec(Raison.SUJET_TROP_GRAND)
 
         val pixels = IntArray(w * h)
         photo.getPixels(pixels, 0, w, 0, 0, w, h)

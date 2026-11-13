@@ -7,4 +7,5 @@
     <string name="fd_3d_en_cours">Cutting out the subject…</string>
     <string name="fd_3d_pas_de_sujet">No clear subject found in this photo. Try a photo with a person, an animal or an object in the foreground.</string>
     <string name="fd_3d_module">The cut-out tool is still being downloaded by Google services. Try again in a minute (with an internet connection).</string>
+    <string name="fd_3d_trop_grand">The subject could not be separated from its background (it covers almost the whole image). Choose a photo where the subject stands out from a different background. Black-and-white drawings and screenshots work poorly.</string>
 </resources>

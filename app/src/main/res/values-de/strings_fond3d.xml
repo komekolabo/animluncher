@@ -7,4 +7,5 @@
     <string name="fd_3d_en_cours">Motiv wird freigestellt…</string>
     <string name="fd_3d_pas_de_sujet">Kein klares Motiv auf diesem Foto gefunden. Versuche ein Foto mit einer Person, einem Tier oder einem Objekt im Vordergrund.</string>
     <string name="fd_3d_module">Das Freistellungs-Tool wird noch von den Google-Diensten heruntergeladen. Versuche es in einer Minute erneut (mit Internet).</string>
+    <string name="fd_3d_trop_grand">Das Motiv konnte nicht vom Hintergrund getrennt werden (es bedeckt fast das ganze Bild). Wähle ein Foto, auf dem sich das Motiv von einem anderen Hintergrund abhebt. Schwarz-Weiß-Zeichnungen und Screenshots funktionieren schlecht.</string>
 </resources>

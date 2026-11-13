@@ -7,4 +7,5 @@
     <string name="fd_3d_en_cours">Détourage du sujet…</string>
     <string name="fd_3d_pas_de_sujet">Aucun sujet net trouvé sur cette photo. Essaie une photo avec une personne, un animal ou un objet au premier plan.</string>
     <string name="fd_3d_module">L’outil de détourage est encore en téléchargement par les services Google. Réessaie dans une minute (avec Internet).</string>
+    <string name="fd_3d_trop_grand">Le sujet n’a pas pu être séparé de son fond (il couvre presque toute l’image). Choisis une photo où le sujet se détache d’un fond différent. Les dessins en noir et blanc et les captures d’écran marchent mal.</string>
 </resources>

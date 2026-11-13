@@ -260,6 +260,7 @@ class FondsActivity : Activity() {
             } catch (e: FabriqueFond3D.Echec) {
                 message = when (e.raison) {
                     FabriqueFond3D.Raison.PAS_DE_SUJET -> R.string.fd_3d_pas_de_sujet
+                    FabriqueFond3D.Raison.SUJET_TROP_GRAND -> R.string.fd_3d_trop_grand
                     FabriqueFond3D.Raison.MODULE_ABSENT -> R.string.fd_3d_module
                     else -> R.string.fd_import_rate
                 }

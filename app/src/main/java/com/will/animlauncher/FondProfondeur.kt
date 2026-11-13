@@ -94,6 +94,15 @@ class FondProfondeur(c: Context, dossier: String) : DessinFond() {
     }
     val valide = fond != null && sujet != null
 
+    // (13/11) DEUX MISES EN PAGE, selon la forme de la photo :
+    //  - photo carrée ou large : le sujet est réduit à 84 % de la hauteur et posé en bas (la « première
+    //    version » choisie par Will) ; sinon il serait coupé sur les côtés ;
+    //  - photo déjà EN HAUTEUR (comme une capture d'écran) : elle remplit déjà l'écran, donc le sujet reste
+    //    exactement à sa place sur le fond (même taille, même position) et cache le trou rebouché. Les calques
+    //    bougent un peu moins, pour que ce trou reste caché. (Vu par Will : en hauteur, l'ancienne mise en page
+    //    laissait des bandes floues sur les côtés.)
+    private val enHauteur = fond != null && fond.height >= fond.width * 1.3f
+
     // la position actuelle des calques ; elle rejoint en douceur ce que donne le capteur
     private var px = 0f
     private var py = 0f
@@ -130,6 +139,7 @@ class FondProfondeur(c: Context, dossier: String) : DessinFond() {
         }
         // 1) LE FOND : il « couvre » l'écran, agrandi de 16 % (on ne voit jamais son bord quand il glisse),
         //    et part à l'OPPOSÉ de l'inclinaison (il est loin)
+        if (enHauteur) { dessinerAligne(c, f, s, w, h); return }
         val sf = max(w / f.width, h / f.height) * 1.16f * 1.02f
         val fw = f.width * sf; val fh = f.height * sf
         val dxf = -px * w * 0.06f; val dyf = -py * w * 0.05f
@@ -150,6 +160,22 @@ class FondProfondeur(c: Context, dossier: String) : DessinFond() {
         cadre.set((w - sw) / 2f + dxs, bas - sh + dys, (w + sw) / 2f + dxs, bas + dys)
         c.drawBitmap(s, null, cadre, filtre)
         // 4) le vignettage (les bords un peu plus sombres)
+        c.drawRect(0f, 0f, w, h, pVignette)
+    }
+
+    // La mise en page « en hauteur » : les deux calques « couvrent » l'écran de la même façon (agrandis de 6 %
+    // pour ne jamais montrer leur bord) ; le fond glisse à l'opposé, le sujet dans le sens de l'inclinaison.
+    private fun dessinerAligne(c: Canvas, f: Bitmap, s: Bitmap, w: Float, h: Float) {
+        val sc = max(w / f.width, h / f.height) * 1.06f
+        val iw = f.width * sc; val ih = f.height * sc
+        val x0 = (w - iw) / 2f; val y0 = (h - ih) / 2f
+        val dxf = -px * w * 0.022f; val dyf = -py * w * 0.018f
+        cadre.set(x0 + dxf, y0 + dyf, x0 + iw + dxf, y0 + ih + dyf)
+        c.drawBitmap(f, null, cadre, filtre)
+        c.drawRect(0f, 0f, w, h, voile)
+        val dxs = px * w * 0.018f; val dys = py * w * 0.012f
+        cadre.set(x0 + dxs, y0 + dys, x0 + iw + dxs, y0 + ih + dys)
+        c.drawBitmap(s, null, cadre, filtre)
         c.drawRect(0f, 0f, w, h, pVignette)
     }
 }

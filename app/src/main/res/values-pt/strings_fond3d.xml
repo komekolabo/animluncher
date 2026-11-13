@@ -7,4 +7,5 @@
     <string name="fd_3d_en_cours">Recortando o objeto principal…</string>
     <string name="fd_3d_pas_de_sujet">Nenhum objeto principal claro nesta foto. Tente uma foto com uma pessoa, um animal ou um objeto em primeiro plano.</string>
     <string name="fd_3d_module">A ferramenta de recorte ainda está sendo baixada pelos serviços do Google. Tente de novo em um minuto (com internet).</string>
+    <string name="fd_3d_trop_grand">Não foi possível separar o objeto principal do fundo (ele cobre quase toda a imagem). Escolha uma foto em que ele se destaque de um fundo diferente. Desenhos em preto e branco e capturas de tela funcionam mal.</string>
 </resources>

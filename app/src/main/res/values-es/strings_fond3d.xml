@@ -7,4 +7,5 @@
     <string name="fd_3d_en_cours">Recortando el sujeto…</string>
     <string name="fd_3d_pas_de_sujet">No se encontró un sujeto claro en esta foto. Prueba una foto con una persona, un animal o un objeto en primer plano.</string>
     <string name="fd_3d_module">La herramienta de recorte aún se está descargando en los servicios de Google. Vuelve a intentarlo en un minuto (con Internet).</string>
+    <string name="fd_3d_trop_grand">No se pudo separar el sujeto de su fondo (cubre casi toda la imagen). Elige una foto donde el sujeto destaque sobre un fondo diferente. Los dibujos en blanco y negro y las capturas de pantalla funcionan mal.</string>
 </resources>
