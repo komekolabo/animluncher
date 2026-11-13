@@ -30,7 +30,8 @@ import kotlin.math.sqrt
 // Ici, on voit le sujet détouré, et on corrige avec le doigt :
 //  - « Effacer » : ce qu'on touche disparaît du sujet (il restera dans le fond) ;
 //  - « Restaurer » : ce qu'on touche revient dans le sujet ;
-//  - trois tailles de pinceau, « Annuler » (le dernier trait), deux doigts pour zoomer et se déplacer ;
+//  - quatre tailles de pinceau, « Annuler » (le dernier trait), deux doigts pour zoomer (jusqu'à x 40) et se déplacer ;
+//  - le flou derrière le sujet : Doux / Net / Aucun ;
 //  - « Essayer l'autre outil » : refait le détourage avec l'autre outil (photo <-> dessins) ;
 //  - « Terminé » : fabrique le fond 3D (FabriqueFond3D.terminer) et ouvre son aperçu.
 // Ce qui est effacé reste visible en transparence (très atténué), pour savoir où on a gommé.
@@ -41,7 +42,11 @@ class GommeActivity : Activity() {
         // (Une photo de 1600 points est trop grosse pour voyager dans un Intent : on la garde en mémoire ici.)
         var enCours: FabriqueFond3D.Detourage? = null
         var photo: Uri? = null
+        // (13/11) quand on RETOUCHE un fond 3D déjà créé : son dossier (sinon null = nouveau fond)
+        var dossier: java.io.File? = null
     }
+
+    private var remplissage = FabriqueFond3D.DOUX
 
     private lateinit var vue: VueGomme
     private val px = { v: Float -> Style.px(this, v) }
@@ -64,7 +69,7 @@ class GommeActivity : Activity() {
         effacer.setOnClickListener { vue.effacer = true; modes() }
         restaurer.setOnClickListener { vue.effacer = false; modes() }
         modes()
-        val tailles = listOf(10f to "•", 22f to "●", 40f to "⬤").map { (dp, signe) ->
+        val tailles = listOf(5f to "·", 12f to "•", 24f to "●", 44f to "⬤").map { (dp, signe) ->
             pilule(signe).apply { tag = dp }
         }
         fun peindreTailles() { for (t in tailles) allumer(t, vue.rayonDp == t.tag as Float) }
@@ -72,14 +77,34 @@ class GommeActivity : Activity() {
         peindreTailles()
         val annuler = pilule("↶").apply { setOnClickListener { vue.annuler() } }
 
+        // (3 rangées, pour tenir sur un écran étroit comme celui du Flip6)
         val ligne1 = LinearLayout(this).apply {
             orientation = LinearLayout.HORIZONTAL
-            gravity = Gravity.CENTER
+            gravity = Gravity.CENTER_VERTICAL
             addView(effacer); addView(restaurer)
-            addView(View(this@GommeActivity), LinearLayout.LayoutParams(px(12f), 1))
-            for (t in tailles) addView(t)
-            addView(View(this@GommeActivity), LinearLayout.LayoutParams(px(12f), 1))
+            addView(View(this@GommeActivity), LinearLayout.LayoutParams(0, 1, 1f))
             addView(annuler)
+        }
+        val lignePinceau = LinearLayout(this).apply {
+            orientation = LinearLayout.HORIZONTAL
+            gravity = Gravity.CENTER_VERTICAL
+            setPadding(0, px(10f), 0, 0)
+            addView(Style.texte(this@GommeActivity, getString(R.string.fd_3d_pinceau), 13f, Style.MUET).apply { setPadding(0, 0, px(10f), 0) })
+            for (t in tailles) addView(t)
+        }
+        // (13/11) le flou derrière le sujet : Doux / Net / Aucun (voir FabriqueFond3D.reboucher)
+        dossier?.let { remplissage = FabriqueFond3D.remplissage(it) }
+        val choixFond = listOf(FabriqueFond3D.DOUX to R.string.fd_3d_flou_doux, FabriqueFond3D.NET to R.string.fd_3d_flou_net,
+            FabriqueFond3D.AUCUN to R.string.fd_3d_flou_aucun).map { (m, t) -> pilule(getString(t)).apply { tag = m } }
+        fun peindreFond() { for (p in choixFond) allumer(p, remplissage == p.tag as Int) }
+        for (p in choixFond) p.setOnClickListener { remplissage = p.tag as Int; peindreFond() }
+        peindreFond()
+        val ligneFond = LinearLayout(this).apply {
+            orientation = LinearLayout.HORIZONTAL
+            gravity = Gravity.CENTER_VERTICAL
+            setPadding(0, px(10f), 0, 0)
+            addView(Style.texte(this@GommeActivity, getString(R.string.fd_3d_flou), 13f, Style.MUET).apply { setPadding(0, 0, px(10f), 0) })
+            for (p in choixFond) addView(p)
         }
         val ligne2 = LinearLayout(this).apply {
             orientation = LinearLayout.HORIZONTAL
@@ -94,6 +119,8 @@ class GommeActivity : Activity() {
             setPadding(px(14f), px(10f), px(14f), px(18f))
             setBackgroundColor(Color.rgb(12, 12, 14))
             addView(ligne1)
+            addView(lignePinceau)
+            addView(ligneFond)
             addView(ligne2)
         }
         setContentView(LinearLayout(this).apply {
@@ -124,11 +151,12 @@ class GommeActivity : Activity() {
         val d = enCours ?: return
         val attente = AlertDialog.Builder(this).setMessage(getString(R.string.fd_3d_finition)).setCancelable(false).show()
         Thread {
-            val dossier = try { FabriqueFond3D.terminer(this, d) } catch (_: Throwable) { null }
+            val dossier = try { FabriqueFond3D.terminer(this, d, remplissage, GommeActivity.dossier) } catch (_: Throwable) { null }
             runOnUiThread {
                 attente.dismiss()
                 if (dossier == null) { Toast.makeText(this, getString(R.string.fd_import_rate), Toast.LENGTH_LONG).show(); return@runOnUiThread }
                 enCours = null
+                GommeActivity.dossier = null
                 startActivity(Intent(this, FondApercuActivity::class.java)
                     .putExtra(FondApercuActivity.SORTE, CarnetFond.PROFONDEUR)
                     .putExtra(FondApercuActivity.ID, dossier.path))
@@ -140,13 +168,12 @@ class GommeActivity : Activity() {
     // « Essayer l'autre outil » : on refait le détourage avec l'outil qu'on n'a pas utilisé.
     private fun autreOutil() {
         val d = enCours ?: return
-        val uri = photo ?: return
         val autre = if (d.outil == FabriqueFond3D.Outil.PHOTO) FabriqueFond3D.Outil.DESSIN else FabriqueFond3D.Outil.PHOTO
         val attente = AlertDialog.Builder(this).setMessage(getString(R.string.fd_3d_en_cours)).setCancelable(false).show()
         Thread {
             var nouveau: FabriqueFond3D.Detourage? = null
             var raison: FabriqueFond3D.Raison? = null
-            try { nouveau = FabriqueFond3D.detourer(this, uri, autre) } catch (e: FabriqueFond3D.Echec) { raison = e.raison } catch (_: Throwable) {}
+            try { nouveau = FabriqueFond3D.detourer(this, d.photo, autre) } catch (e: FabriqueFond3D.Echec) { raison = e.raison } catch (_: Throwable) {}
             runOnUiThread {
                 attente.dismiss()
                 val n = nouveau
@@ -254,7 +281,8 @@ class VueGomme(c: Context, private var d: FabriqueFond3D.Detourage) : View(c) {
             val valeurs = FloatArray(9); versEcran.getValues(valeurs)
             val actuel = valeurs[Matrix.MSCALE_X]
             val mini = min(width.toFloat() / d.w, height.toFloat() / d.h) * 0.8f
-            val f = (actuel * g.scaleFactor).coerceIn(mini, mini * 12f) / actuel
+            // jusqu'à 40 fois plus grand qu'au départ (demande de Will : zoomer très fort pour les petits détails)
+            val f = (actuel * g.scaleFactor).coerceIn(mini, mini * 50f) / actuel
             versEcran.postScale(f, f, g.focusX, g.focusY)
             versEcran.invert(versImage)
             invalidate()

@@ -21,4 +21,10 @@
     <string name="fd_3d_telechargement_rate">Download fehlgeschlagen. Prüfe deine Internetverbindung und versuche es erneut.</string>
     <string name="fd_3d_outil_place">Freistell-Werkzeug für Zeichnungen · %1$d MB</string>
     <string name="fd_3d_outil_supprime">Werkzeug gelöscht.</string>
+    <string name="fd_3d_flou">Unschärfe dahinter:</string>
+    <string name="fd_3d_flou_doux">Weich</string>
+    <string name="fd_3d_flou_net">Scharf</string>
+    <string name="fd_3d_flou_aucun">Keine</string>
+    <string name="fd_3d_retoucher">Freistellung nachbearbeiten</string>
+    <string name="fd_3d_pinceau">Pinsel:</string>
 </resources>

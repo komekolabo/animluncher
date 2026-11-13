@@ -21,4 +21,10 @@
     <string name="fd_3d_telechargement_rate">Download non riuscito. Controlla la connessione a Internet e riprova.</string>
     <string name="fd_3d_outil_place">Strumento di scontorno per disegni · %1$d MB</string>
     <string name="fd_3d_outil_supprime">Strumento eliminato.</string>
+    <string name="fd_3d_flou">Sfocatura dietro:</string>
+    <string name="fd_3d_flou_doux">Morbida</string>
+    <string name="fd_3d_flou_net">Netta</string>
+    <string name="fd_3d_flou_aucun">Nessuna</string>
+    <string name="fd_3d_retoucher">Ritocca lo scontorno</string>
+    <string name="fd_3d_pinceau">Pennello:</string>
 </resources>

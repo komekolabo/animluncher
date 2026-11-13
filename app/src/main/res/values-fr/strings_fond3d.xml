@@ -21,4 +21,10 @@
     <string name="fd_3d_telechargement_rate">Téléchargement impossible. Vérifie ta connexion Internet et réessaie.</string>
     <string name="fd_3d_outil_place">Outil de détourage des dessins · %1$d Mo</string>
     <string name="fd_3d_outil_supprime">Outil supprimé.</string>
+    <string name="fd_3d_flou">Flou derrière :</string>
+    <string name="fd_3d_flou_doux">Doux</string>
+    <string name="fd_3d_flou_net">Net</string>
+    <string name="fd_3d_flou_aucun">Aucun</string>
+    <string name="fd_3d_retoucher">Retoucher le détourage</string>
+    <string name="fd_3d_pinceau">Pinceau :</string>
 </resources>

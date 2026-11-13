@@ -280,12 +280,33 @@ class FondApercuActivity : Activity() {
             })
         }
 
+        // (13/11) un fond 3D se RETOUCHE : on rouvre la gomme avec son détourage
+        if (sorte == CarnetFond.PROFONDEUR) addView(Style.boutonDiscret(this@FondApercuActivity, getString(R.string.fd_3d_retoucher)) {
+            retoucher()
+        }, LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT).apply { topMargin = px(14f) })
+
         addView(Style.boutonBlanc(this@FondApercuActivity, getString(R.string.fd_appliquer)) { appliquer() },
             LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT).apply { topMargin = px(14f) })
         addView(Style.texte(this@FondApercuActivity, getString(R.string.fd_toucher_masquer), 11f, Style.MUET).apply {
             gravity = Gravity.CENTER
             setPadding(0, px(8f), 0, 0)
         }, LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT))
+    }
+
+    // Rouvre la gomme sur ce fond 3D (la photo d'origine et le détourage sont relus depuis son dossier).
+    private fun retoucher() {
+        val dossier = java.io.File(ref)
+        Thread {
+            val d = FabriqueFond3D.rouvrir(this, dossier)
+            runOnUiThread {
+                if (d == null) { Toast.makeText(this, getString(R.string.fd_import_rate), Toast.LENGTH_LONG).show(); return@runOnUiThread }
+                GommeActivity.enCours = d
+                GommeActivity.photo = null
+                GommeActivity.dossier = dossier
+                startActivity(Intent(this, GommeActivity::class.java))
+                finish()
+            }
+        }.start()
     }
 
     private fun pilule(t: String, action: () -> Unit): TextView = Style.texte(this, t, 13f, Style.TEXTE, gras = true).apply {

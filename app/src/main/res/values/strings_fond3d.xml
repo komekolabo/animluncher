@@ -21,4 +21,10 @@
     <string name="fd_3d_telechargement_rate">Download failed. Check your internet connection and try again.</string>
     <string name="fd_3d_outil_place">Drawing cut-out tool · %1$d MB</string>
     <string name="fd_3d_outil_supprime">Tool deleted.</string>
+    <string name="fd_3d_flou">Blur behind:</string>
+    <string name="fd_3d_flou_doux">Soft</string>
+    <string name="fd_3d_flou_net">Sharp</string>
+    <string name="fd_3d_flou_aucun">None</string>
+    <string name="fd_3d_retoucher">Touch up the cut-out</string>
+    <string name="fd_3d_pinceau">Brush:</string>
 </resources>

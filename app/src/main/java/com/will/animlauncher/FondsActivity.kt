@@ -279,6 +279,7 @@ class FondsActivity : Activity() {
                     r != null -> {
                         GommeActivity.enCours = r
                         GommeActivity.photo = uri
+                        GommeActivity.dossier = null          // un NOUVEAU fond (pas une retouche)
                         startActivity(Intent(this, GommeActivity::class.java))
                     }
                     raison == FabriqueFond3D.Raison.OUTIL_DESSINS_ABSENT -> OutilDessinsUi.proposer(this) { fabriquer3D(uri) }

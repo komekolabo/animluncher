@@ -21,4 +21,10 @@
     <string name="fd_3d_telechargement_rate">No se pudo descargar. Comprueba tu conexión a Internet y vuelve a intentarlo.</string>
     <string name="fd_3d_outil_place">Herramienta de recorte de dibujos · %1$d MB</string>
     <string name="fd_3d_outil_supprime">Herramienta eliminada.</string>
+    <string name="fd_3d_flou">Desenfoque detrás:</string>
+    <string name="fd_3d_flou_doux">Suave</string>
+    <string name="fd_3d_flou_net">Nítido</string>
+    <string name="fd_3d_flou_aucun">Ninguno</string>
+    <string name="fd_3d_retoucher">Retocar el recorte</string>
+    <string name="fd_3d_pinceau">Pincel:</string>
 </resources>
