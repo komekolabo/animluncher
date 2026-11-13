@@ -74,7 +74,7 @@ object FabriqueFond3D {
             if (e.raison == Raison.MODULE_ABSENT && force == null && DetourageDessins.estInstalle(c)) return parDessins(c, photo)
             throw e
         }
-        var probleme = evaluer(confiance)
+        var probleme = evaluer(confiance, photo.width, photo.height)
         // (outil photo choisi à la main : un contour incertain est accepté, la gomme est là pour corriger)
         if (force == Outil.PHOTO && probleme == Raison.ILLISIBLE) probleme = null
         if (probleme == null) return Detourage(photo, nettoyer(confiance, photo.width, photo.height), Outil.PHOTO)
@@ -89,7 +89,7 @@ object FabriqueFond3D {
     private fun parDessins(c: Context, photo: Bitmap): Detourage {
         if (!DetourageDessins.estInstalle(c)) throw Echec(Raison.OUTIL_DESSINS_ABSENT)
         val confiance = try { DetourageDessins.masque(c, photo) } catch (e: Exception) { throw Echec(Raison.ILLISIBLE) }
-        evaluer(confiance)?.let { if (it != Raison.ILLISIBLE) throw Echec(it) }
+        evaluer(confiance, photo.width, photo.height)?.let { if (it != Raison.ILLISIBLE) throw Echec(it) }
         return Detourage(photo, nettoyer(confiance, photo.width, photo.height), Outil.DESSIN)
     }
 
@@ -119,16 +119,26 @@ object FabriqueFond3D {
     //  - sujet trop grand : plus de 60 % (vu par Will sur une capture de manga : toute la page était « le sujet ») ;
     //  - contour très incertain : beaucoup de points « à moitié sûrs » (entre 20 et 80 %) par rapport au sujet
     //    (marqué ILLISIBLE ici : ça veut juste dire « essayer l'autre outil »).
-    private fun evaluer(confiance: FloatArray): Raison? {
+    private fun evaluer(confiance: FloatArray, w: Int, h: Int): Raison? {
         var sujet = 0; var incertain = 0
         for (v in confiance) { if (v > 0.5f) sujet++; if (v > 0.2f && v < 0.8f) incertain++ }
         val part = sujet.toFloat() / confiance.size
         return when {
             part < 0.02f -> Raison.PAS_DE_SUJET
-            part > 0.6f -> Raison.SUJET_TROP_GRAND
+            // (13/11) « trop grand » = presque toute l'image, OU plus de 60 % ET le sujet touche largement les
+            // QUATRE bords (une page entière). Avant : 60 % suffisait, et un portrait en gros plan (65 %, vu par Will
+            // sur un dessin) était refusé à tort alors que son détourage était parfait.
+            part > 0.9f -> Raison.SUJET_TROP_GRAND
+            part > 0.6f && touteLaPage(confiance, w, h) -> Raison.SUJET_TROP_GRAND
             incertain > sujet * 0.35f -> Raison.ILLISIBLE
             else -> null
         }
+    }
+
+    // Le sujet touche-t-il largement les quatre bords ? (plus de 40 % de chaque bord est « sujet »)
+    private fun touteLaPage(confiance: FloatArray, w: Int, h: Int): Boolean {
+        fun bord(n: Int, point: (Int) -> Int): Boolean { var k = 0; for (i in 0 until n) if (confiance[point(i)] > 0.5f) k++; return k > n * 0.4f }
+        return bord(w) { it } && bord(w) { (h - 1) * w + it } && bord(h) { it * w } && bord(h) { it * w + w - 1 }
     }
 
     // Une image presque sans couleur (manga, croquis au crayon) : on mesure l'écart moyen entre le rouge, le vert et
