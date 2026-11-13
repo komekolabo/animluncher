@@ -30,8 +30,8 @@
     <string name="fd_applique">Fondo aplicado ✓</string>
     <string name="fd_choisir_ecran">Android te preguntará: elige «Pantalla de inicio» o «Pantallas de inicio y bloqueo».</string>
     <string name="fd_pas_possible">Este teléfono no admite fondos animados.</string>
-    <string name="fd_service_dessin">AnimLauncher · Fondos</string>
-    <string name="fd_service_video">AnimLauncher · Vídeo</string>
-    <string name="fd_desc_dessin">Fondos animados dibujados por AnimLauncher, o tus propios GIF e imágenes. Se detiene cuando está oculto.</string>
+    <string name="fd_service_dessin">AnimEngine · Fondos</string>
+    <string name="fd_service_video">AnimEngine · Vídeo</string>
+    <string name="fd_desc_dessin">Fondos animados dibujados por AnimEngine, o tus propios GIF e imágenes. Se detiene cuando está oculto.</string>
     <string name="fd_desc_video">Tu propio vídeo como fondo, sin sonido y en bucle. Se detiene cuando está oculto.</string>
 </resources>

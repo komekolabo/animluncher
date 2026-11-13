@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Les textes du FOND 3D (13/11) : la case « Fond 3D » de l’écran Fonds d’écran, et ses messages. Voir FabriqueFond3D.kt. -->
+<resources>
+    <string name="fd_nom_3d">Sfondo 3D</string>
+    <string name="fd_creer_3d">Foto 3D</string>
+    <string name="fd_creer_3d_expl">Una foto che si muove in profondità quando inclini il telefono</string>
+    <string name="fd_3d_en_cours">Scontorno del soggetto…</string>
+    <string name="fd_3d_pas_de_sujet">Nessun soggetto chiaro in questa foto. Prova una foto con una persona, un animale o un oggetto in primo piano.</string>
+    <string name="fd_3d_module">Lo strumento di scontorno è ancora in download dai servizi Google. Riprova tra un minuto (con Internet).</string>
+</resources>

@@ -22,68 +22,6 @@ import kotlin.random.Random
 
 private fun versRadians(degres: Float): Float = degres * PI.toFloat() / 180f
 
-// ===================== INSTAGRAM : « Pellicule » =====================
-// Une bande de pellicule défile, éclairée par derrière ; chaque image est un coucher de soleil
-// aux couleurs violet-orangé. L'image du centre grandit et devient l'app.
-class Pellicule : Scene() {
-    private val teintes = arrayOf(
-        intArrayOf(rgb(120, 40, 160), rgb(250, 120, 60)), intArrayOf(rgb(200, 50, 120), rgb(255, 180, 80)),
-        intArrayOf(rgb(80, 40, 170), rgb(230, 70, 120)), intArrayOf(rgb(160, 40, 140), rgb(255, 140, 70))
-    )
-
-    private fun image(c: Canvas, o: Outils, r: RectF, k: Int, alpha: Float) {
-        val t = teintes[modulo(k.toFloat(), 4f).toInt()]
-        val p = o.pinceau()
-        p.shader = LinearGradient(0f, r.top, 0f, r.bottom, avecAlpha(fonce(t[0], 0.45f), alpha), avecAlpha(fonce(t[1], 0.55f), alpha), Shader.TileMode.CLAMP)
-        c.drawRect(r, p)
-        o.halo(c, r.centerX(), r.top + r.height() * 0.62f, r.width() * 0.16f, 0.35f * alpha, t[1])
-        val mont = Path(); mont.moveTo(r.left, r.bottom)
-        for (s in 0..12) {
-            val u = s / 12f
-            mont.lineTo(r.left + u * r.width(), r.top + r.height() * (0.7f - 0.08f * sin(u * 7f + k)))
-        }
-        mont.lineTo(r.right, r.bottom); mont.close()
-        c.drawPath(mont, o.pinceau(avecAlpha(rgb(20, 10, 26), alpha)))
-    }
-
-    override fun dessiner(c: Canvas, o: Outils, i: Instant) {
-        val dp = o.dp; val sec = i.secondes; val intro = i.intro; val rev = i.revelation
-        val w = c.width.toFloat(); val h = c.height.toFloat()
-        c.drawColor(rgb(8, 6, 10))
-        val app = ralentit(intro)
-        val a = 1f - rev
-        val m = min(w, h)
-        val cx = w / 2f
-        val L = m * 0.5f; val H = L * 0.75f
-        val pas = H * 1.15f
-        o.tache(c, cx, h / 2f, L * 0.9f, h * 0.5f, 0.12f * app, rgb(200, 90, 160))
-        c.drawRect(cx - L * 0.62f, -10f, cx + L * 0.62f, h + 10f, o.pinceau(argb(255f * app, 22, 18, 20)))
-        val arret = ralentit(borne(sec / 0.9f))
-        val defil = arret * pas * 6f + (1f - app) * pas            // la bande défile puis s'arrête
-        val decal = modulo(defil, pas)
-        val k0 = (defil / pas).toInt()
-        for (n in -3..3) {
-            if (n == 0) continue
-            val y = h / 2f + n * pas + decal
-            image(c, o, RectF(cx - L / 2f, y - H / 2f, cx + L / 2f, y + H / 2f), n - k0, app * a)
-        }
-        val trou = o.pinceau(argb(255f * app * a, 6, 5, 7))          // perforations
-        val ecart = 14f * dp
-        for (s in 0 until (h / ecart).toInt() + 2) {
-            val y = modulo(s * ecart + decal, h + ecart) - 7f * dp
-            for (x in floatArrayOf(cx - L * 0.56f, cx + L * 0.56f)) {
-                c.drawRoundRect(RectF(x - 3f * dp, y - 4f * dp, x + 3f * dp, y + 4f * dp), 1.5f * dp, 1.5f * dp, trou)
-            }
-        }
-        val k = doux(rev)                                          // l'image du centre grandit
-        val yc = h / 2f + decal
-        val r = RectF(mix(cx - L / 2f, -2f, k), mix(yc - H / 2f, -2f, k), mix(cx + L / 2f, w + 2f, k), mix(yc + H / 2f, h + 2f, k))
-        image(c, o, r, -k0, app)
-        o.vignette(c, w, h, 0.6f)
-        if (rev > 0f) gommeRect(c, o, r, ralentit(rev * 1.3f))
-    }
-}
-
 // ===================== X : « Éclipse » =====================
 // Une éclipse totale : un disque noir, une couronne blanche qui frémit, quelques étoiles.
 class Eclipse : Scene() {
@@ -120,49 +58,6 @@ class Eclipse : Scene() {
         o.halo(c, cx + cos(t) * R, cy + sin(t) * R, R * 0.25f, 0.5f * perle * app * a, Color.WHITE)
         o.vignette(c, w, h, 0.5f)
         o.revelationDouce(c, cx, cy, rev, rgb(220, 225, 240))
-    }
-}
-
-// ===================== DISCORD : « Néon sous la pluie » =====================
-// Une ruelle sous la pluie : une enseigne néon bleu-violet grésille puis s'allume, et se reflète dans les flaques.
-class EnseigneNeon : Scene() {
-    private val pluie = nuage(161, 90)
-
-    override fun dessiner(c: Canvas, o: Outils, i: Instant) {
-        val dp = o.dp; val sec = i.secondes; val intro = i.intro; val rev = i.revelation
-        val w = c.width.toFloat(); val h = c.height.toFloat()
-        val sol = h * 0.7f
-        degradeVertical(c, o, w, rgb(8, 8, 14), rgb(12, 12, 20), 0f, sol)
-        degradeVertical(c, o, w, rgb(10, 10, 16), rgb(4, 4, 7), sol, h)
-        val app = ralentit(intro)
-        val a = 1f - rev
-        val violet = rgb(110, 120, 255)
-        val m = min(w, h)
-        val cx = w / 2f; val cy = h * 0.4f
-        val s = m * 0.24f * (1f + 2.5f * accelere(rev))
-        val gresille = if (sec > 0.35f || sin(sec * 90f) > 0.2f) 1f else 0.25f   // le néon grésille avant de tenir
-        val lum = app * gresille * a
-        c.drawRect(0f, 0f, w * 0.12f, sol, o.pinceau(rgb(6, 6, 10)))        // murs
-        c.drawRect(w * 0.88f, 0f, w, sol, o.pinceau(rgb(6, 6, 10)))
-        o.tache(c, cx, cy, s * 2.2f, s * 1.6f, 0.18f * lum, violet)
-        val forme = Path().apply { addRoundRect(RectF(cx - s, cy - s * 0.62f, cx + s, cy + s * 0.62f), s * 0.5f, s * 0.5f, Path.Direction.CW) }
-        val couches = arrayOf(floatArrayOf(18f, 0.08f), floatArrayOf(8f, 0.25f), floatArrayOf(3f, 0.9f))
-        for (cc in couches) c.drawPath(forme, o.lumiere(avecAlpha(violet, cc[1] * lum), cc[0] * dp))
-        c.drawPath(forme, o.lumiere(avecAlpha(rgb(230, 235, 255), 0.6f * lum), 1f * dp))
-        for (k in intArrayOf(-1, 1)) c.drawCircle(cx + k * s * 0.35f, cy, s * 0.11f, o.lumiere(avecAlpha(violet, 0.8f * lum), 2.5f * dp))
-        c.save(); c.clipRect(0f, sol, w, h)                                  // reflet dans la flaque
-        c.translate(0f, 2f * sol); c.scale(1f, -1f)
-        c.drawPath(forme, o.lumiere(avecAlpha(violet, 0.25f * lum), 6f * dp))
-        c.restore()
-        o.tache(c, cx, sol + (sol - cy) * 0.8f, s * 1.4f, s * 0.25f, 0.15f * lum, violet)
-        for (g in pluie) {                                                   // la pluie
-            val z = g[2]
-            val x = g[0] * w
-            val y = modulo(g[1] + sec * (1.6f + z), 1f) * h
-            c.drawLine(x, y, x - 2f * dp, y + (8f + 14f * z) * dp, o.lumiere(argb((30f + 50f * z) * app * a, 170, 180, 230), 1f * dp))
-        }
-        o.vignette(c, w, h, 0.6f)
-        o.revelationDouce(c, cx, cy, rev, violet)
     }
 }
 
@@ -210,55 +105,6 @@ class Vinyle : Scene() {
         o.halo(c, bx, by, 10f * dp, 0.4f * pose * app * a, vert)
         o.vignette(c, w, h, 0.55f)
         o.revelationDouce(c, cx, cy, rev, vert)
-    }
-}
-
-// ===================== WHATSAPP : « Avion en papier » =====================
-// Un avion en papier traverse la nuit en laissant une traînée ; à l'arrivée, deux coches s'allument.
-class AvionPapier : Scene() {
-    private val etoiles = nuage(171, 70)
-
-    private fun px(t: Float, w: Float) = mix(-0.1f, 0.5f, t) * w
-    private fun py(t: Float, h: Float) = h * (0.62f - 0.22f * sin(PI.toFloat() * t * 0.9f)) + sin(t * 9f) * h * 0.015f
-
-    override fun dessiner(c: Canvas, o: Outils, i: Instant) {
-        val dp = o.dp; val sec = i.secondes; val intro = i.intro; val rev = i.revelation
-        val w = c.width.toFloat(); val h = c.height.toFloat()
-        degradeVertical(c, o, w, rgb(5, 10, 10), rgb(8, 16, 14), 0f, h)
-        val app = ralentit(intro)
-        val a = 1f - rev
-        val vert = rgb(40, 210, 120)
-        o.poussieres(c, etoiles, sec * 0.2f, w, h, rgb(210, 240, 230), 0.4f * a, vx = 0f, vy = 0f)
-        val vol = ralentit(borne(sec / 0.85f))
-        val trainee = Path()
-        for (s in 0..40) {
-            val t = vol * s / 40f
-            if (s == 0) trainee.moveTo(px(t, w), py(t, h)) else trainee.lineTo(px(t, w), py(t, h))
-        }
-        c.drawPath(trainee, o.lumiere(avecAlpha(vert, 0.06f * app * a), 8f * dp))
-        c.drawPath(trainee, o.lumiere(avecAlpha(vert, 0.4f * app * a), 2f * dp))
-        val x = px(vol, w); val y = py(vol, h)
-        val v2 = max(0f, vol - 0.02f)
-        val ang = atan2(y - py(v2, h), x - px(v2, w) + 1e-6f) * 180f / PI.toFloat()
-        val s = min(w, h) * 0.1f
-        c.save(); c.translate(x, y); c.rotate(ang)
-        val aile = Path(); aile.moveTo(s, 0f); aile.lineTo(-s, -s * 0.55f); aile.lineTo(-s * 0.55f, 0f); aile.close()
-        c.drawPath(aile, o.pinceau(argb(255f * app * a, 225, 235, 230)))
-        val aile2 = Path(); aile2.moveTo(s, 0f); aile2.lineTo(-s * 0.55f, 0f); aile2.lineTo(-s * 0.8f, s * 0.4f); aile2.close()
-        c.drawPath(aile2, o.pinceau(argb(255f * app * a, 150, 165, 160)))
-        c.restore()
-        o.halo(c, x, y, s * 1.5f, 0.15f * app * a, vert)
-        val coches = borne((sec - 0.8f) / 0.15f)                   // les deux coches
-        for (k in 0 until 2) {
-            val f = borne(coches * 2f - k * 0.6f)
-            if (f <= 0f) continue
-            val bx = x + s * 1.4f + k * s * 0.45f; val by = y - s * 1.1f
-            val p = Path(); p.moveTo(bx - s * 0.3f, by); p.lineTo(bx - s * 0.1f, by + s * 0.22f); p.lineTo(bx + s * 0.32f, by - s * 0.25f)
-            c.drawPath(p, o.lumiere(avecAlpha(vert, 0.9f * f * a), 3f * dp))
-            o.halo(c, bx, by, s * 0.5f, 0.3f * f * a, vert)
-        }
-        o.vignette(c, w, h, 0.55f)
-        o.revelationDouce(c, x, y, rev, vert)
     }
 }
 

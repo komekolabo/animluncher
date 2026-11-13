@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Les textes du FOND 3D (13/11) : la case « Fond 3D » de l’écran Fonds d’écran, et ses messages. Voir FabriqueFond3D.kt. -->
+<resources>
+    <string name="fd_nom_3d">Fondo 3D</string>
+    <string name="fd_creer_3d">Foto 3D</string>
+    <string name="fd_creer_3d_expl">Una foto que se mueve en profundidad al inclinar el teléfono</string>
+    <string name="fd_3d_en_cours">Recortando el sujeto…</string>
+    <string name="fd_3d_pas_de_sujet">No se encontró un sujeto claro en esta foto. Prueba una foto con una persona, un animal o un objeto en primer plano.</string>
+    <string name="fd_3d_module">La herramienta de recorte aún se está descargando en los servicios de Google. Vuelve a intentarlo en un minuto (con Internet).</string>
+</resources>

@@ -82,7 +82,7 @@ class MainActivity : Activity() {
             contentDescription = getString(R.string.menu_ouvrir)
             setOnClickListener { ouvrirMenu() }
         }, LinearLayout.LayoutParams(px(48f), px(48f)))
-        entete.addView(Style.texte(this, "AnimLauncher", 18f, Style.TEXTE, gras = true).apply {
+        entete.addView(Style.texte(this, "AnimEngine", 18f, Style.TEXTE, gras = true).apply {
             gravity = Gravity.CENTER
         }, LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f))
         entete.addView(Icone(this, Icone.ROUE).apply {

@@ -89,8 +89,8 @@
     <string name="expl_refuser">Ablehnen</string>
     <string name="expl_refus">Ohne die Bedienungshilfen kann %1$s keine Animation abspielen. Du kannst es dir jederzeit über den Schalter unten anders überlegen.</string>
     <string name="tuile_off">Aus</string>
-    <string name="description_service">Erkennt die App, die du öffnest, um eine eigene Animation abzuspielen. AnimLauncher liest den Inhalt deiner Bildschirme nicht.</string>
-    <string name="widget_description">Das AnimLauncher-Logo, animiert: anstelle des Symbols platzieren.</string>
+    <string name="description_service">Erkennt die App, die du öffnest, um eine eigene Animation abzuspielen. AnimEngine liest den Inhalt deiner Bildschirme nicht.</string>
+    <string name="widget_description">Das AnimEngine-Logo, animiert: anstelle des Symbols platzieren.</string>
     <string name="widget_app_titre">Animierter Kiesel (Test)</string>
     <string name="widget_app_description">Das Logo einer App schwebt in einem dunklen Glaskiesel.</string>
     <string name="widget_groupe_titre">Animierter Ordner</string>

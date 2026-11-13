@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Les textes du FOND 3D (13/11) : la case « Fond 3D » de l’écran Fonds d’écran, et ses messages. Voir FabriqueFond3D.kt. -->
+<resources>
+    <string name="fd_nom_3d">3D wallpaper</string>
+    <string name="fd_creer_3d">3D photo</string>
+    <string name="fd_creer_3d_expl">A photo that moves in depth when you tilt the phone</string>
+    <string name="fd_3d_en_cours">Cutting out the subject…</string>
+    <string name="fd_3d_pas_de_sujet">No clear subject found in this photo. Try a photo with a person, an animal or an object in the foreground.</string>
+    <string name="fd_3d_module">The cut-out tool is still being downloaded by Google services. Try again in a minute (with an internet connection).</string>
+</resources>

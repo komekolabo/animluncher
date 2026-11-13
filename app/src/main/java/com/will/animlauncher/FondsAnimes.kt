@@ -36,6 +36,16 @@ abstract class DessinFond {
     // dp = la taille d'un « dp » en pixels (pour que les étoiles aient la même taille sur tous les écrans)
     abstract fun dessiner(c: Canvas, w: Float, h: Float, t: Float, dp: Float)
 
+    // (13/11, pour le fond 3D) Un dessin peut avoir besoin d'un capteur : on l'allume quand il devient
+    // visible (demarrer) et on l'éteint quand il est caché (arreter). Par défaut : rien à faire.
+    open fun demarrer() {}
+    open fun arreter() {}
+    // « au repos » = l'image ne change plus : inutile de la redessiner tant que rien ne bouge.
+    // Le dessin appelle alors « reveil » quand il a de nouveau besoin d'être dessiné (le téléphone a bougé).
+    // Par défaut : jamais au repos (Nuit et Galets bougent tout le temps).
+    open fun auRepos(): Boolean = false
+    var reveil: (() -> Unit)? = null
+
     // Un cycle de 0 à 1 qui se répète toutes les « periode » secondes.
     protected fun cycle(t: Float, periode: Float): Float {
         val r = t % periode
@@ -139,11 +149,24 @@ class VueDessinFond(context: Context, private val dessin: DessinFond) : View(con
     var assombrir = 0             // 0 à 60 : % de noir posé par-dessus
         set(v) { field = v; invalidate() }
 
+    // le capteur du dessin (fond 3D) n'est allumé que pendant que la vue est à l'écran
+    override fun onAttachedToWindow() {
+        super.onAttachedToWindow()
+        dessin.reveil = { invalidate() }
+        dessin.demarrer()
+    }
+
+    override fun onDetachedFromWindow() {
+        dessin.arreter()
+        dessin.reveil = null
+        super.onDetachedFromWindow()
+    }
+
     override fun onDraw(c: Canvas) {
         val t = (SystemClock.uptimeMillis() - debut) / 1000f
         dessin.dessiner(c, width.toFloat(), height.toFloat(), t, dp)
         if (assombrir > 0) c.drawColor(Color.argb(assombrir * 255 / 100, 0, 0, 0))
-        postInvalidateOnAnimation()
+        if (!dessin.auRepos()) postInvalidateOnAnimation()       // au repos : on attend le réveil
     }
 }
 
@@ -155,6 +178,7 @@ object CarnetFond {
     const val VIDEO = "video"     // une vidéo importée
     const val GIF = "gif"         // un GIF importé
     const val IMAGE = "image"     // une image fixe importée
+    const val PROFONDEUR = "profondeur"   // (13/11) un fond 3D : id = son dossier (voir FondProfondeur.kt)
 
     // Le catalogue des fonds proposés par l'app : identifiant -> (nom affiché, fabrique du dessin).
     // Pour en ajouter un : une ligne ici + son nom dans res/values*/strings_fonds.xml.
@@ -165,8 +189,12 @@ object CarnetFond {
     )
     fun dessin(id: String): DessinFond = (catalogue.firstOrNull { it.id == id } ?: catalogue[0]).fabriquer()
 
+    // Le dessin d'un choix : un fond 3D (s'il existe encore) ou un dessin de l'app.
+    fun dessinPour(c: Context, sorte: String, id: String): DessinFond =
+        if (sorte == PROFONDEUR) FondProfondeur(c, id).takeIf { it.valide } ?: FondNuit() else dessin(id)
+
     // Ce que l'utilisateur a choisi, tout en un.
-    //  - sorte : APP / VIDEO / GIF / IMAGE
+    //  - sorte : APP / VIDEO / GIF / IMAGE / PROFONDEUR
     //  - id : le nom du dessin (APP) ou le chemin du fichier (les autres)
     //  - fluide : 60 images par seconde au lieu de 30
     //  - figer : arrêter le mouvement après 10 s sans toucher l'accueil

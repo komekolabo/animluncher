@@ -50,14 +50,14 @@ android {
         create("perso") {
             dimension = "version"
             buildConfigField("boolean", "STORE", "false")
-            resValue("string", "app_name", "AnimLauncher Perso")
+            resValue("string", "app_name", "AnimEngine Perso")
         }
         create("store") {
             dimension = "version"
             // L'identifiant définitif sur le Play Store (modifiable tant que l'app n'est pas publiée).
             applicationIdSuffix = ".store"
             buildConfigField("boolean", "STORE", "true")
-            resValue("string", "app_name", "AnimLauncher")
+            resValue("string", "app_name", "AnimEngine")
         }
     }
 
@@ -74,6 +74,14 @@ android {
 // elle publie le fichier « outputs/apk/debug/app-debug.apk ». Avec deux versions, Android range
 // les APK ailleurs (apk/perso/... et apk/store/...). On copie donc la version Perso à l'ancien
 // endroit, pour que ton lien de téléchargement habituel continue de marcher.
+// LES BIBLIOTHÈQUES (13/11) : jusqu'ici l'app n'en utilisait aucune. Le fond 3D a besoin de l'outil de
+// DÉTOURAGE de Google (ML Kit « Subject Segmentation ») : il trouve le sujet d'une photo, sur le téléphone.
+// Son modèle n'est pas dans notre app : il est fourni par les services Google du téléphone (l'app ne grossit
+// presque pas). Voir FabriqueFond3D.kt.
+dependencies {
+    implementation("com.google.android.gms:play-services-mlkit-subject-segmentation:16.0.0-beta1")
+}
+
 val copierApkPerso = tasks.register<Copy>("copierApkPerso") {
     from(layout.buildDirectory.file("outputs/apk/perso/debug/app-perso-debug.apk"))
     into(layout.buildDirectory.dir("outputs/apk/debug"))

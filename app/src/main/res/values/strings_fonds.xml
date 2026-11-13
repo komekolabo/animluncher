@@ -30,9 +30,9 @@
     <string name="fd_applique">Wallpaper applied ✓</string>
     <string name="fd_choisir_ecran">Android will ask you: choose “Home screen” or “Home and lock screens”.</string>
     <string name="fd_pas_possible">This phone doesn\'t support live wallpapers.</string>
-    <string name="fd_service_dessin">AnimLauncher · Wallpapers</string>
-    <string name="fd_service_video">AnimLauncher · Video</string>
-    <string name="fd_desc_dessin">Animated wallpapers drawn by AnimLauncher, or your own GIFs and images. Stops when hidden.</string>
+    <string name="fd_service_dessin">AnimEngine · Wallpapers</string>
+    <string name="fd_service_video">AnimEngine · Video</string>
+    <string name="fd_desc_dessin">Animated wallpapers drawn by AnimEngine, or your own GIFs and images. Stops when hidden.</string>
     <string name="fd_desc_video">Your own video as a wallpaper, silent and looping. Stops when hidden.</string>
     <string name="fd_diag_titre">Diagnostic (to send to Claude if something looks wrong)</string>
     <string name="fd_diag_dessin">Drawn: visible %1$s · %2$d frames (%3$s ago) · saver %4$s · hot %5$s</string>

@@ -89,8 +89,8 @@
     <string name="expl_refuser">Rechazar</string>
     <string name="expl_refus">Sin Accesibilidad, %1$s no puede reproducir animaciones. Puedes cambiar de opinión cuando quieras con el botón de abajo.</string>
     <string name="tuile_off">Desactivado</string>
-    <string name="description_service">Detecta la aplicación que abres para reproducir una animación personalizada. AnimLauncher no lee el contenido de tus pantallas.</string>
-    <string name="widget_description">El logo de AnimLauncher, animado: ponlo en lugar del icono.</string>
+    <string name="description_service">Detecta la aplicación que abres para reproducir una animación personalizada. AnimEngine no lee el contenido de tus pantallas.</string>
+    <string name="widget_description">El logo de AnimEngine, animado: ponlo en lugar del icono.</string>
     <string name="widget_app_titre">Piedra animada (prueba)</string>
     <string name="widget_app_description">El logo de una app flotando en una piedra de cristal oscuro.</string>
     <string name="widget_groupe_titre">Carpeta animada</string>

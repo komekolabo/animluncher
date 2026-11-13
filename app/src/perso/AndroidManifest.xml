@@ -6,31 +6,16 @@
     <!-- Internet : seulement pour envoyer le journal sur GitHub (si une clé a été donnée). -->
     <uses-permission android:name="android.permission.INTERNET" />
 
-    <!-- MODE STANDARD (sans accessibilité, voir ModeStandard.kt) :
-         - lire le journal d'utilisation d'Android (l'utilisateur l'autorise dans les réglages) ;
-         - afficher le rideau par-dessus les autres apps ;
-         - tourner en continu avec une notification (service « au premier plan »). -->
-    <uses-permission android:name="android.permission.PACKAGE_USAGE_STATS"
-        tools:ignore="ProtectedPermissions" />
-    <uses-permission android:name="android.permission.SYSTEM_ALERT_WINDOW" />
-    <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
-    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_SPECIAL_USE" />
-    <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
-
     <!-- FONDS D'ÉCRAN ANIMÉS : l'app en propose, mais elle reste installable sur un appareil qui ne sait
          pas les afficher (required="false"). -->
     <uses-feature android:name="android.software.live_wallpaper" android:required="false" />
 
     <application>
-        <!-- Le MODE STANDARD : la détection sans accessibilité (prototype). -->
-        <service
-            android:name=".ModeStandard"
-            android:exported="false"
-            android:foregroundServiceType="specialUse">
-            <property
-                android:name="android.app.PROPERTY_SPECIAL_USE_FGS_SUBTYPE"
-                android:value="Détecte l'ouverture des apps pour jouer une animation de lancement" />
-        </service>
+        <!-- (13/11) FOND 3D : demande aux services Google de télécharger l'outil de DÉTOURAGE dès
+             l'installation de l'app (sinon il ne se télécharge qu'au premier fond 3D). Voir FabriqueFond3D.kt. -->
+        <meta-data
+            android:name="com.google.mlkit.vision.DEPENDENCIES"
+            android:value="subject_segment" />
 
         <!-- LES FONDS D'ÉCRAN ANIMÉS (12/11) : le même bloc que dans src/store/AndroidManifest.xml. -->
         <!-- L'aperçu plein écran d'un fond d'écran (avec « Appliquer »). Voir FondApercuActivity.kt. -->

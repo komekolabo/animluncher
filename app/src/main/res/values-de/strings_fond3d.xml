@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Les textes du FOND 3D (13/11) : la case « Fond 3D » de l’écran Fonds d’écran, et ses messages. Voir FabriqueFond3D.kt. -->
+<resources>
+    <string name="fd_nom_3d">3D-Hintergrund</string>
+    <string name="fd_creer_3d">3D-Foto</string>
+    <string name="fd_creer_3d_expl">Ein Foto, das sich räumlich bewegt, wenn du das Handy neigst</string>
+    <string name="fd_3d_en_cours">Motiv wird freigestellt…</string>
+    <string name="fd_3d_pas_de_sujet">Kein klares Motiv auf diesem Foto gefunden. Versuche ein Foto mit einer Person, einem Tier oder einem Objekt im Vordergrund.</string>
+    <string name="fd_3d_module">Das Freistellungs-Tool wird noch von den Google-Diensten heruntergeladen. Versuche es in einer Minute erneut (mit Internet).</string>
+</resources>

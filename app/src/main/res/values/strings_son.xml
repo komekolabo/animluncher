@@ -8,7 +8,7 @@
     <string name="son_expl_internet">This app has no Internet access.</string>
     <string name="son_expl_video">The effect hides itself in full-screen videos and games, and only runs while music is playing.</string>
     <string name="son_expl_micro">Android will ask for microphone access: it is required to read the sound level.</string>
-    <string name="son_service">Turn on AnimLauncher in the Accessibility settings first: the effect needs it to appear.</string>
+    <string name="son_service">Turn on AnimEngine in the Accessibility settings first: the effect needs it to appear.</string>
     <string name="son_couleurs">Colors</string>
     <string name="son_calme">Calm</string>
     <string name="son_calme_desc">When the music breathes</string>

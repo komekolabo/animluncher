@@ -139,7 +139,7 @@ class FondApercuActivity : Activity() {
             setImageBitmap(PeintreFond.chargerImage(ref, max(m.widthPixels, m.heightPixels)))
         }
         CarnetFond.GIF -> VueGif(this, ref)
-        else -> VueDessinFond(this, CarnetFond.dessin(ref))
+        else -> VueDessinFond(this, CarnetFond.dessinPour(this, sorte, ref))
     }
 
     // La vidéo, jouée en boucle et muette, qui « couvre » l'écran sans être déformée.
@@ -205,6 +205,7 @@ class FondApercuActivity : Activity() {
             CarnetFond.VIDEO -> getString(R.string.fd_nom_video)
             CarnetFond.GIF -> getString(R.string.fd_nom_gif)
             CarnetFond.IMAGE -> getString(R.string.fd_nom_image)
+            CarnetFond.PROFONDEUR -> getString(R.string.fd_nom_3d)
             else -> getString((CarnetFond.catalogue.firstOrNull { it.id == ref } ?: CarnetFond.catalogue[0]).nom)
         }
         pastille = Style.texte(this@FondApercuActivity, "", 12f, Style.DOUX)
@@ -218,7 +219,7 @@ class FondApercuActivity : Activity() {
         majPastille()
 
         val video = sorte == CarnetFond.VIDEO
-        val bouge = sorte == CarnetFond.APP || sorte == CarnetFond.GIF
+        val bouge = sorte == CarnetFond.APP || sorte == CarnetFond.GIF || sorte == CarnetFond.PROFONDEUR
 
         // Fluidité : deux pilules, une seule allumée
         if (bouge) {

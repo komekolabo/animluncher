@@ -89,8 +89,8 @@
     <string name="expl_refuser">Rifiuta</string>
     <string name="expl_refus">Senza l’Accessibilità, %1$s non può riprodurre animazioni. Puoi cambiare idea quando vuoi con il pulsante qui sotto.</string>
     <string name="tuile_off">Disattivato</string>
-    <string name="description_service">Rileva l’app che apri per riprodurre un’animazione personalizzata. AnimLauncher non legge il contenuto dei tuoi schermi.</string>
-    <string name="widget_description">Il logo di AnimLauncher, animato: da mettere al posto dell’icona.</string>
+    <string name="description_service">Rileva l’app che apri per riprodurre un’animazione personalizzata. AnimEngine non legge il contenuto dei tuoi schermi.</string>
+    <string name="widget_description">Il logo di AnimEngine, animato: da mettere al posto dell’icona.</string>
     <string name="widget_app_titre">Ciottolo animato (prova)</string>
     <string name="widget_app_description">Il logo di un’app che fluttua in un ciottolo di vetro scuro.</string>
     <string name="widget_groupe_titre">Cartella animata</string>

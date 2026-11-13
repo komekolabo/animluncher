@@ -8,7 +8,7 @@
     <string name="son_expl_internet">Diese App hat keinen Internetzugang.</string>
     <string name="son_expl_video">Der Effekt blendet sich bei Videos und Spielen im Vollbild aus und läuft nur, wenn Musik spielt.</string>
     <string name="son_expl_micro">Android fragt nach dem Mikrofonzugriff: Er ist nötig, um den Pegel zu lesen.</string>
-    <string name="son_service">Aktiviere zuerst AnimLauncher in den Bedienungshilfen: Der Effekt braucht das, um zu erscheinen.</string>
+    <string name="son_service">Aktiviere zuerst AnimEngine in den Bedienungshilfen: Der Effekt braucht das, um zu erscheinen.</string>
     <string name="son_couleurs">Farben</string>
     <string name="son_calme">Ruhig</string>
     <string name="son_calme_desc">Wenn die Musik atmet</string>

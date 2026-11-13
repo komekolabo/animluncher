@@ -89,8 +89,8 @@
     <string name="expl_refuser">Decline</string>
     <string name="expl_refus">Without Accessibility, %1$s cannot play any animation. You can change your mind anytime with the button below.</string>
     <string name="tuile_off">Off</string>
-    <string name="description_service">Detects the app you open to play a custom animation. AnimLauncher does not read the content of your screens.</string>
-    <string name="widget_description">The AnimLauncher logo, animated: place it instead of the icon.</string>
+    <string name="description_service">Detects the app you open to play a custom animation. AnimEngine does not read the content of your screens.</string>
+    <string name="widget_description">The AnimEngine logo, animated: place it instead of the icon.</string>
     <string name="widget_app_titre">Animated pebble (trial)</string>
     <string name="widget_app_description">An app’s logo floating in a dark glass pebble.</string>
     <string name="widget_groupe_titre">Animated folder</string>

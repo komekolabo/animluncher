@@ -30,8 +30,8 @@
     <string name="fd_applique">Fundo aplicado ✓</string>
     <string name="fd_choisir_ecran">O Android vai perguntar: escolha “Tela inicial” ou “Telas inicial e de bloqueio”.</string>
     <string name="fd_pas_possible">Este celular não suporta fundos animados.</string>
-    <string name="fd_service_dessin">AnimLauncher · Fundos</string>
-    <string name="fd_service_video">AnimLauncher · Vídeo</string>
-    <string name="fd_desc_dessin">Fundos animados desenhados pelo AnimLauncher, ou seus próprios GIFs e imagens. Para quando está oculto.</string>
+    <string name="fd_service_dessin">AnimEngine · Fundos</string>
+    <string name="fd_service_video">AnimEngine · Vídeo</string>
+    <string name="fd_desc_dessin">Fundos animados desenhados pelo AnimEngine, ou seus próprios GIFs e imagens. Para quando está oculto.</string>
     <string name="fd_desc_video">Seu próprio vídeo como fundo, sem som e em loop. Para quando está oculto.</string>
 </resources>

@@ -3,14 +3,15 @@
      typeViewClicked = "on a appuyé sur quelque chose" (ici : une icône de l'écran d'accueil).
        C'est le signal le plus précoce possible : l'animation démarre avant que l'app s'ouvre.
      typeWindowStateChanged = "une app (ou son écran de lancement) passe au premier plan".
-     Les autres types (appui long, sélection, focus) ne servent qu'au mouchard des dossiers :
-       on les note dans le journal pour comprendre ce que le lanceur envoie.
+     typeAnnouncement = les annonces du lanceur, comme « application Instagram fermée ».
+       (13/11 : les types « appui long, sélection, focus » du mouchard des dossiers sont retirés :
+       le service ne les traitait plus, c'était du travail pour rien à chaque geste.)
      notificationTimeout=0 : événements livrés sans délai.
      canRetrieveWindowContent=true + flagReportViewIds : quand on touche un WIDGET sur l'écran
        d'accueil, on lit l'identifiant de l'élément touché (ex. "com.spotify.music:id/lecture")
        pour savoir quelle app il va ouvrir. Le service ne lit rien d'autre, et jamais dans les apps. -->
 <accessibility-service xmlns:android="http://schemas.android.com/apk/res/android"
-    android:accessibilityEventTypes="typeWindowStateChanged|typeViewClicked|typeViewLongClicked|typeViewSelected|typeViewFocused|typeViewAccessibilityFocused|typeAnnouncement"
+    android:accessibilityEventTypes="typeWindowStateChanged|typeViewClicked|typeAnnouncement"
     android:accessibilityFeedbackType="feedbackGeneric"
     android:notificationTimeout="0"
     android:canRetrieveWindowContent="true"

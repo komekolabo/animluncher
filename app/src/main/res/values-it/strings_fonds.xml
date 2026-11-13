@@ -30,8 +30,8 @@
     <string name="fd_applique">Sfondo applicato ✓</string>
     <string name="fd_choisir_ecran">Android ti chiederà: scegli «Schermata Home» o «Schermate Home e di blocco».</string>
     <string name="fd_pas_possible">Questo telefono non supporta gli sfondi animati.</string>
-    <string name="fd_service_dessin">AnimLauncher · Sfondi</string>
-    <string name="fd_service_video">AnimLauncher · Video</string>
-    <string name="fd_desc_dessin">Sfondi animati disegnati da AnimLauncher, o le tue GIF e immagini. Si ferma quando è nascosto.</string>
+    <string name="fd_service_dessin">AnimEngine · Sfondi</string>
+    <string name="fd_service_video">AnimEngine · Video</string>
+    <string name="fd_desc_dessin">Sfondi animati disegnati da AnimEngine, o le tue GIF e immagini. Si ferma quando è nascosto.</string>
     <string name="fd_desc_video">Il tuo video come sfondo, muto e in loop. Si ferma quando è nascosto.</string>
 </resources>

@@ -334,51 +334,6 @@ class Fouet : Scene() {
     }
 }
 
-// ===================== ÉCHECS : « Échiquier » =====================
-// Un échiquier en perspective sort de l'ombre ; les pièces (silhouettes simples) se lèvent une à une.
-class Echiquier : Scene() {
-    private val pieces = arrayOf(floatArrayOf(3.5f, 1.5f), floatArrayOf(4.5f, 1.5f), floatArrayOf(2.5f, 2.5f), floatArrayOf(5.5f, 3.5f), floatArrayOf(3.5f, 5.5f))
-
-    override fun dessiner(c: Canvas, o: Outils, i: Instant) {
-        val dp = o.dp; val sec = i.secondes; val intro = i.intro; val rev = i.revelation
-        val w = c.width.toFloat(); val h = c.height.toFloat()
-        degradeVertical(c, o, w, rgb(10, 12, 10), rgb(4, 5, 4), 0f, h)
-        val app = ralentit(intro)
-        val a = 1f - rev
-        val m = min(w, h)
-        val cx = w / 2f; val horizon = h * 0.32f
-        fun px(gx: Float, gy: Float) = cx + (gx - 4f) * m * 0.11f / (1f + gy * 0.28f) * 1.6f   // case -> écran, en perspective
-        fun py(gy: Float) = horizon + m * 0.75f / (1f + gy * 0.28f)
-        val case = o.pinceau()
-        for (gy in 0 until 8) for (gx in 0 until 8) {
-            val x0 = gx.toFloat(); val y0 = gy.toFloat()
-            val chemin = Path()
-            chemin.moveTo(px(x0, y0), py(y0)); chemin.lineTo(px(x0 + 1f, y0), py(y0))
-            chemin.lineTo(px(x0 + 1f, y0 + 1f), py(y0 + 1f)); chemin.lineTo(px(x0, y0 + 1f), py(y0 + 1f)); chemin.close()
-            val f = 255f * app * borne(1.3f - gy * 0.12f)
-            case.color = if ((gx + gy) % 2 == 0) argb(f, 88, 112, 64) else argb(f, 34, 44, 28)
-            c.drawPath(chemin, case)
-        }
-        for ((k, q) in pieces.withIndex()) {
-            val leve = ralentit(borne(sec / 0.15f - k * 0.6f))
-            val gx = q[0]; val gy = q[1]
-            val x = px(gx, gy); val y = py(gy)
-            val s = m * 0.05f / (1f + gy * 0.28f) * 1.4f
-            val hy = y - s * 2.4f * leve
-            c.drawOval(RectF(x - s, y - s * 0.3f, x + s, y + s * 0.3f), o.pinceau(argb(200f * leve * app * a, 10, 10, 10)))
-            val coul = if (k % 2 == 0) rgb(230, 225, 210) else rgb(30, 30, 32)
-            val pion = Path()
-            pion.moveTo(x - s * 0.8f, y); pion.lineTo(x - s * 0.35f, hy + s * 0.8f); pion.lineTo(x + s * 0.35f, hy + s * 0.8f); pion.lineTo(x + s * 0.8f, y); pion.close()
-            c.drawPath(pion, o.pinceau(avecAlpha(coul, leve * app * a)))
-            c.drawCircle(x, hy + s * 0.5f, s * 0.45f, o.pinceau(avecAlpha(coul, leve * app * a)))
-            c.drawCircle(x, hy + s * 0.5f, s * 0.45f, o.lumiere(argb(50f * leve * app * a, 255, 255, 255), 1f * dp))
-        }
-        o.tache(c, cx, horizon + m * 0.2f, m * 0.6f, m * 0.25f, 0.1f * app * a, rgb(180, 220, 140))
-        o.vignette(c, w, h, 0.6f)
-        o.revelationDouce(c, cx, horizon + m * 0.35f, rev, rgb(150, 200, 110))
-    }
-}
-
 // ===================== MICROG : « Puzzle » =====================
 // Des pièces de puzzle arrivent de loin et s'emboîtent en un carré lumineux.
 class Puzzle : Scene() {

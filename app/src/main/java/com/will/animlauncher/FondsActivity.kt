@@ -34,7 +34,8 @@ import kotlin.math.max
 //
 // Deux parties, en grilles de 3 vignettes (au format d'un téléphone) :
 //  - « Proposés par l'app » : nos fonds dessinés (Nuit, Galets), qui bougent déjà dans leur vignette ;
-//  - « Mes fonds » : la case « + Importer » puis les fonds importés par l'utilisateur
+//  - « Mes fonds » : la case « + Importer », la case « Fond 3D » (13/11 : une photo dont le sujet et le fond
+//    bougent séparément quand on penche le téléphone, voir FondProfondeur.kt), puis les fonds de l'utilisateur
 //    (vidéo, GIF ou image de son téléphone). Appui long sur un fond importé = le supprimer.
 // Un appui sur une vignette ouvre l'aperçu plein écran (FondApercuActivity), avec le bouton « Appliquer ».
 //
@@ -45,6 +46,7 @@ import kotlin.math.max
 class FondsActivity : Activity() {
 
     private val CODE_IMPORT = 41
+    private val CODE_3D = 42                 // (13/11) la photo choisie pour un fond 3D
     private lateinit var liste: LinearLayout
     private val px = { v: Float -> Style.px(this, v) }
 
@@ -81,7 +83,15 @@ class FondsActivity : Activity() {
         })
         // 2) mes fonds : « + Importer » puis les fichiers importés
         liste.addView(Style.titreCarte(this, getString(R.string.fd_mes_fonds)).apply { setPadding(px(4f), px(22f), 0, px(10f)) })
-        val cases = mutableListOf<View>(caseImporter())
+        val cases = mutableListOf<View>(caseImporter(), caseFond3D())
+        // (13/11) les fonds 3D : leur vignette (apercu.jpg), un badge « 3D »
+        for (d in FabriqueFond3D.liste(this)) {
+            val miniature = ImageView(this).apply { scaleType = ImageView.ScaleType.CENTER_CROP }
+            chargerMiniature(File(d, "apercu.jpg"), CarnetFond.IMAGE, miniature)
+            cases.add(vignette(miniature, getString(R.string.fd_nom_3d), "3D") { ouvrirApercu(CarnetFond.PROFONDEUR, d.path) }.apply {
+                setOnLongClickListener { proposerSuppression(d); true }
+            })
+        }
         for (f in CarnetFond.importes(this)) {
             val sorte = CarnetFond.sorteDe(f)
             val miniature = ImageView(this).apply { scaleType = ImageView.ScaleType.CENTER_CROP }
@@ -204,6 +214,65 @@ class FondsActivity : Activity() {
         setOnClickListener { choisirFichier() }
     }
 
+    // (13/11) La case « Fond 3D » : même forme que « Importer », avec un petit symbole de calques.
+    private fun caseFond3D(): View = LinearLayout(this).apply {
+        orientation = LinearLayout.VERTICAL
+        gravity = Gravity.CENTER
+        background = GradientDrawable().apply {
+            setColor(Color.argb(10, 255, 255, 255))
+            cornerRadius = px(18f).toFloat()
+            setStroke(px(1.5f), Color.rgb(70, 70, 78), px(6f).toFloat(), px(5f).toFloat())
+        }
+        setPadding(px(8f), 0, px(8f), 0)
+        addView(Style.texte(this@FondsActivity, "◩", 30f, Style.TEXTE).apply { gravity = Gravity.CENTER })
+        addView(Style.texte(this@FondsActivity, getString(R.string.fd_creer_3d), 14f, Style.TEXTE, gras = true).apply { gravity = Gravity.CENTER })
+        addView(Style.texte(this@FondsActivity, getString(R.string.fd_creer_3d_expl), 11f, Style.MUET).apply {
+            gravity = Gravity.CENTER
+            setPadding(0, px(6f), 0, 0)
+        })
+        isClickable = true
+        setOnClickListener { choisirPhoto3D() }
+    }
+
+    // Le sélecteur de photos, pour un fond 3D (photos seulement).
+    private fun choisirPhoto3D() {
+        val intent = if (Build.VERSION.SDK_INT >= 33) Intent(MediaStore.ACTION_PICK_IMAGES).apply { type = "image/*" }
+        else Intent(Intent.ACTION_OPEN_DOCUMENT).apply {
+            addCategory(Intent.CATEGORY_OPENABLE)
+            type = "image/*"
+        }
+        try {
+            @Suppress("DEPRECATION")
+            startActivityForResult(intent, CODE_3D)
+        } catch (_: Exception) {
+            Toast.makeText(this, getString(R.string.fd_import_rate), Toast.LENGTH_LONG).show()
+        }
+    }
+
+    // La photo est choisie : on fabrique les deux calques (1 à 3 s), puis on ouvre l'aperçu.
+    private fun fabriquer3D(uri: Uri) {
+        val attente = AlertDialog.Builder(this).setMessage(getString(R.string.fd_3d_en_cours)).setCancelable(false).show()
+        Thread {
+            var dossier: File? = null
+            var message = R.string.fd_import_rate
+            try {
+                dossier = FabriqueFond3D.fabriquer(this, uri)
+            } catch (e: FabriqueFond3D.Echec) {
+                message = when (e.raison) {
+                    FabriqueFond3D.Raison.PAS_DE_SUJET -> R.string.fd_3d_pas_de_sujet
+                    FabriqueFond3D.Raison.MODULE_ABSENT -> R.string.fd_3d_module
+                    else -> R.string.fd_import_rate
+                }
+            } catch (_: Throwable) {}
+            runOnUiThread {
+                attente.dismiss()
+                val d = dossier
+                if (d == null) Toast.makeText(this, getString(message), Toast.LENGTH_LONG).show()
+                else ouvrirApercu(CarnetFond.PROFONDEUR, d.path)
+            }
+        }.start()
+    }
+
     // La miniature d'un fond importé, préparée en arrière-plan (lire une vidéo prend un instant).
     private fun chargerMiniature(f: File, sorte: String, vue: ImageView) {
         Thread {
@@ -228,7 +297,7 @@ class FondsActivity : Activity() {
     private fun proposerSuppression(f: File) {
         AlertDialog.Builder(this)
             .setTitle(getString(R.string.fd_supprimer_q))
-            .setPositiveButton(getString(R.string.fd_supprimer)) { _, _ -> f.delete(); construire() }
+            .setPositiveButton(getString(R.string.fd_supprimer)) { _, _ -> f.deleteRecursively(); construire() }
             .setNegativeButton(getString(R.string.fd_annuler), null)
             .show()
     }
@@ -264,6 +333,7 @@ class FondsActivity : Activity() {
         @Suppress("DEPRECATION")
         super.onActivityResult(requestCode, resultCode, data)
         val uri = data?.data
+        if (requestCode == CODE_3D && resultCode == RESULT_OK && uri != null) { fabriquer3D(uri); return }
         if (requestCode != CODE_IMPORT || resultCode != RESULT_OK || uri == null) return
         // une petite fenêtre « Préparation du fond… » pendant la copie (quelques secondes pour une vidéo)
         val attente = AlertDialog.Builder(this).setMessage(getString(R.string.fd_import_en_cours)).setCancelable(false).show()

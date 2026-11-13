@@ -213,7 +213,11 @@ class FondDessinService : WallpaperService() {
         private var signalRecu = false
         private val minuteur = Handler(Looper.getMainLooper())
         private val secours = Runnable {
-            if (!signalRecu) { visible = gardien.ecranAllume; noterVisible(); relancer() }
+            if (!signalRecu) {
+                visible = gardien.ecranAllume; noterVisible()
+                if (visible) dessin?.demarrer() else dessin?.arreter()
+                relancer()
+            }
         }
         private var images = 0                   // images dessinées (pour le diagnostic)
         private var dernierDiag = 0L
@@ -232,7 +236,10 @@ class FondDessinService : WallpaperService() {
         }
 
         private fun quandLeGardienChange() {
-            if (!signalRecu) visible = gardien.ecranAllume      // mode secours : on suit l'écran
+            if (!signalRecu) {
+                visible = gardien.ecranAllume      // mode secours : on suit l'écran
+                if (visible) dessin?.demarrer() else dessin?.arreter()
+            }
             noterVisible()
             relancer()
         }
@@ -247,11 +254,13 @@ class FondDessinService : WallpaperService() {
             Choreographer.getInstance().removeFrameCallback(this)
             CarnetFond.carnet(ctx).unregisterOnSharedPreferenceChangeListener(this)
             gardien.arreter()
+            dessin?.arreter()
             super.onDestroy()
         }
 
         // Prépare le contenu d'après le carnet. Si le fichier a disparu : le fond « Nuit ».
         private fun charger() {
+            dessin?.arreter()                      // (le capteur de l'ancien dessin s'éteint)
             dessin = null; image = null; gif = null
             val f = File(choix.id)
             when (choix.sorte) {
@@ -260,9 +269,12 @@ class FondDessinService : WallpaperService() {
                     image = if (f.exists()) PeintreFond.chargerImage(f.path, max(m.widthPixels, m.heightPixels)) else null
                 }
                 CarnetFond.GIF -> gif = if (f.exists()) LecteurGif(f.path).takeIf { it.valide } else null
-                else -> dessin = CarnetFond.dessin(choix.id)
+                else -> dessin = CarnetFond.dessinPour(ctx, choix.sorte, choix.id)
             }
             if (dessin == null && image == null && gif == null) dessin = FondNuit()
+            // (13/11) le fond 3D : son capteur réveille le moteur quand le téléphone bouge
+            dessin?.reveil = { relancer() }
+            if (visible) dessin?.demarrer()
             voile.color = Color.argb(choix.assombrir * 255 / 100, 0, 0, 0)
         }
 
@@ -299,11 +311,13 @@ class FondDessinService : WallpaperService() {
             if (v) {
                 dernierContact = SystemClock.uptimeMillis()
                 derniereImageNs = 0L
+                dessin?.demarrer()                 // (fond 3D : le capteur se rallume)
                 relancer()
             } else {
-                // caché : on arrête TOUT (c'est l'économie n°1)
+                // caché : on arrête TOUT (c'est l'économie n°1), capteur compris
                 Choreographer.getInstance().removeFrameCallback(this)
                 imageDemandee = false
+                dessin?.arreter()
             }
         }
 
@@ -369,7 +383,8 @@ class FondDessinService : WallpaperService() {
                 DiagFond.noter(ctx, "d_images" to images, "d_img_ms" to System.currentTimeMillis())
             }
             // on redemande une image seulement si ça bouge encore
-            if (anime() && (vitesse > 0f || !doitFiger)) relancer()
+            // (fond 3D « au repos » : on ne redessine plus ; son capteur nous réveillera)
+            if (anime() && dessin?.auRepos() != true && (vitesse > 0f || !doitFiger)) relancer()
         }
 
         // Dessine UNE image sur la surface du fond d'écran.

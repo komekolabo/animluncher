@@ -9,6 +9,12 @@
     <uses-feature android:name="android.software.live_wallpaper" android:required="false" />
 
     <application>
+        <!-- (13/11) FOND 3D : demande aux services Google de télécharger l'outil de DÉTOURAGE dès
+             l'installation de l'app (sinon il ne se télécharge qu'au premier fond 3D). Voir FabriqueFond3D.kt. -->
+        <meta-data
+            android:name="com.google.mlkit.vision.DEPENDENCIES"
+            android:value="subject_segment" />
+
         <!-- L'aperçu plein écran d'un fond d'écran (avec « Appliquer »). Voir FondApercuActivity.kt. -->
         <activity
             android:name="com.will.animlauncher.FondApercuActivity"

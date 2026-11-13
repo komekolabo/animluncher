@@ -89,8 +89,8 @@
     <string name="expl_refuser">Refuser</string>
     <string name="expl_refus">Sans l’accessibilité, %1$s ne peut pas jouer d’animation. Tu peux changer d’avis quand tu veux avec le bouton ci-dessous.</string>
     <string name="tuile_off">Coupé</string>
-    <string name="description_service">Détecte l’application que tu ouvres pour jouer une animation personnalisée. AnimLauncher ne lit pas le contenu de tes écrans.</string>
-    <string name="widget_description">Le logo d’AnimLauncher, animé : à poser à la place de l’icône.</string>
+    <string name="description_service">Détecte l’application que tu ouvres pour jouer une animation personnalisée. AnimEngine ne lit pas le contenu de tes écrans.</string>
+    <string name="widget_description">Le logo d’AnimEngine, animé : à poser à la place de l’icône.</string>
     <string name="widget_app_titre">Galet animé (essai)</string>
     <string name="widget_app_description">Le logo d’une app qui flotte dans un galet de verre sombre.</string>
     <string name="widget_groupe_titre">Dossier animé</string>

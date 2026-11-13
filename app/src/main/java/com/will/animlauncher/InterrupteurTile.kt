@@ -25,7 +25,7 @@ class InterrupteurTile : TileService() {
         val actif = Reglages.actif(this)
         // STATE_ACTIVE = bouton allumé (en couleur), STATE_INACTIVE = grisé.
         tuile.state = if (actif) Tile.STATE_ACTIVE else Tile.STATE_INACTIVE
-        tuile.label = "AnimLauncher"
+        tuile.label = "AnimEngine"
         // Le sous-titre n'existe qu'à partir d'Android 10 (API 29).
         if (Build.VERSION.SDK_INT >= 29) {
             tuile.subtitle = getString(if (actif) R.string.etat_on else R.string.tuile_off)

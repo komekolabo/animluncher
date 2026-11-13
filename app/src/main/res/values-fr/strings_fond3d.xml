@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Les textes du FOND 3D (13/11) : la case « Fond 3D » de l’écran Fonds d’écran, et ses messages. Voir FabriqueFond3D.kt. -->
+<resources>
+    <string name="fd_nom_3d">Fond 3D</string>
+    <string name="fd_creer_3d">Photo 3D</string>
+    <string name="fd_creer_3d_expl">Une photo qui bouge en profondeur quand tu penches le téléphone</string>
+    <string name="fd_3d_en_cours">Détourage du sujet…</string>
+    <string name="fd_3d_pas_de_sujet">Aucun sujet net trouvé sur cette photo. Essaie une photo avec une personne, un animal ou un objet au premier plan.</string>
+    <string name="fd_3d_module">L’outil de détourage est encore en téléchargement par les services Google. Réessaie dans une minute (avec Internet).</string>
+</resources>

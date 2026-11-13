@@ -131,18 +131,6 @@ class ReglagesActivity : Activity() {
             setOnClickListener { copierListeApps() }
         }
 
-        // 4. LE MODE STANDARD (prototype sans accessibilité, voir ModeStandard.kt).
-        // Un seul bouton qui guide : il demande la permission qui manque, puis allume/éteint le mode.
-        statutStandard = TextView(this).apply {
-            textSize = 15f
-            setTextColor(Color.parseColor("#DFE4F7"))
-            gravity = Gravity.CENTER
-            setPadding(0, 56, 0, 16)
-        }
-        boutonStandard = Button(this).apply {
-            setOnClickListener { etapeSuivanteStandard() }
-        }
-
         val version = TextView(this).apply {
             text = getString(R.string.version, packageManager.getPackageInfo(packageName, 0).versionName)
             textSize = 14f
@@ -164,12 +152,10 @@ class ReglagesActivity : Activity() {
         // Le journal : dans les deux versions. En Store, il reste sur le téléphone (pas d'Internet) :
         // on le copie et on le colle dans Claude pour comprendre un souci.
         colonne.addView(boutonJournal)
-        // Les autres outils de développement (liste des apps, mode standard) : version Perso seulement.
-        if (!BuildConfig.STORE) {
-            colonne.addView(boutonListe)
-            colonne.addView(statutStandard)
-            colonne.addView(boutonStandard)
-        }
+        // L'autre outil de développement (la liste des apps) : version Perso seulement.
+        // (Le « mode standard », prototype sans accessibilité, a été retiré le 13/11 : il montrait l'app
+        // 0,2-0,3 s avant l'animation, et demandait 4 autorisations pour rien.)
+        if (!BuildConfig.STORE) colonne.addView(boutonListe)
         colonne.addView(version)
 
         setContentView(ScrollView(this).apply {
@@ -190,7 +176,6 @@ class ReglagesActivity : Activity() {
         } else {
             getString(R.string.detection_ko, nomApp)
         }
-        if (!BuildConfig.STORE) afficherEtatStandard()
     }
 
     // ---------------- L'ÉCRAN D'EXPLICATION (version Store) ----------------
@@ -242,45 +227,6 @@ class ReglagesActivity : Activity() {
         }
     }
 
-    // ---------------- MODE STANDARD ----------------
-    private lateinit var statutStandard: TextView
-    private lateinit var boutonStandard: Button
-
-    // Affiche où on en est, et ce que fera le bouton.
-    private fun afficherEtatStandard() {
-        val enMarche = ModeStandard.enMarche
-        statutStandard.text = "🧪 Mode standard (test sans accessibilité)\n" + when {
-            enMarche && serviceActif() -> "En marche, mais en veille : coupe l'accessibilité pour le tester."
-            enMarche -> "✅ En marche. Ouvre une app depuis l'accueil, puis regarde le journal (« décalage »)."
-            else -> "Arrêté."
-        }
-        boutonStandard.text = when {
-            enMarche -> "Arrêter le mode standard"
-            !ModeStandard.accesUtilisation(this) -> "1/2 · Autoriser l'accès aux données d'utilisation"
-            !Settings.canDrawOverlays(this) -> "2/2 · Autoriser l'affichage par-dessus les apps"
-            else -> "Démarrer le mode standard"
-        }
-    }
-
-    // Fait l'étape suivante : ouvrir la bonne page des réglages, ou démarrer/arrêter le service.
-    private fun etapeSuivanteStandard() {
-        when {
-            ModeStandard.enMarche -> stopService(Intent(this, ModeStandard::class.java))
-            !ModeStandard.accesUtilisation(this) ->
-                startActivity(Intent(Settings.ACTION_USAGE_ACCESS_SETTINGS))
-            !Settings.canDrawOverlays(this) ->
-                startActivity(Intent(Settings.ACTION_MANAGE_OVERLAY_PERMISSION,
-                    android.net.Uri.parse("package:$packageName")))
-            else -> {
-                // Android 13+ : on demande le droit d'afficher la notification permanente.
-                if (Build.VERSION.SDK_INT >= 33) requestPermissions(arrayOf("android.permission.POST_NOTIFICATIONS"), 1)
-                startForegroundService(Intent(this, ModeStandard::class.java))
-            }
-        }
-        // le service met un instant à démarrer/s'arrêter : on rafraîchit l'affichage juste après
-        statutStandard.postDelayed({ afficherEtatStandard() }, 400)
-    }
-
     // Demande à Android toutes les apps qui ont une icône, et copie
     // "Nom affiché = nom.technique" pour chacune, triées par ordre alphabétique.
     private fun copierListeApps() {
@@ -300,7 +246,7 @@ class ReglagesActivity : Activity() {
             val barre = getSystemService(StatusBarManager::class.java)
             barre.requestAddTileService(
                 ComponentName(this, InterrupteurTile::class.java),
-                "AnimLauncher",
+                "AnimEngine",
                 Icon.createWithResource(this, android.R.drawable.ic_media_pause),
                 mainExecutor
             ) { }

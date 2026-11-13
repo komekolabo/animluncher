@@ -8,7 +8,7 @@
     <string name="son_expl_internet">Esta app no tiene acceso a Internet.</string>
     <string name="son_expl_video">El efecto se oculta solo en vídeos y juegos a pantalla completa, y solo funciona cuando suena música.</string>
     <string name="son_expl_micro">Android pedirá acceso al micrófono: es obligatorio para leer el nivel del sonido.</string>
-    <string name="son_service">Activa primero AnimLauncher en los ajustes de accesibilidad: el efecto lo necesita para mostrarse.</string>
+    <string name="son_service">Activa primero AnimEngine en los ajustes de accesibilidad: el efecto lo necesita para mostrarse.</string>
     <string name="son_couleurs">Colores</string>
     <string name="son_calme">Calma</string>
     <string name="son_calme_desc">Cuando la música respira</string>

@@ -30,8 +30,8 @@
     <string name="fd_applique">Hintergrund angewendet ✓</string>
     <string name="fd_choisir_ecran">Android fragt dich: wähle „Startbildschirm“ oder „Start- und Sperrbildschirm“.</string>
     <string name="fd_pas_possible">Dieses Handy unterstützt keine Live-Hintergründe.</string>
-    <string name="fd_service_dessin">AnimLauncher · Hintergründe</string>
-    <string name="fd_service_video">AnimLauncher · Video</string>
-    <string name="fd_desc_dessin">Animierte Hintergründe von AnimLauncher, oder deine eigenen GIFs und Bilder. Stoppt, wenn verdeckt.</string>
+    <string name="fd_service_dessin">AnimEngine · Hintergründe</string>
+    <string name="fd_service_video">AnimEngine · Video</string>
+    <string name="fd_desc_dessin">Animierte Hintergründe von AnimEngine, oder deine eigenen GIFs und Bilder. Stoppt, wenn verdeckt.</string>
     <string name="fd_desc_video">Dein eigenes Video als Hintergrund, stumm und in Schleife. Stoppt, wenn verdeckt.</string>
 </resources>

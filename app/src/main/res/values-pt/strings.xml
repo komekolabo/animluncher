@@ -89,8 +89,8 @@
     <string name="expl_refuser">Recusar</string>
     <string name="expl_refus">Sem a Acessibilidade, %1$s não pode tocar animações. Pode mudar de ideias quando quiser com o botão abaixo.</string>
     <string name="tuile_off">Desativado</string>
-    <string name="description_service">Deteta a aplicação que abre para tocar uma animação personalizada. O AnimLauncher não lê o conteúdo dos seus ecrãs.</string>
-    <string name="widget_description">O logótipo do AnimLauncher, animado: para pôr em vez do ícone.</string>
+    <string name="description_service">Deteta a aplicação que abre para tocar uma animação personalizada. O AnimEngine não lê o conteúdo dos seus ecrãs.</string>
+    <string name="widget_description">O logótipo do AnimEngine, animado: para pôr em vez do ícone.</string>
     <string name="widget_app_titre">Seixo animado (teste)</string>
     <string name="widget_app_description">O logótipo de uma app a flutuar num seixo de vidro escuro.</string>
     <string name="widget_groupe_titre">Pasta animada</string>
