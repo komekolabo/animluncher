@@ -8,4 +8,17 @@
     <string name="fd_3d_pas_de_sujet">Aucun sujet net trouvé sur cette photo. Essaie une photo avec une personne, un animal ou un objet au premier plan.</string>
     <string name="fd_3d_module">L’outil de détourage est encore en téléchargement par les services Google. Réessaie dans une minute (avec Internet).</string>
     <string name="fd_3d_trop_grand">Le sujet n’a pas pu être séparé de son fond (il couvre presque toute l’image). Choisis une photo où le sujet se détache d’un fond différent. Les dessins en noir et blanc et les captures d’écran marchent mal.</string>
+    <string name="fd_3d_gomme_aide">Efface ce qui dépasse avec ton doigt. Deux doigts pour zoomer et te déplacer.</string>
+    <string name="fd_3d_effacer">Effacer</string>
+    <string name="fd_3d_restaurer">Restaurer</string>
+    <string name="fd_3d_autre_outil">Essayer l’autre outil</string>
+    <string name="fd_3d_termine">Terminé</string>
+    <string name="fd_3d_finition">Création du fond 3D…</string>
+    <string name="fd_3d_outil_titre">Outil de détourage des dessins</string>
+    <string name="fd_3d_outil_texte">Cette image ressemble à un dessin ou à un anime. Pour bien la détourer, AnimEngine doit télécharger un outil spécialisé : %1$d Mo, une seule fois.\n\nTu pourras le supprimer à tout moment en un bouton, en bas de l’écran Fonds d’écran (il ne se retéléchargera que si tu détoures un autre dessin).</string>
+    <string name="fd_3d_telecharger">Télécharger (%1$d Mo)</string>
+    <string name="fd_3d_telechargement">Téléchargement de l’outil…</string>
+    <string name="fd_3d_telechargement_rate">Téléchargement impossible. Vérifie ta connexion Internet et réessaie.</string>
+    <string name="fd_3d_outil_place">Outil de détourage des dessins · %1$d Mo</string>
+    <string name="fd_3d_outil_supprime">Outil supprimé.</string>
 </resources>

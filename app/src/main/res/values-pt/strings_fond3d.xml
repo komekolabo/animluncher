@@ -8,4 +8,17 @@
     <string name="fd_3d_pas_de_sujet">Nenhum objeto principal claro nesta foto. Tente uma foto com uma pessoa, um animal ou um objeto em primeiro plano.</string>
     <string name="fd_3d_module">A ferramenta de recorte ainda está sendo baixada pelos serviços do Google. Tente de novo em um minuto (com internet).</string>
     <string name="fd_3d_trop_grand">Não foi possível separar o objeto principal do fundo (ele cobre quase toda a imagem). Escolha uma foto em que ele se destaque de um fundo diferente. Desenhos em preto e branco e capturas de tela funcionam mal.</string>
+    <string name="fd_3d_gomme_aide">Apague com o dedo o que sobra. Dois dedos para dar zoom e se mover.</string>
+    <string name="fd_3d_effacer">Apagar</string>
+    <string name="fd_3d_restaurer">Restaurar</string>
+    <string name="fd_3d_autre_outil">Tentar a outra ferramenta</string>
+    <string name="fd_3d_termine">Concluído</string>
+    <string name="fd_3d_finition">Criando o fundo 3D…</string>
+    <string name="fd_3d_outil_titre">Ferramenta de recorte de desenhos</string>
+    <string name="fd_3d_outil_texte">Esta imagem parece um desenho ou anime. Para recortá-la bem, o AnimEngine precisa baixar uma ferramenta especializada: %1$d MB, uma única vez.\n\nVocê pode excluí-la a qualquer momento com um botão, no fim da tela Papéis de parede (ela só será baixada de novo se você recortar outro desenho).</string>
+    <string name="fd_3d_telecharger">Baixar (%1$d MB)</string>
+    <string name="fd_3d_telechargement">Baixando a ferramenta…</string>
+    <string name="fd_3d_telechargement_rate">Não foi possível baixar. Verifique sua conexão com a internet e tente de novo.</string>
+    <string name="fd_3d_outil_place">Ferramenta de recorte de desenhos · %1$d MB</string>
+    <string name="fd_3d_outil_supprime">Ferramenta excluída.</string>
 </resources>

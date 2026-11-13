@@ -5,7 +5,7 @@
     <string name="son_expl_mode">As margens do ecrã movem-se suavemente ao ritmo da música do telemóvel, mesmo fora da app.</string>
     <string name="son_expl_rien">Nada é gravado nem guardado.</string>
     <string name="son_expl_direct">A app lê apenas o nível do som, em direto, e esquece-o de imediato.</string>
-    <string name="son_expl_internet">Esta app não tem acesso à Internet.</string>
+    <string name="son_expl_internet">O som nunca é enviado pela Internet.</string>
     <string name="son_expl_video">O efeito esconde-se sozinho em vídeos e jogos em ecrã inteiro, e só funciona quando há música a tocar.</string>
     <string name="son_expl_micro">O Android vai pedir acesso ao microfone: é obrigatório para ler o nível do som.</string>
     <string name="son_service">Ativa primeiro o AnimEngine nas definições de acessibilidade: o efeito precisa disso para aparecer.</string>

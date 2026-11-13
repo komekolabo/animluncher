@@ -18,6 +18,11 @@
             android:value="subject_segment" />
 
         <!-- LES FONDS D'ÉCRAN ANIMÉS (12/11) : le même bloc que dans src/store/AndroidManifest.xml. -->
+        <!-- (13/11) La GOMME du fond 3D : corriger le détourage avant d'enregistrer. Voir GommeActivity.kt. -->
+        <activity
+            android:name="com.will.animlauncher.GommeActivity"
+            android:exported="false" />
+
         <!-- L'aperçu plein écran d'un fond d'écran (avec « Appliquer »). Voir FondApercuActivity.kt. -->
         <activity
             android:name="com.will.animlauncher.FondApercuActivity"

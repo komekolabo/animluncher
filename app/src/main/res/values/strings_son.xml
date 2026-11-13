@@ -5,7 +5,7 @@
     <string name="son_expl_mode">The edges of your screen move softly to the rhythm of your phone’s music, even outside the app.</string>
     <string name="son_expl_rien">Nothing is recorded or saved.</string>
     <string name="son_expl_direct">The app only reads the sound level, live, and forgets it instantly.</string>
-    <string name="son_expl_internet">This app has no Internet access.</string>
+    <string name="son_expl_internet">The sound is never sent over the Internet.</string>
     <string name="son_expl_video">The effect hides itself in full-screen videos and games, and only runs while music is playing.</string>
     <string name="son_expl_micro">Android will ask for microphone access: it is required to read the sound level.</string>
     <string name="son_service">Turn on AnimEngine in the Accessibility settings first: the effect needs it to appear.</string>

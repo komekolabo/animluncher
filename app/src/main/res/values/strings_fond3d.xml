@@ -8,4 +8,17 @@
     <string name="fd_3d_pas_de_sujet">No clear subject found in this photo. Try a photo with a person, an animal or an object in the foreground.</string>
     <string name="fd_3d_module">The cut-out tool is still being downloaded by Google services. Try again in a minute (with an internet connection).</string>
     <string name="fd_3d_trop_grand">The subject could not be separated from its background (it covers almost the whole image). Choose a photo where the subject stands out from a different background. Black-and-white drawings and screenshots work poorly.</string>
+    <string name="fd_3d_gomme_aide">Erase what sticks out with your finger. Two fingers to zoom and move.</string>
+    <string name="fd_3d_effacer">Erase</string>
+    <string name="fd_3d_restaurer">Restore</string>
+    <string name="fd_3d_autre_outil">Try the other tool</string>
+    <string name="fd_3d_termine">Done</string>
+    <string name="fd_3d_finition">Creating the 3D wallpaper…</string>
+    <string name="fd_3d_outil_titre">Drawing cut-out tool</string>
+    <string name="fd_3d_outil_texte">This image looks like a drawing or anime. To cut it out properly, AnimEngine needs to download a dedicated tool: %1$d MB, only once.\n\nYou can delete it anytime with one button, at the bottom of the Wallpapers screen (it will only be downloaded again if you cut out another drawing).</string>
+    <string name="fd_3d_telecharger">Download (%1$d MB)</string>
+    <string name="fd_3d_telechargement">Downloading the tool…</string>
+    <string name="fd_3d_telechargement_rate">Download failed. Check your internet connection and try again.</string>
+    <string name="fd_3d_outil_place">Drawing cut-out tool · %1$d MB</string>
+    <string name="fd_3d_outil_supprime">Tool deleted.</string>
 </resources>

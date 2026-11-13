@@ -18,18 +18,22 @@ import kotlin.math.min
 
 // LA FABRIQUE D'UN FOND 3D (13/11) : à partir d'une photo choisie par l'utilisateur, on fabrique les deux
 // calques du fond 3D (voir FondProfondeur.kt). Tout se passe SUR LE TÉLÉPHONE, la photo n'est envoyée nulle part.
+// Deux étapes, avec la GOMME entre les deux (GommeActivity.kt) :
 //
-//  1) LE DÉTOURAGE : l'outil gratuit de Google « ML Kit, Subject Segmentation » trouve le sujet de la photo
-//     (personne, animal, objet). Il donne, pour chaque point de l'image, une « confiance » de 0 à 1 :
-//     1 = sûrement le sujet, 0 = sûrement le fond. Son modèle est fourni par les services Google du téléphone
-//     (téléchargé une fois par Android, il ne grossit pas notre app).
-//  2) LE SUJET : la photo, dont chaque point devient plus ou moins transparent selon cette confiance.
-//  3) LE FOND REBOUCHÉ : on efface le sujet et on remplit le trou avec les couleurs qui l'entourent
-//     (méthode « pousser-tirer », expliquée plus bas), puis on adoucit. Ce n'est pas parfait, mais le sujet
-//     cache presque tout le trou : on n'en voit que les bords quand on penche le téléphone.
-//  4) On enregistre fond.jpg, sujet.png et apercu.jpg (la vignette de la galerie) dans fonds3d/p_<date>/.
+//  ÉTAPE 1, detourer() : trouver le sujet. Deux outils possibles, choisis tout seuls :
+//   - l'outil PHOTO de Google (« ML Kit, Subject Segmentation »), fourni par les services Google du téléphone ;
+//   - l'outil DESSINS (DetourageDessins.kt), spécialisé dans les dessins et l'anime, téléchargé à la demande (44 Mo).
+//   Le choix : une image en noir et blanc (manga…) va directement à l'outil dessins. Sinon on essaie l'outil photo, et
+//   s'il donne un mauvais résultat (sujet introuvable, sujet qui couvre toute l'image, contour très incertain), on
+//   passe à l'outil dessins. Chaque outil donne, pour chaque point, une « confiance » de 0 à 1 (1 = sûrement le sujet).
+//   Puis on NETTOIE : on est plus strict (sous 40 % de confiance : transparent), et on ne garde que les gros
+//   morceaux (le personnage), pas les petits bouts isolés autour (lettres, traits de vitesse…).
 //
-// À lancer HORS de l'écran (dans un Thread) : ça prend 1 à 3 secondes.
+//  ÉTAPE 2, terminer() (après la gomme) : le sujet (la photo, transparente hors du sujet), le fond rebouché (le trou du
+//   sujet rempli avec les couleurs autour, méthode « pousser-tirer » expliquée plus bas), et la vignette ; le tout
+//   enregistré dans fonds3d/p_<date>/.
+//
+// À lancer HORS de l'écran (dans un Thread) : chaque étape prend 1 à 5 secondes.
 object FabriqueFond3D {
 
     // Le dossier de tous les fonds 3D.
@@ -41,18 +45,53 @@ object FabriqueFond3D {
             .filter { it.isDirectory && File(it, "fond.jpg").exists() && File(it, "sujet.png").exists() }
             .sortedByDescending { it.lastModified() }
 
+    enum class Outil { PHOTO, DESSIN }
+
     // Ce qui peut mal tourner, pour afficher le bon message.
     class Echec(val raison: Raison) : Exception()
-    enum class Raison { ILLISIBLE, PAS_DE_SUJET, SUJET_TROP_GRAND, MODULE_ABSENT }
+    enum class Raison { ILLISIBLE, PAS_DE_SUJET, SUJET_TROP_GRAND, MODULE_ABSENT, OUTIL_DESSINS_ABSENT }
 
-    // Fabrique le fond 3D de la photo « uri ». Renvoie son dossier, ou lance un Echec.
-    fun fabriquer(c: Context, uri: Uri): File {
+    // Le résultat de l'étape 1 : la photo, et pour chaque point la part de sujet (0 = fond, 1 = sujet).
+    // « masque » est modifié par la gomme.
+    class Detourage(val photo: Bitmap, val masque: FloatArray, val outil: Outil) {
+        val w get() = photo.width
+        val h get() = photo.height
+    }
+
+    // ÉTAPE 1. « force » : null = choix automatique, sinon l'outil voulu (bouton « Essayer l'autre outil » de la gomme).
+    fun detourer(c: Context, uri: Uri, force: Outil? = null): Detourage {
         // la photo, réduite à 1600 points sur son grand côté (assez pour un écran, et le détourage reste rapide)
         val photo = charger(c, uri, 1600) ?: throw Echec(Raison.ILLISIBLE)
+        val choix = force ?: if (noirEtBlanc(photo)) Outil.DESSIN else null
+        if (choix == Outil.DESSIN) return parDessins(c, photo)
+        val confiance = try { parPhoto(photo) } catch (e: Echec) {
+            // l'outil photo n'est pas prêt : l'outil dessins s'il est là, sinon le message
+            if (e.raison == Raison.MODULE_ABSENT && force == null && DetourageDessins.estInstalle(c)) return parDessins(c, photo)
+            throw e
+        }
+        var probleme = evaluer(confiance)
+        // (outil photo choisi à la main : un contour incertain est accepté, la gomme est là pour corriger)
+        if (force == Outil.PHOTO && probleme == Raison.ILLISIBLE) probleme = null
+        if (probleme == null) return Detourage(photo, nettoyer(confiance, photo.width, photo.height), Outil.PHOTO)
+        // mauvais résultat : en automatique, on passe à l'outil dessins (s'il manque, l'écran propose de le télécharger)
+        if (force == null) {
+            if (!DetourageDessins.estInstalle(c)) throw Echec(Raison.OUTIL_DESSINS_ABSENT)
+            return parDessins(c, photo)
+        }
+        throw Echec(probleme)
+    }
+
+    private fun parDessins(c: Context, photo: Bitmap): Detourage {
+        if (!DetourageDessins.estInstalle(c)) throw Echec(Raison.OUTIL_DESSINS_ABSENT)
+        val confiance = try { DetourageDessins.masque(c, photo) } catch (e: Exception) { throw Echec(Raison.ILLISIBLE) }
+        evaluer(confiance)?.let { if (it != Raison.ILLISIBLE) throw Echec(it) }
+        return Detourage(photo, nettoyer(confiance, photo.width, photo.height), Outil.DESSIN)
+    }
+
+    // L'outil photo de Google.
+    private fun parPhoto(photo: Bitmap): FloatArray {
         val w = photo.width
         val h = photo.height
-
-        // 1) LE DÉTOURAGE
         val confiance = FloatArray(w * h)
         val outil = SubjectSegmentation.getClient(
             SubjectSegmenterOptions.Builder().enableForegroundConfidenceMask().build())
@@ -67,27 +106,85 @@ object FabriqueFond3D {
         } finally {
             try { outil.close() } catch (_: Exception) {}
         }
-        // pas de sujet trouvé (moins de 2 % de l'image) : un fond 3D n'aurait pas de sens
-        val part = confiance.count { it > 0.5f }.toFloat() / (w * h)
-        if (part < 0.02f) throw Echec(Raison.PAS_DE_SUJET)
-        // (13/11, vu par Will sur une capture de manga) le « sujet » couvre presque toute l'image : l'outil n'a pas
-        // su séparer le sujet de son fond (dessin noir et blanc, capture d'écran…). Le fond 3D n'aurait aucun relief.
-        if (part > 0.6f) throw Echec(Raison.SUJET_TROP_GRAND)
+        return confiance
+    }
 
-        val pixels = IntArray(w * h)
-        photo.getPixels(pixels, 0, w, 0, 0, w, h)
-
-        // 2) LE SUJET : alpha = la confiance, rendue un peu plus nette (sous 0,3 : transparent ; au-dessus de 0,7 : opaque)
-        val sujet = IntArray(w * h)
-        for (i in pixels.indices) {
-            val a = ((confiance[i] - 0.3f) / 0.4f).coerceIn(0f, 1f)
-            sujet[i] = (pixels[i] and 0x00FFFFFF) or ((a * 255f).toInt() shl 24)
+    // Le résultat est-il bon ? null = oui ; sinon le problème.
+    //  - sujet introuvable : moins de 2 % de l'image ;
+    //  - sujet trop grand : plus de 60 % (vu par Will sur une capture de manga : toute la page était « le sujet ») ;
+    //  - contour très incertain : beaucoup de points « à moitié sûrs » (entre 20 et 80 %) par rapport au sujet
+    //    (marqué ILLISIBLE ici : ça veut juste dire « essayer l'autre outil »).
+    private fun evaluer(confiance: FloatArray): Raison? {
+        var sujet = 0; var incertain = 0
+        for (v in confiance) { if (v > 0.5f) sujet++; if (v > 0.2f && v < 0.8f) incertain++ }
+        val part = sujet.toFloat() / confiance.size
+        return when {
+            part < 0.02f -> Raison.PAS_DE_SUJET
+            part > 0.6f -> Raison.SUJET_TROP_GRAND
+            incertain > sujet * 0.35f -> Raison.ILLISIBLE
+            else -> null
         }
+    }
 
-        // 3) LE FOND REBOUCHÉ
-        val fond = reboucher(pixels, confiance, w, h)
+    // Une image presque sans couleur (manga, croquis au crayon) : on mesure l'écart moyen entre le rouge, le vert et
+    // le bleu de chaque point (0 = parfaitement gris). Une photo, même terne, a toujours un peu de couleur.
+    private fun noirEtBlanc(photo: Bitmap): Boolean {
+        val petite = Bitmap.createScaledBitmap(photo, 96, max(1, 96 * photo.height / photo.width), true)
+        val p = IntArray(petite.width * petite.height)
+        petite.getPixels(p, 0, petite.width, 0, 0, petite.width, petite.height)
+        var somme = 0L
+        for (q in p) {
+            val r = Color.red(q); val g = Color.green(q); val b = Color.blue(q)
+            somme += maxOf(r, g, b) - minOf(r, g, b)
+        }
+        return somme / p.size < 6
+    }
 
-        // 4) L'ENREGISTREMENT
+    // LE NETTOYAGE (testé sur la capture de manga de Will : les onomatopées « WAAA » restaient en transparence).
+    //  1) plus strict : sous 40 % de confiance, transparent ; au-dessus de 80 %, opaque ; entre les deux, un fondu ;
+    //  2) on repère les MORCEAUX (les zones de sujet qui se touchent) et on ne garde que le plus gros, plus ceux qui
+    //     font au moins 15 % de sa taille (un bras séparé du corps, par exemple). Les petits bouts isolés partent ;
+    //  3) on laisse une petite marge autour des morceaux gardés (pour les cheveux fins et les bords doux).
+    fun nettoyer(confiance: FloatArray, w: Int, h: Int): FloatArray {
+        val a = FloatArray(w * h) { ((confiance[it] - 0.4f) / 0.4f).coerceIn(0f, 1f) }
+        // les morceaux : chaque point de sujet reçoit le numéro de son morceau (remplissage de proche en proche)
+        val numero = IntArray(w * h)
+        val tailles = ArrayList<Int>()
+        val file = IntArray(w * h)
+        for (depart in 0 until w * h) {
+            if (a[depart] <= 0.5f || numero[depart] != 0) continue
+            val n = tailles.size + 1
+            var debut = 0; var fin = 0
+            file[fin++] = depart; numero[depart] = n
+            while (debut < fin) {
+                val i = file[debut++]
+                val x = i % w; val y = i / w
+                if (x > 0) { val j = i - 1; if (numero[j] == 0 && a[j] > 0.5f) { numero[j] = n; file[fin++] = j } }
+                if (x < w - 1) { val j = i + 1; if (numero[j] == 0 && a[j] > 0.5f) { numero[j] = n; file[fin++] = j } }
+                if (y > 0) { val j = i - w; if (numero[j] == 0 && a[j] > 0.5f) { numero[j] = n; file[fin++] = j } }
+                if (y < h - 1) { val j = i + w; if (numero[j] == 0 && a[j] > 0.5f) { numero[j] = n; file[fin++] = j } }
+            }
+            tailles.add(fin)
+        }
+        if (tailles.isEmpty()) return a
+        val plusGros = tailles.max()
+        val garde = BooleanArray(w * h) { numero[it] != 0 && tailles[numero[it] - 1] >= plusGros * 0.15f }
+        val zone = elargir(garde, w, h, max(2, max(w, h) / 270))
+        for (i in a.indices) if (!zone[i]) a[i] = 0f
+        return a
+    }
+
+    // ÉTAPE 2 : enregistre le fond 3D (après la gomme). Renvoie son dossier, ou lance un Echec.
+    fun terminer(c: Context, d: Detourage): File {
+        val w = d.w
+        val h = d.h
+        val pixels = IntArray(w * h)
+        d.photo.getPixels(pixels, 0, w, 0, 0, w, h)
+        // LE SUJET : la photo, avec pour transparence la part de sujet de chaque point
+        val sujet = IntArray(w * h) { (pixels[it] and 0x00FFFFFF) or ((d.masque[it] * 255f).toInt().coerceIn(0, 255) shl 24) }
+        // LE FOND REBOUCHÉ
+        val fond = reboucher(pixels, d.masque, w, h)
+        // L'ENREGISTREMENT
         val dossier = File(dossierTous(c), "p_" + System.currentTimeMillis()).apply { mkdirs() }
         try {
             Bitmap.createBitmap(fond, w, h, Bitmap.Config.ARGB_8888).let { b ->

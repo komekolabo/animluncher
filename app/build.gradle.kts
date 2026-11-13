@@ -80,6 +80,9 @@ android {
 // presque pas). Voir FabriqueFond3D.kt.
 dependencies {
     implementation("com.google.android.gms:play-services-mlkit-subject-segmentation:16.0.0-beta1")
+    // (13/11) Le moteur d'IA des services Google (« LiteRT », ex-TensorFlow Lite) : il fait tourner l'outil de
+    // détourage des DESSINS, téléchargé à la demande (DetourageDessins.kt). Le moteur n'est pas dans l'app non plus.
+    implementation("com.google.android.gms:play-services-tflite-java:16.4.0")
 }
 
 val copierApkPerso = tasks.register<Copy>("copierApkPerso") {

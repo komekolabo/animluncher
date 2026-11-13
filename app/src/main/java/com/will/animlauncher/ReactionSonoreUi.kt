@@ -150,7 +150,7 @@ object FenetreSon {
         ligne(a.getString(R.string.son_expl_mode), Style.DOUX, haut = 10f)
         ligne(a.getString(R.string.son_expl_rien), Style.TEXTE, gras = true, haut = 12f)
         ligne(a.getString(R.string.son_expl_direct), Style.MUET, haut = 2f)
-        if (BuildConfig.STORE) ligne(a.getString(R.string.son_expl_internet), Style.MUET)     // vrai seulement en version Store
+        ligne(a.getString(R.string.son_expl_internet), Style.MUET)     // (13/11 : l'app a Internet pour le fond 3D, mais le son ne sort jamais du téléphone)
         ligne(a.getString(R.string.son_expl_video), Style.MUET, haut = 10f)
 
         // LES TROIS COULEURS (10/11) : calme, moyen, quand ça envoie. L'app choisit toute seule selon la musique.

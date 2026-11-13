@@ -5,7 +5,7 @@
     <string name="son_expl_mode">Die Ränder deines Bildschirms bewegen sich sanft im Rhythmus der Musik deines Handys, auch außerhalb der App.</string>
     <string name="son_expl_rien">Nichts wird aufgenommen oder gespeichert.</string>
     <string name="son_expl_direct">Die App liest nur live den Lautstärkepegel und vergisst ihn sofort wieder.</string>
-    <string name="son_expl_internet">Diese App hat keinen Internetzugang.</string>
+    <string name="son_expl_internet">Der Ton wird nie ins Internet gesendet.</string>
     <string name="son_expl_video">Der Effekt blendet sich bei Videos und Spielen im Vollbild aus und läuft nur, wenn Musik spielt.</string>
     <string name="son_expl_micro">Android fragt nach dem Mikrofonzugriff: Er ist nötig, um den Pegel zu lesen.</string>
     <string name="son_service">Aktiviere zuerst AnimEngine in den Bedienungshilfen: Der Effekt braucht das, um zu erscheinen.</string>

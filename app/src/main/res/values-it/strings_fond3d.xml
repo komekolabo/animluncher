@@ -8,4 +8,17 @@
     <string name="fd_3d_pas_de_sujet">Nessun soggetto chiaro in questa foto. Prova una foto con una persona, un animale o un oggetto in primo piano.</string>
     <string name="fd_3d_module">Lo strumento di scontorno è ancora in download dai servizi Google. Riprova tra un minuto (con Internet).</string>
     <string name="fd_3d_trop_grand">Non è stato possibile separare il soggetto dallo sfondo (copre quasi tutta l’immagine). Scegli una foto in cui il soggetto risalti su uno sfondo diverso. Disegni in bianco e nero e screenshot funzionano male.</string>
+    <string name="fd_3d_gomme_aide">Cancella con il dito ciò che sporge. Due dita per zoomare e spostarti.</string>
+    <string name="fd_3d_effacer">Cancella</string>
+    <string name="fd_3d_restaurer">Ripristina</string>
+    <string name="fd_3d_autre_outil">Prova l’altro strumento</string>
+    <string name="fd_3d_termine">Fatto</string>
+    <string name="fd_3d_finition">Creazione dello sfondo 3D…</string>
+    <string name="fd_3d_outil_titre">Strumento di scontorno per disegni</string>
+    <string name="fd_3d_outil_texte">Questa immagine sembra un disegno o un anime. Per scontornarla bene, AnimEngine deve scaricare uno strumento specializzato: %1$d MB, una sola volta.\n\nPotrai eliminarlo in qualsiasi momento con un pulsante, in fondo alla schermata Sfondi (verrà riscaricato solo se scontorni un altro disegno).</string>
+    <string name="fd_3d_telecharger">Scarica (%1$d MB)</string>
+    <string name="fd_3d_telechargement">Download dello strumento…</string>
+    <string name="fd_3d_telechargement_rate">Download non riuscito. Controlla la connessione a Internet e riprova.</string>
+    <string name="fd_3d_outil_place">Strumento di scontorno per disegni · %1$d MB</string>
+    <string name="fd_3d_outil_supprime">Strumento eliminato.</string>
 </resources>

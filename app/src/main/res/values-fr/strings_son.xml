@@ -5,7 +5,7 @@
     <string name="son_expl_mode">Les bords de ton écran bougent doucement au rythme de la musique du téléphone, même en dehors de l’app.</string>
     <string name="son_expl_rien">Rien n’est enregistré ni sauvegardé.</string>
     <string name="son_expl_direct">L’app lit seulement le niveau du son, en direct, et l’oublie aussitôt.</string>
-    <string name="son_expl_internet">Cette app n’a pas accès à Internet.</string>
+    <string name="son_expl_internet">Le son n’est jamais envoyé sur Internet.</string>
     <string name="son_expl_video">L’effet se cache tout seul pendant les vidéos et les jeux en plein écran, et ne tourne que quand de la musique joue.</string>
     <string name="son_expl_micro">Android va demander l’accès au micro : c’est obligatoire pour lire le niveau du son.</string>
     <string name="son_service">Active d’abord AnimEngine dans les réglages d’accessibilité : l’effet en a besoin pour s’afficher.</string>

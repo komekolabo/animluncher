@@ -107,6 +107,21 @@ class FondsActivity : Activity() {
             setLineSpacing(0f, 1.2f)
             setPadding(px(4f), px(18f), px(4f), 0)
         })
+        // 3 bis) (13/11) l'outil de détourage des dessins, s'il a été téléchargé : sa place, et un bouton pour le supprimer
+        if (DetourageDessins.estInstalle(this)) {
+            liste.addView(LinearLayout(this).apply {
+                orientation = LinearLayout.HORIZONTAL
+                gravity = Gravity.CENTER_VERTICAL
+                setPadding(px(4f), px(16f), 0, 0)
+                addView(Style.texte(this@FondsActivity, getString(R.string.fd_3d_outil_place, DetourageDessins.placeMo(this@FondsActivity)),
+                    13f, Style.DOUX), LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f))
+                addView(Style.boutonDiscret(this@FondsActivity, getString(R.string.fd_supprimer)) {
+                    DetourageDessins.supprimer(this@FondsActivity)
+                    Toast.makeText(this@FondsActivity, getString(R.string.fd_3d_outil_supprime), Toast.LENGTH_SHORT).show()
+                    construire()
+                }, LinearLayout.LayoutParams(ViewGroup.LayoutParams.WRAP_CONTENT, px(42f)))
+            })
+        }
         // 4) le diagnostic (12/11) : ce que les fonds d'écran ont vécu la dernière fois qu'ils étaient affichés
         liste.addView(Style.texte(this, diagnostic(), 11f, Color.rgb(110, 110, 118)).apply {
             setLineSpacing(0f, 1.25f)
@@ -249,27 +264,26 @@ class FondsActivity : Activity() {
         }
     }
 
-    // La photo est choisie : on fabrique les deux calques (1 à 3 s), puis on ouvre l'aperçu.
+    // La photo est choisie : on détoure le sujet (1 à 5 s), puis on ouvre la GOMME pour corriger (GommeActivity).
+    // Si l'image demande l'outil des dessins et qu'il n'est pas encore là : la fenêtre des 44 Mo, puis on recommence.
     private fun fabriquer3D(uri: Uri) {
         val attente = AlertDialog.Builder(this).setMessage(getString(R.string.fd_3d_en_cours)).setCancelable(false).show()
         Thread {
-            var dossier: File? = null
-            var message = R.string.fd_import_rate
-            try {
-                dossier = FabriqueFond3D.fabriquer(this, uri)
-            } catch (e: FabriqueFond3D.Echec) {
-                message = when (e.raison) {
-                    FabriqueFond3D.Raison.PAS_DE_SUJET -> R.string.fd_3d_pas_de_sujet
-                    FabriqueFond3D.Raison.SUJET_TROP_GRAND -> R.string.fd_3d_trop_grand
-                    FabriqueFond3D.Raison.MODULE_ABSENT -> R.string.fd_3d_module
-                    else -> R.string.fd_import_rate
-                }
-            } catch (_: Throwable) {}
+            var d: FabriqueFond3D.Detourage? = null
+            var raison: FabriqueFond3D.Raison? = null
+            try { d = FabriqueFond3D.detourer(this, uri) } catch (e: FabriqueFond3D.Echec) { raison = e.raison } catch (_: Throwable) {}
             runOnUiThread {
                 attente.dismiss()
-                val d = dossier
-                if (d == null) Toast.makeText(this, getString(message), Toast.LENGTH_LONG).show()
-                else ouvrirApercu(CarnetFond.PROFONDEUR, d.path)
+                val r = d
+                when {
+                    r != null -> {
+                        GommeActivity.enCours = r
+                        GommeActivity.photo = uri
+                        startActivity(Intent(this, GommeActivity::class.java))
+                    }
+                    raison == FabriqueFond3D.Raison.OUTIL_DESSINS_ABSENT -> OutilDessinsUi.proposer(this) { fabriquer3D(uri) }
+                    else -> Toast.makeText(this, getString(OutilDessinsUi.message(raison)), Toast.LENGTH_LONG).show()
+                }
             }
         }.start()
     }
