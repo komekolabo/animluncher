@@ -18,6 +18,9 @@
     <string name="dfd_maintenant">ORA</string>
     <string name="dfd_service">AnimEngine · Cartella</string>
     <string name="dfd_desc">Le tue foto e i tuoi video si alternano: uno nuovo ogni volta che torni alla schermata Home.</string>
+    <string name="dfd_son_tout">Audio per tutti</string>
+    <string name="dfd_muet_tout">Disattiva tutti</string>
+    <string name="dfd_son_expl">Tocca 🔊 su un video per attivare o disattivare il suo audio. L\'audio esce solo se l\'impostazione sopra lo consente.</string>
     <plurals name="dfd_ajoutes">
         <item quantity="one">%d aggiunto</item>
         <item quantity="other">%d aggiunti</item>

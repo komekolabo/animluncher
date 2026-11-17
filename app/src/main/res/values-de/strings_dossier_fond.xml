@@ -18,6 +18,9 @@
     <string name="dfd_maintenant">JETZT</string>
     <string name="dfd_service">AnimEngine · Ordner</string>
     <string name="dfd_desc">Deine Fotos und Videos wechseln sich ab: jedes Mal ein neues, wenn du zum Startbildschirm zurückkehrst.</string>
+    <string name="dfd_son_tout">Ton für alle</string>
+    <string name="dfd_muet_tout">Alle stumm</string>
+    <string name="dfd_son_expl">Tippe auf 🔊 bei einem Video, um seinen Ton ein- oder auszuschalten. Der Ton läuft nur, wenn die Einstellung oben es erlaubt.</string>
     <plurals name="dfd_ajoutes">
         <item quantity="one">%d hinzugefügt</item>
         <item quantity="other">%d hinzugefügt</item>

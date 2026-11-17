@@ -18,6 +18,9 @@
     <string name="dfd_maintenant">AGORA</string>
     <string name="dfd_service">AnimEngine · Pasta</string>
     <string name="dfd_desc">Suas fotos e vídeos se alternam: um novo a cada vez que você volta à tela inicial.</string>
+    <string name="dfd_son_tout">Som em todos</string>
+    <string name="dfd_muet_tout">Silenciar todos</string>
+    <string name="dfd_son_expl">Toque em 🔊 num vídeo para ligar ou desligar o som dele. O som só sai se o ajuste acima permitir.</string>
     <plurals name="dfd_ajoutes">
         <item quantity="one">%d adicionado</item>
         <item quantity="other">%d adicionados</item>

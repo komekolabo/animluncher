@@ -18,6 +18,9 @@
     <string name="dfd_maintenant">NOW</string>
     <string name="dfd_service">AnimEngine · Folder</string>
     <string name="dfd_desc">Your photos and videos take turns: a new one each time you return to the home screen.</string>
+    <string name="dfd_son_tout">Sound on for all</string>
+    <string name="dfd_muet_tout">Mute all</string>
+    <string name="dfd_son_expl">Tap 🔊 on a video to turn its sound on or off. The sound only plays if the setting above allows it.</string>
     <plurals name="dfd_ajoutes">
         <item quantity="one">%d added</item>
         <item quantity="other">%d added</item>

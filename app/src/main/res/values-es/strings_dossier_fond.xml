@@ -18,6 +18,9 @@
     <string name="dfd_maintenant">AHORA</string>
     <string name="dfd_service">AnimEngine · Carpeta</string>
     <string name="dfd_desc">Tus fotos y vídeos se turnan: uno nuevo cada vez que vuelves a la pantalla de inicio.</string>
+    <string name="dfd_son_tout">Sonido en todos</string>
+    <string name="dfd_muet_tout">Silenciar todos</string>
+    <string name="dfd_son_expl">Toca 🔊 en un vídeo para activar o quitar su sonido. El sonido solo sale si el ajuste de arriba lo permite.</string>
     <plurals name="dfd_ajoutes">
         <item quantity="one">%d añadido</item>
         <item quantity="other">%d añadidos</item>

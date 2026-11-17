@@ -18,6 +18,9 @@
     <string name="dfd_maintenant">EN CE MOMENT</string>
     <string name="dfd_service">AnimEngine · Dossier</string>
     <string name="dfd_desc">Tes photos et vidéos se relaient : une nouvelle à chaque retour sur l\'écran d\'accueil.</string>
+    <string name="dfd_son_tout">Son pour toutes</string>
+    <string name="dfd_muet_tout">Tout couper</string>
+    <string name="dfd_son_expl">Touche 🔊 sur une vidéo pour activer ou couper son son. Le son ne sort que si le réglage au-dessus le permet.</string>
     <plurals name="dfd_ajoutes">
         <item quantity="one">%d ajouté</item>
         <item quantity="other">%d ajoutés</item>
