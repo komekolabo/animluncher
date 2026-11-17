@@ -4,15 +4,9 @@ import android.app.Activity
 import android.app.AlertDialog
 import android.content.Intent
 import android.graphics.Bitmap
-import android.graphics.BitmapFactory
 import android.graphics.Color
-import android.graphics.ImageDecoder
 import android.graphics.drawable.GradientDrawable
-import android.media.MediaCodec
-import android.media.MediaExtractor
-import android.media.MediaFormat
 import android.media.MediaMetadataRetriever
-import android.media.MediaMuxer
 import android.net.Uri
 import android.os.Build
 import android.os.Bundle
@@ -27,7 +21,6 @@ import android.widget.LinearLayout
 import android.widget.ScrollView
 import android.widget.Toast
 import java.io.File
-import java.nio.ByteBuffer
 import kotlin.math.max
 
 // L'ÉCRAN « FONDS D'ÉCRAN » (carte 3 de l'accueil) — 11/11, étape 1.
@@ -39,7 +32,8 @@ import kotlin.math.max
 //    (vidéo, GIF ou image de son téléphone). Appui long sur un fond importé = le supprimer.
 // Un appui sur une vignette ouvre l'aperçu plein écran (FondApercuActivity), avec le bouton « Appliquer ».
 //
-// L'IMPORT : le fichier choisi est COPIÉ dans le dossier privé de l'app (il reste sur le téléphone) :
+// L'IMPORT : le fichier choisi est COPIÉ dans le dossier privé de l'app (il reste sur le téléphone).
+// (17/11) Le travail de copie est dans ImportFond.kt, partagé avec le « dossier de fonds » (DossierFondActivity) :
 //  - vidéo : on garde seulement la piste vidéo (le son est retiré, sans réencoder : c'est rapide) ;
 //  - image : réduite à la taille de l'écran (une photo énorme gaspillerait de la mémoire) ;
 //  - GIF : copié tel quel (étape 2 : le convertir en vidéo, encore plus économe).
@@ -83,7 +77,7 @@ class FondsActivity : Activity() {
         })
         // 2) mes fonds : « + Importer » puis les fichiers importés
         liste.addView(Style.titreCarte(this, getString(R.string.fd_mes_fonds)).apply { setPadding(px(4f), px(22f), 0, px(10f)) })
-        val cases = mutableListOf<View>(caseImporter(), caseFond3D())
+        val cases = mutableListOf<View>(caseImporter(), caseFond3D(), caseDossier())
         // (13/11) les fonds 3D : leur vignette (apercu.jpg), un badge « 3D »
         for (d in FabriqueFond3D.liste(this)) {
             val miniature = ImageView(this).apply { scaleType = ImageView.ScaleType.CENTER_CROP }
@@ -249,6 +243,30 @@ class FondsActivity : Activity() {
         setOnClickListener { choisirPhoto3D() }
     }
 
+    // (17/11) La case « Dossier » : des photos et des vidéos qui se relaient en fond d'écran (une nouvelle à chaque
+    // retour sur l'accueil). Elle ouvre l'écran du dossier (DossierFondActivity). Sous le titre : combien il y en a.
+    private fun caseDossier(): View = LinearLayout(this).apply {
+        orientation = LinearLayout.VERTICAL
+        gravity = Gravity.CENTER
+        background = GradientDrawable().apply {
+            setColor(Color.argb(10, 255, 255, 255))
+            cornerRadius = px(18f).toFloat()
+            setStroke(px(1.5f), Color.rgb(70, 70, 78), px(6f).toFloat(), px(5f).toFloat())
+        }
+        setPadding(px(8f), 0, px(8f), 0)
+        addView(Style.texte(this@FondsActivity, "⧉", 30f, Style.TEXTE).apply { gravity = Gravity.CENTER })
+        addView(Style.texte(this@FondsActivity, getString(R.string.dfd_case), 14f, Style.TEXTE, gras = true).apply { gravity = Gravity.CENTER })
+        val n = DossierFond.fichiers(this@FondsActivity).size
+        addView(Style.texte(this@FondsActivity,
+            if (n == 0) getString(R.string.dfd_case_expl) else getString(R.string.dfd_nombre, n, DossierFond.MAX),
+            11f, Style.MUET).apply {
+            gravity = Gravity.CENTER
+            setPadding(0, px(6f), 0, 0)
+        })
+        isClickable = true
+        setOnClickListener { startActivity(Intent(this@FondsActivity, DossierFondActivity::class.java)) }
+    }
+
     // Le sélecteur de photos, pour un fond 3D (photos seulement).
     private fun choisirPhoto3D() {
         val intent = if (Build.VERSION.SDK_INT >= 33) Intent(MediaStore.ACTION_PICK_IMAGES).apply { type = "image/*" }
@@ -354,111 +372,12 @@ class FondsActivity : Activity() {
         // une petite fenêtre « Préparation du fond… » pendant la copie (quelques secondes pour une vidéo)
         val attente = AlertDialog.Builder(this).setMessage(getString(R.string.fd_import_en_cours)).setCancelable(false).show()
         Thread {
-            val f = try { importer(uri) } catch (_: Exception) { null }
+            val f = try { ImportFond.importer(this, uri, CarnetFond.dossier(this)) } catch (_: Exception) { null }
             runOnUiThread {
                 attente.dismiss()
                 if (f == null) Toast.makeText(this, getString(R.string.fd_import_rate), Toast.LENGTH_LONG).show()
                 else ouvrirApercu(CarnetFond.sorteDe(f), f.path)
             }
         }.start()
-    }
-
-    // Copie le fichier choisi dans « fonds/ », sous la bonne forme. Renvoie le fichier créé (ou null).
-    private fun importer(uri: Uri): File? {
-        val type = contentResolver.getType(uri) ?: ""
-        val nom = "fond_" + System.currentTimeMillis()
-        val dossier = CarnetFond.dossier(this)
-        return when {
-            type == "image/gif" -> File(dossier, "$nom.gif").also { copier(uri, it) }
-            type.startsWith("video/") -> {
-                val brut = File(cacheDir, "$nom.tmp")
-                copier(uri, brut)
-                val sortie = try { sansSon(brut, dossier, nom) } catch (_: Exception) {
-                    // si le retrait du son échoue (format rare), on garde la vidéo telle quelle (muette à la lecture)
-                    File(dossier, "$nom.mp4").also { brut.copyTo(it, overwrite = true) }
-                }
-                brut.delete()
-                sortie
-            }
-            type.startsWith("image/") -> imageReduite(uri, File(dossier, "$nom.jpg"))
-            else -> null
-        }
-    }
-
-    private fun copier(uri: Uri, vers: File) {
-        contentResolver.openInputStream(uri).use { entree ->
-            requireNotNull(entree)
-            vers.outputStream().use { sortie -> entree.copyTo(sortie) }
-        }
-    }
-
-    // Réduit l'image à la taille de l'écran et l'enregistre en JPEG.
-    private fun imageReduite(uri: Uri, vers: File): File? {
-        val m = resources.displayMetrics
-        val cible = max(m.widthPixels, m.heightPixels)
-        val b: Bitmap = if (Build.VERSION.SDK_INT >= 28) {
-            // ImageDecoder tient compte du sens de la photo (portrait / paysage) tout seul
-            ImageDecoder.decodeBitmap(ImageDecoder.createSource(contentResolver, uri)) { dec, info, _ ->
-                val k = max(info.size.width, info.size.height).toFloat() / cible
-                if (k > 1f) dec.setTargetSize((info.size.width / k).toInt(), (info.size.height / k).toInt())
-                dec.allocator = ImageDecoder.ALLOCATOR_SOFTWARE
-            }
-        } else {
-            contentResolver.openInputStream(uri).use { BitmapFactory.decodeStream(it) } ?: return null
-        }
-        vers.outputStream().use { b.compress(Bitmap.CompressFormat.JPEG, 92, it) }
-        return vers
-    }
-
-    // RETIRER LE SON d'une vidéo sans la réencoder : on recopie seulement la piste vidéo dans un
-    // nouveau fichier (« démultiplexer » puis « multiplexer »). Pourquoi ? Une vidéo avec du son, même
-    // muette, fait croire au téléphone qu'une musique joue (et la réaction sonore s'allumerait).
-    private fun sansSon(brut: File, dossier: File, nom: String): File {
-        val lecteur = MediaExtractor()
-        lecteur.setDataSource(brut.path)
-        var piste = -1
-        var format: MediaFormat? = null
-        for (i in 0 until lecteur.trackCount) {
-            val f = lecteur.getTrackFormat(i)
-            if (f.getString(MediaFormat.KEY_MIME)?.startsWith("video/") == true) { piste = i; format = f; break }
-        }
-        if (piste < 0 || format == null) { lecteur.release(); throw IllegalStateException("pas de vidéo") }
-        val mime = format.getString(MediaFormat.KEY_MIME) ?: ""
-        val webm = mime == "video/x-vnd.on2.vp8" || mime == "video/x-vnd.on2.vp9"
-        val sortie = File(dossier, nom + if (webm) ".webm" else ".mp4")
-        val ecrivain = MediaMuxer(sortie.path,
-            if (webm) MediaMuxer.OutputFormat.MUXER_OUTPUT_WEBM else MediaMuxer.OutputFormat.MUXER_OUTPUT_MPEG_4)
-        try {
-            // le sens de la vidéo (filmée en portrait = souvent « tournée de 90° » dans le fichier)
-            val r = MediaMetadataRetriever()
-            try {
-                r.setDataSource(brut.path)
-                r.extractMetadata(MediaMetadataRetriever.METADATA_KEY_VIDEO_ROTATION)?.toIntOrNull()?.let { ecrivain.setOrientationHint(it) }
-            } catch (_: Exception) {} finally { r.release() }
-            val destination = ecrivain.addTrack(format)
-            ecrivain.start()
-            lecteur.selectTrack(piste)
-            val taille = if (format.containsKey(MediaFormat.KEY_MAX_INPUT_SIZE)) format.getInteger(MediaFormat.KEY_MAX_INPUT_SIZE) else 0
-            val tampon = ByteBuffer.allocate(max(taille, 4 * 1024 * 1024))
-            val info = MediaCodec.BufferInfo()
-            while (true) {
-                val n = lecteur.readSampleData(tampon, 0)
-                if (n < 0) break
-                info.offset = 0
-                info.size = n
-                info.presentationTimeUs = lecteur.sampleTime
-                info.flags = if (lecteur.sampleFlags and MediaExtractor.SAMPLE_FLAG_SYNC != 0) MediaCodec.BUFFER_FLAG_KEY_FRAME else 0
-                ecrivain.writeSampleData(destination, tampon, info)
-                lecteur.advance()
-            }
-            ecrivain.stop()
-        } catch (e: Exception) {
-            sortie.delete()
-            throw e
-        } finally {
-            try { ecrivain.release() } catch (_: Exception) {}
-            lecteur.release()
-        }
-        return sortie
     }
 }

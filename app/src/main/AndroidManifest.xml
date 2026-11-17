@@ -52,6 +52,10 @@
         <activity
             android:name=".FondsActivity"
             android:exported="false" />
+        <!-- (17/11) Le « dossier de fonds » : photos et vidéos qui se relaient. Voir DossierFondActivity.kt. -->
+        <activity
+            android:name=".DossierFondActivity"
+            android:exported="false" />
 
         <!-- L'écran Journal (pas d'icône : on y accède depuis l'écran principal). -->
         <activity
@@ -157,6 +161,21 @@
                 android:name="android.appwidget.provider"
                 android:resource="@xml/widget_groupe_info" />
         </receiver>
+
+        <!-- (17/11) Le fond d'écran « dossier » : photos et vidéos qui se relaient (voir FondDossierService.kt).
+             Comme les deux autres fonds animés : seul Android peut s'y brancher (BIND_WALLPAPER). -->
+        <service
+            android:name=".FondDossierService"
+            android:exported="true"
+            android:label="@string/dfd_service"
+            android:permission="android.permission.BIND_WALLPAPER">
+            <intent-filter>
+                <action android:name="android.service.wallpaper.WallpaperService" />
+            </intent-filter>
+            <meta-data
+                android:name="android.service.wallpaper"
+                android:resource="@xml/fond_dossier" />
+        </service>
 
         <!-- Le KILL SWITCH : un bouton dans le volet des réglages rapides. -->
         <service
