@@ -3,7 +3,7 @@
      Voir CompatiblesActivity.kt. Les autres langues prennent les textes anglais. -->
 <resources>
     <string name="compat_titre">Detected apps</string>
-    <string name="compat_resume">%1$d apps · %2$d with their own animation</string>
+    <string name="compat_resume">%1$d apps · %2$d with an animation</string>
     <string name="compat_animee">Animated</string>
     <string name="compat_coupee">Muted</string>
     <string name="compat_classee">Sorted</string>
@@ -15,4 +15,15 @@
     <string name="compat_tri_couleur">By colour</string>
     <string name="compat_tri_nom">A → Z</string>
     <string name="compat_tri_date">Recent</string>
+    <string name="compat_categorie">Category</string>
+    <string name="compat_anim_categorie">Category animation</string>
+    <string name="compat_par_choix">your choice</string>
+    <string name="compat_par_liste">known list</string>
+    <string name="compat_par_editeur">publisher</string>
+    <string name="compat_par_android">declared to Android</string>
+    <string name="compat_par_moteur">game engine</string>
+    <string name="compat_par_role">app role</string>
+    <string name="compat_par_nom">name</string>
+    <string name="compat_par_paquet">package name</string>
+    <string name="compat_par_service">service</string>
 </resources>
