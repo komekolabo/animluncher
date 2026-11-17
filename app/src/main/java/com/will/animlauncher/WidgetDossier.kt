@@ -29,7 +29,8 @@ import kotlin.math.sin
 import kotlin.math.sqrt
 
 // LE WIDGET « DOSSIER ANIMÉ » AVEC LES VRAIES ICÔNES (10/11, validé par Will sur l'aperçu dossier_1a9.mp4).
-// La boucle de 12 s : le logo respire et fait son geste -> points qui tournent en traçant un anneau ->
+// La boucle de 12 s : le logo respire et fait son geste -> les icônes des apps tournent en traçant un anneau
+// (des points de couleur avant le 17/11) ->
 // tuiles qui ondulent -> le logo renaît. Mais :
 //  - (11/11) CHAQUE DOSSIER A SON LOGO (bulle pour Social, cœur pour Health, engrenages pour Settings…,
 //    voir LogosDossier.kt) ; l'étoile reste celle de l'IA ;
@@ -386,29 +387,42 @@ object WidgetDossier {
             cv.restore()
         }
 
-        // LES POINTS : autant que d'apps, répartis régulièrement sur l'anneau, chacun de la couleur de son app.
-        // Ils jaillissent du centre, font trois quarts de tour, puis filent vers la place de leur icône.
+        // LES APPS QUI TOURNENT (17/11, demande de Will : avant, c'étaient des points de couleur).
+        // Les vraies icônes jaillissent du centre l'une après l'autre (petit ressort), font trois quarts de tour sur
+        // l'anneau en restant DROITES (pour qu'on les reconnaisse), avec un léger halo de leur couleur. Puis elles
+        // filent l'une après l'autre vers leur place en grandissant : arrivées, la tuile (fonction suivante) prend
+        // le relais, à la même taille et au même endroit, donc on ne voit aucun changement.
+        // Sur l'anneau, leur taille dépend de leur nombre, pour ne pas se chevaucher (au plus 16 unités).
+        val tailleAnneau = min(16.0, 0.78 * 2 * Math.PI * 22 / n.coerceAtLeast(1))
         fun points(cv: Canvas, t: Double) {
-            if (t <= 2.0 || t >= 5.4 || n == 0) return
+            if (t <= 2.0 || n == 0) return
             val orbite = cle(t, 2.3 to 0.0 by LIN, 4.5 to 270.0 by DOUX)
-            val sortie = cle(t, 2.0 to 0.0 by LIN, 2.5 to 1.0 by RESSORT)
-            val vol = cle(t, 4.5 to 0.0 by LIN, 5.1 to 1.0 by DOUX)
-            val fondu = 1 - cle(t, 4.9 to 0.0 by LIN, 5.3 to 1.0 by LIN)
             val depart = if (n == 4) -135.0 else -90.0      // 4 apps : sur les diagonales, comme l'ancienne animation
-            p.reset(); p.isAntiAlias = true
+            p.reset(); p.isAntiAlias = true; p.isFilterBitmap = true
+            val zone = RectF()
             for (i in 0 until n) {
+                val fin = arrivee(i)
+                if (t >= fin) continue                        // arrivée à sa place : c'est la tuile qui la dessine
+                val sortie = cle(t, (2.0 + 0.04 * i) to 0.0 by LIN, (2.55 + 0.04 * i) to 1.0 by RESSORT)
+                if (sortie <= 0.001) continue
                 val a = Math.toRadians(orbite + depart + 360.0 * i / n)
                 val ox = CX + 22 * sortie * cos(a); val oy = CY + 22 * sortie * sin(a)
+                val vol = cle(t, (4.5 + 0.05 * i) to 0.0 by LIN, fin to 1.0 by DOUX)   // le trajet vers sa place
                 val x = (ox + (places[i][0] - ox) * vol).toFloat(); val y = (oy + (places[i][1] - oy) * vol).toFloat()
-                p.color = couleurs[i]; p.alpha = (0.19 * fondu * 255).toInt()
-                cv.drawCircle(x, y, 6f, p)
-                p.color = couleurs[i]; p.alpha = (fondu * 255).toInt()
-                cv.drawCircle(x, y, 3.4f, p)
+                val h = (sortie * cle(t, (4.5 + 0.05 * i) to tailleAnneau by LIN, fin to cote.toDouble() by RESSORT) / 2).toFloat()
+                // le halo, qui s'efface pendant le trajet
+                p.color = couleurs[i]; p.alpha = (0.22 * (1 - vol) * 255).toInt()
+                cv.drawCircle(x, y, h * 1.35f, p)
+                p.alpha = 255
+                zone.set(x - h, y - h, x + h, y + h)
+                cv.drawBitmap(icones[i], null, zone, p)
             }
         }
+        // le moment où l'app « i » arrive à sa place (elles arrivent l'une après l'autre)
+        fun arrivee(i: Int) = 5.2 + 0.05 * i
 
-        // LES ICÔNES : elles éclosent (ressort) à 4,8 s, une vague passe deux fois (espacées : 6,9 et 8,6 s),
-        // et elles restent jusqu'à 10,3 s avant de rentrer au centre
+        // LES ICÔNES à leur place : elles prennent le relais des apps qui tournaient (dès leur arrivée), une vague
+        // passe deux fois (espacées : 6,9 et 8,6 s), et elles restent jusqu'à 10,3 s avant de rentrer au centre
         fun tuiles(cv: Canvas, t: Double) {
             if (t >= 11.9) return
             p.reset(); p.isAntiAlias = true; p.isFilterBitmap = true
@@ -416,7 +430,7 @@ object WidgetDossier {
             for (i in 0 until n) {
                 val d = 0.06 * i
                 val vague1 = 6.9 + 0.12 * i; val vague2 = 8.6 + 0.12 * i
-                val sc = cle(t, (4.8 + d) to 0.0 by LIN, (5.3 + d) to 1.0 by RESSORT,
+                val sc = cle(t, (arrivee(i) - 0.001) to 0.0 by LIN, arrivee(i) to 1.0 by LIN,
                              vague1 to 1.0 by LIN, (vague1 + 0.25) to 1.10 by DOUX, (vague1 + 0.5) to 1.0 by DOUX,
                              vague2 to 1.0 by LIN, (vague2 + 0.25) to 1.10 by DOUX, (vague2 + 0.5) to 1.0 by DOUX,
                              (10.3 + d) to 1.0 by LIN, (10.8 + d) to 0.0 by ACC)
