@@ -64,6 +64,12 @@
             android:name=".DossierFondActivity"
             android:exported="false" />
 
+        <!-- (17/11) L'écran caché « Apps détectées » (appui long sur la roue de l'accueil). Voir CompatiblesActivity.kt. -->
+        <activity
+            android:name=".CompatiblesActivity"
+            android:exported="false"
+            android:windowSoftInputMode="adjustResize" />
+
         <!-- L'écran Journal (pas d'icône : on y accède depuis l'écran principal). -->
         <activity
             android:name=".JournalActivity"

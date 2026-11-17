@@ -179,6 +179,12 @@ class Icone(context: Context, private val type: Int) : View(context) {
         val a = context.obtainStyledAttributes(intArrayOf(android.R.attr.selectableItemBackgroundBorderless))
         background = a.getDrawable(0)
         a.recycle()
+        // (17/11, pour Will) un APPUI LONG sur la roue des réglages (en haut à droite de l'accueil) ouvre l'écran
+        // caché « Apps détectées » (CompatiblesActivity). Un appui normal ouvre toujours les réglages.
+        if (type == ROUE) setOnLongClickListener {
+            context.startActivity(android.content.Intent(context, CompatiblesActivity::class.java))
+            true
+        }
     }
 
     override fun onDraw(c: Canvas) {
