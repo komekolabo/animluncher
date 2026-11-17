@@ -7,8 +7,10 @@ import android.content.Context
 // le nombre qu'on lui donne est le numéro de la variante (pour les apps qui en ont plusieurs).
 // "variantes" = le nom de chaque variante (liste vide si l'app n'a qu'une animation).
 // "actifParDefaut" = false : l'animation existe mais est désactivée de base (on peut l'activer dans les options).
+// "parCategorie" (17/11) : rempli pour une ANIMATION DE CATÉGORIE (l'app n'a pas d'animation à elle, elle reçoit celle
+// de sa catégorie, voir ScenesCategories.kt) ; null pour une animation faite exprès pour l'app.
 class Entree(val categorie: Categorie, val fabrique: (Int) -> Scene, val variantes: List<String> = emptyList(),
-             val actifParDefaut: Boolean = true) {
+             val actifParDefaut: Boolean = true, val parCategorie: String? = null) {
     // La durée par défaut (apparition + révélation), en millisecondes.
     val dureeDefaut: Int get() = (categorie.intro + categorie.revelation).toInt()
 }
@@ -33,7 +35,12 @@ fun gemini(numero: Int): Scene = when (numero) {
 object Catalogue {
     // Le film de la collision de galaxies est long à calculer : on le prépare en arrière-plan dès le départ.
     // Pareil pour les décors d'Instagram (les fonds des vidéos et le mur dans la nuit) : dessinés une fois.
-    init { FilmCollision.preparer(); FondsReels.preparer(); FondsMur.preparer() }
+    init {
+        FilmCollision.preparer(); FondsReels.preparer(); FondsMur.preparer()
+        // (17/11) le protocole de classement demande à Android la liste des rôles et des services des apps :
+        // on la prépare tout de suite, en arrière-plan, pour que le premier appui ne soit pas ralenti.
+        Thread { AnimApp.contexte?.let { Classement.preparer(it) } }.start()
+    }
 
     private val E = Categorie.ESSENTIELLE
     private val C = Categorie.COURANTE
@@ -157,7 +164,30 @@ object Catalogue {
         "com.wizway.nfcagent" to off(S) { SansContact() },
     )
 
-    fun pour(app: String): Entree? = entrees[app]
+    // L'animation d'une app : la sienne si elle en a une, sinon (17/11) celle de sa catégorie.
+    fun pour(app: String): Entree? = entrees[app] ?: deCategorie(app)
+
+    // Seulement les animations faites exprès pour l'app (sans les animations de catégorie).
+    fun propre(app: String): Entree? = entrees[app]
+
+    // LES ANIMATIONS DE CATÉGORIE (17/11, demande de Will). Une app sans animation à elle, mais que le protocole
+    // de classement (Classement.kt) range dans une catégorie, reçoit l'animation de sa catégorie, avec SON icône
+    // et SA couleur (voir ScenesCategories.kt). Seulement pour les apps qu'on ouvre depuis une icône.
+    // Elles sont « secondaires » (courtes) : la démo de l'accueil les laisse de côté (voir DemoAccueil).
+    // On garde chaque entrée préparée (une par app et par catégorie) pour ne pas la refaire à chaque fois.
+    private val memoCategories = java.util.concurrent.ConcurrentHashMap<String, Entree>()
+
+    private fun deCategorie(app: String): Entree? {
+        val c = AnimApp.contexte ?: return null
+        if (app == c.packageName) return null
+        return try {
+            val id = Classement.categorieFinale(c, app)?.first ?: return null
+            if (id !in AnimCategorie.IDS || !Classement.lanceable(c, app)) return null
+            memoCategories.getOrPut("$id|$app") {
+                Entree(Categorie.SECONDAIRE, { _ -> AnimCategorie(id, Apparence.de(c, app)) }, parCategorie = id)
+            }
+        } catch (_: Throwable) { null }
+    }
 
     // (17/11, demande de Will) LA VITESSE PAR DÉFAUT des animations d'apps : « Rapide », c'est-à-dire 60 % de la
     // durée prévue pour l'app (comme le bouton Rapide de l'écran de réglage d'une app, voir ReglageAppActivity).
@@ -171,7 +201,7 @@ object Catalogue {
     // Renvoie null s'il ne faut rien jouer : pas d'animation pour cette app, animation
     // désactivée, durée réglée à 0 s, ou toutes les variantes décochées.
     fun lancement(c: Context, app: String): Lancement? {
-        val e = entrees[app] ?: return null
+        val e = pour(app) ?: return null
         if (!Reglages.appActive(c, app)) return null
         // (17/11) rien de choisi pour cette app : la vitesse « Rapide » (demande de Will), plus « Normale »
         val ms = Reglages.duree(c, app).let { if (it < 0) dureeParDefaut(e) else it }
