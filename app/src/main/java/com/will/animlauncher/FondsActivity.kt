@@ -96,6 +96,8 @@ class FondsActivity : Activity() {
             })
         }
         grille(cases)
+        // 2 bis) (17/11) le son des fonds vidéo : sans son / avec écouteurs / toujours (voir SonFond.kt)
+        liste.addView(SonFond.vue(this))
         // 3) l'astuce batterie
         liste.addView(Style.texte(this, getString(R.string.fd_astuce), 13f, Style.MUET).apply {
             setLineSpacing(0f, 1.2f)
@@ -331,7 +333,7 @@ class FondsActivity : Activity() {
     private fun proposerSuppression(f: File) {
         AlertDialog.Builder(this)
             .setTitle(getString(R.string.fd_supprimer_q))
-            .setPositiveButton(getString(R.string.fd_supprimer)) { _, _ -> f.deleteRecursively(); construire() }
+            .setPositiveButton(getString(R.string.fd_supprimer)) { _, _ -> ImportFond.supprimer(f); construire() }
             .setNegativeButton(getString(R.string.fd_annuler), null)
             .show()
     }
