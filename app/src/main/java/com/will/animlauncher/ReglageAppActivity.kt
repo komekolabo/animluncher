@@ -35,7 +35,8 @@ class ReglageAppActivity : Activity() {
     private fun px(v: Float) = Style.px(this, v)
 
     // Les 3 vitesses : leur nom, et par combien on multiplie la durée normale de l'animation.
-    // (Normale = la durée prévue pour cette app, rangée comme « -1 » dans les réglages.)
+    // (17/11) Rapide est la vitesse PAR DÉFAUT : elle est rangée comme « -1 » (= rien de choisi) dans les réglages.
+    // Normale et Lente sont rangées en millisecondes. (Avant le 17/11, c'était Normale qui était par défaut.)
     // (« by lazy » : la liste est fabriquée à la première utilisation, quand l'écran existe et
     // peut donc lire ses textes dans la langue du téléphone.)
     private val NOMS by lazy { listOf(getString(R.string.rapide), getString(R.string.normale), getString(R.string.lente)) }
@@ -90,8 +91,8 @@ class ReglageAppActivity : Activity() {
                 gravity = Gravity.CENTER
                 isClickable = true
                 setOnClickListener {
-                    // Normale -> on efface le choix (-1) ; sinon on range la durée en millisecondes
-                    val ms = if (i == 1) -1 else Math.round(entree.dureeDefaut * FACTEURS[i])
+                    // Rapide -> on efface le choix (-1 = la vitesse par défaut) ; sinon on range la durée en millisecondes
+                    val ms = if (i == 0) -1 else Math.round(entree.dureeDefaut * FACTEURS[i])
                     Reglages.definirDuree(this@ReglageAppActivity, pkg, ms)
                     majVitesse()
                 }
@@ -200,14 +201,14 @@ class ReglageAppActivity : Activity() {
         majVitesse()
     }
 
-    // La durée réglée pour cette app, en millisecondes (la durée normale si rien n'est choisi).
-    private fun dureeMs(): Int = Reglages.duree(this, pkg).let { if (it < 0) entree.dureeDefaut else it }
+    // La durée réglée pour cette app, en millisecondes (la durée « Rapide » si rien n'est choisi).
+    private fun dureeMs(): Int = Reglages.duree(this, pkg).let { if (it < 0) Catalogue.dureeParDefaut(entree) else it }
 
     // Quelle vitesse est choisie ? 0 = Rapide, 1 = Normale, 2 = Lente, -1 = aucune (durée à 0).
     // (Une ancienne durée réglée au curseur est rangée dans la vitesse la plus proche.)
     private fun vitesseChoisie(): Int {
         val choisie = Reglages.duree(this, pkg)
-        if (choisie < 0) return 1
+        if (choisie < 0) return 0                       // rien de choisi = Rapide (par défaut)
         if (choisie == 0) return -1
         val rapport = choisie.toFloat() / entree.dureeDefaut
         return if (rapport < 0.8f) 0 else if (rapport > 1.3f) 2 else 1

@@ -159,6 +159,11 @@ object Catalogue {
 
     fun pour(app: String): Entree? = entrees[app]
 
+    // (17/11, demande de Will) LA VITESSE PAR DÉFAUT des animations d'apps : « Rapide », c'est-à-dire 60 % de la
+    // durée prévue pour l'app (comme le bouton Rapide de l'écran de réglage d'une app, voir ReglageAppActivity).
+    const val VITESSE_DEFAUT = 0.6f
+    fun dureeParDefaut(e: Entree): Int = Math.round(e.dureeDefaut * VITESSE_DEFAUT)
+
     // L'animation de cette app est-elle activée de base ? (oui, sauf les apps marquées off)
     fun actifParDefaut(app: String): Boolean = entrees[app]?.actifParDefaut ?: true
 
@@ -168,7 +173,8 @@ object Catalogue {
     fun lancement(c: Context, app: String): Lancement? {
         val e = entrees[app] ?: return null
         if (!Reglages.appActive(c, app)) return null
-        val ms = Reglages.duree(c, app).let { if (it < 0) e.dureeDefaut else it }
+        // (17/11) rien de choisi pour cette app : la vitesse « Rapide » (demande de Will), plus « Normale »
+        val ms = Reglages.duree(c, app).let { if (it < 0) dureeParDefaut(e) else it }
         if (ms <= 0) return null
         var numero = -1
         if (e.variantes.isNotEmpty()) {
