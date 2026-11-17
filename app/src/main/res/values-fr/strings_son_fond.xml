@@ -6,4 +6,5 @@
     <string name="son_fond_ecouteurs">Écouteurs</string>
     <string name="son_fond_toujours">Toujours</string>
     <string name="son_fond_expl">Pour les fonds vidéo. « Écouteurs » : seulement quand des écouteurs sont branchés. « Toujours » : aussi par le haut-parleur du téléphone et les enceintes Bluetooth. Les vidéos importées avant cette version n\'ont pas de son : importe-les à nouveau.</string>
+    <string name="son_fond_pas_de_son">Cette vidéo n\'a pas de son enregistré. Si elle en a un, importe-la à nouveau.</string>
 </resources>

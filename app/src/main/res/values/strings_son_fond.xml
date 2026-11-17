@@ -6,4 +6,5 @@
     <string name="son_fond_ecouteurs">Headphones</string>
     <string name="son_fond_toujours">Always</string>
     <string name="son_fond_expl">For video wallpapers. “Headphones”: only when headphones are connected. “Always”: also through the phone speaker and Bluetooth speakers. Videos imported before this version have no sound: import them again.</string>
+    <string name="son_fond_pas_de_son">This video has no saved sound. If it does have sound, import it again.</string>
 </resources>

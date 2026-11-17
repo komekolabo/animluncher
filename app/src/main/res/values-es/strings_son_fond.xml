@@ -6,4 +6,5 @@
     <string name="son_fond_ecouteurs">Auriculares</string>
     <string name="son_fond_toujours">Siempre</string>
     <string name="son_fond_expl">Para los fondos de vídeo. «Auriculares»: solo con auriculares conectados. «Siempre»: también por el altavoz del teléfono y los altavoces Bluetooth. Los vídeos importados antes de esta versión no tienen sonido: vuelve a importarlos.</string>
+    <string name="son_fond_pas_de_son">Este vídeo no tiene sonido guardado. Si tiene sonido, vuelve a importarlo.</string>
 </resources>

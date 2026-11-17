@@ -6,4 +6,5 @@
     <string name="son_fond_ecouteurs">Cuffie</string>
     <string name="son_fond_toujours">Sempre</string>
     <string name="son_fond_expl">Per gli sfondi video. «Cuffie»: solo con le cuffie collegate. «Sempre»: anche dall\'altoparlante del telefono e dalle casse Bluetooth. I video importati prima di questa versione non hanno audio: importali di nuovo.</string>
+    <string name="son_fond_pas_de_son">Questo video non ha audio salvato. Se ce l\'ha, importalo di nuovo.</string>
 </resources>

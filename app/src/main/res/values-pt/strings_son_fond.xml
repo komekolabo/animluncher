@@ -6,4 +6,5 @@
     <string name="son_fond_ecouteurs">Fones</string>
     <string name="son_fond_toujours">Sempre</string>
     <string name="son_fond_expl">Para papéis de parede em vídeo. “Fones”: só com fones conectados. “Sempre”: também pelo alto-falante do celular e caixas de som Bluetooth. Vídeos importados antes desta versão não têm som: importe-os de novo.</string>
+    <string name="son_fond_pas_de_son">Este vídeo não tem som salvo. Se ele tiver som, importe-o de novo.</string>
 </resources>

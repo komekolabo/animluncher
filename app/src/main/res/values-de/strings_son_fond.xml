@@ -6,4 +6,5 @@
     <string name="son_fond_ecouteurs">Kopfhörer</string>
     <string name="son_fond_toujours">Immer</string>
     <string name="son_fond_expl">Für Video-Hintergründe. „Kopfhörer“: nur wenn Kopfhörer verbunden sind. „Immer“: auch über den Lautsprecher des Telefons und Bluetooth-Lautsprecher. Vor dieser Version importierte Videos haben keinen Ton: importiere sie erneut.</string>
+    <string name="son_fond_pas_de_son">Für dieses Video ist kein Ton gespeichert. Falls es Ton hat, importiere es erneut.</string>
 </resources>
