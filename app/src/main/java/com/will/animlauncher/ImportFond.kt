@@ -31,9 +31,20 @@ object ImportFond {
             type.startsWith("video/") -> {
                 val brut = File(c.cacheDir, "$nom.tmp")
                 copier(c, uri, brut)
+                var muette = true
                 val sortie = try { sansSon(brut, dossier, nom) } catch (_: Exception) {
                     // si le retrait du son échoue (format rare), on garde la vidéo telle quelle (muette à la lecture)
+                    muette = false
                     File(dossier, "$nom.mp4").also { brut.copyTo(it, overwrite = true) }
+                }
+                // (17/11) si la vidéo avait du son, on garde AUSSI l'originale, avec son son, dans le sous-dossier
+                // « son/ » : elle est jouée quand l'utilisateur permet le son des fonds (voir SonFond.kt)
+                if (muette && aDuSon(brut)) {
+                    try {
+                        val avecSon = SonFond.avecSon(sortie)
+                        avecSon.parentFile?.mkdirs()
+                        brut.copyTo(avecSon, overwrite = true)
+                    } catch (_: Exception) {}
                 }
                 brut.delete()
                 sortie
@@ -41,6 +52,21 @@ object ImportFond {
             type.startsWith("image/") -> imageReduite(c, uri, File(dossier, "$nom.jpg"))
             else -> null
         }
+    }
+
+    // SUPPRIMER un fond importé (17/11) : le fichier (ou le dossier d'un fond 3D) ET sa version avec le son.
+    fun supprimer(f: File) {
+        SonFond.avecSon(f).delete()
+        f.deleteRecursively()
+    }
+
+    // La vidéo a-t-elle une piste son ?
+    private fun aDuSon(f: File): Boolean {
+        val lecteur = MediaExtractor()
+        return try {
+            lecteur.setDataSource(f.path)
+            (0 until lecteur.trackCount).any { lecteur.getTrackFormat(it).getString(MediaFormat.KEY_MIME)?.startsWith("audio/") == true }
+        } catch (_: Exception) { false } finally { lecteur.release() }
     }
 
     private fun copier(c: Context, uri: Uri, vers: File) {
