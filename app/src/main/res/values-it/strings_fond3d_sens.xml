@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- (17/11) Le SENS DU MOUVEMENT d'un fond 3D (italiano) : comme le téléphone ou inversé. Voir FondProfondeur.kt. -->
+<resources>
+    <string name="fd_3d_sens">Direzione del movimento:</string>
+    <string name="fd_3d_sens_normal">Come il telefono</string>
+    <string name="fd_3d_sens_inverse">Invertito</string>
+</resources>

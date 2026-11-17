@@ -108,6 +108,17 @@ class FondProfondeur(c: Context, dossier: String) : DessinFond() {
     private var py = 0f
     private val inclinaison = Inclinaison(c) { reveil?.invoke() }
 
+    // (17/11, demande de Will) LE SENS DU MOUVEMENT : « comme le téléphone » (de base : le sujet part du côté où
+    // l'on penche, le fond à l'opposé) ou « inversé » (tout part dans l'autre sens). Le choix est rangé dans le
+    // carnet des fonds (case « dessin_inverse ») ; l'aperçu peut le changer en direct (inverse = true / false).
+    var inverse = CarnetFond.carnet(c).getBoolean(CLE_INVERSE, false)
+    private val sens get() = if (inverse) -1f else 1f
+
+    companion object {
+        // (le préfixe « dessin_ » fait que le service du fond d'écran se recharge quand le choix change)
+        const val CLE_INVERSE = CarnetFond.PREFIXE_DESSIN + "inverse"
+    }
+
     private val filtre = Paint(Paint.FILTER_BITMAP_FLAG or Paint.ANTI_ALIAS_FLAG)
     private val voile = Paint()
     private val pLueur = Paint(Paint.ANTI_ALIAS_FLAG)
@@ -120,14 +131,15 @@ class FondProfondeur(c: Context, dossier: String) : DessinFond() {
     override fun arreter() = inclinaison.arreter()
 
     // au repos = les calques sont arrivés là où le capteur les veut : plus besoin de redessiner
-    override fun auRepos() = abs(inclinaison.x - px) < 0.002f && abs(inclinaison.y - py) < 0.002f
+    override fun auRepos() = abs(inclinaison.x * sens - px) < 0.002f && abs(inclinaison.y * sens - py) < 0.002f
 
     override fun dessiner(c: Canvas, w: Float, h: Float, t: Float, dp: Float) {
         val f = fond ?: return
         val s = sujet ?: return
         // rattraper le capteur : 12 % du chemin à chaque image (mouvement souple, sans à-coups)
-        px += (inclinaison.x - px) * 0.12f
-        py += (inclinaison.y - py) * 0.12f
+        // (en sens inversé, on prend l'inclinaison à l'envers : tous les calques partent dans l'autre sens)
+        px += (inclinaison.x * sens - px) * 0.12f
+        py += (inclinaison.y * sens - py) * 0.12f
         if (w != wCache || h != hCache) {
             pLueur.shader = RadialGradient(w / 2f, h * 0.5f, w * 0.6f,
                 intArrayOf(Color.argb(38, 255, 236, 220), Color.TRANSPARENT), null, Shader.TileMode.CLAMP)
