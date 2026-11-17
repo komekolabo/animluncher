@@ -101,7 +101,7 @@ object DossierFond {
 
     // RETIRER un fond du dossier.
     fun retirer(c: Context, f: File) {
-        f.delete()
+        ImportFond.supprimer(f)                          // (et sa version avec le son, s'il y en a une)
         if (carnet(c).getString(COURANT, null) == f.name) {
             carnet(c).edit().putString(COURANT, fichiers(c).firstOrNull()?.name).apply()
         } else signalerChangement(c)
