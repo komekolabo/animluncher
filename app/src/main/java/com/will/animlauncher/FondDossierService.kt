@@ -51,6 +51,7 @@ import kotlin.math.min
 //
 // LE SON (17/11) : comme le fond « Vidéo », une vidéo est muette, sauf si l'utilisateur permet le son des fonds
 // (sans son / avec écouteurs / toujours, voir SonFond.kt) : on joue alors sa version avec le son.
+// En plus, chaque vidéo du dossier peut avoir son son coupé à part (DossierFond.estMuette) : elle reste muette.
 //
 // LES ÉCONOMIES : rien ne tourne quand le fond est caché (la vidéo est en pause ; une photo n'est dessinée
 // qu'une fois) ; un seul fichier est chargé à la fois.
@@ -92,7 +93,7 @@ class FondDossierService : WallpaperService() {
             val permis = son.permis
             gl.post {
                 rendu?.liberer()
-                rendu = try { RenduDossier(surface) } catch (e: Exception) {
+                rendu = try { RenduDossier(surface) { DossierFond.estMuette(ctx, it) } } catch (e: Exception) {
                     DiagFond.noter(ctx, "f_erreur" to ((e.message ?: e.javaClass.simpleName)).take(80))
                     null
                 }
@@ -161,7 +162,8 @@ class FondDossierService : WallpaperService() {
 
         // Le carnet a changé : un autre fond est « en cours » (ou la collection a changé) -> on l'affiche.
         override fun onSharedPreferenceChanged(p: SharedPreferences?, cle: String?) {
-            if (cle != null && cle != DossierFond.COURANT && cle != "change") return
+            // (« muettes » : le son d'une vidéo vient d'être coupé ou remis)
+            if (cle != null && cle != DossierFond.COURANT && cle != "change" && cle != DossierFond.MUETTES) return
             val f = DossierFond.courant(ctx)
             val vis = visible && !gardien.surchauffe
             val permis = son.permis
@@ -173,7 +175,8 @@ class FondDossierService : WallpaperService() {
 // =============================================================================================
 // LE DESSIN AVEC LA CARTE GRAPHIQUE. Tout ici se passe sur le fil « fond-dossier ».
 // =============================================================================================
-class RenduDossier(surface: Surface) {
+// « muette » : dit si le son d'une vidéo a été coupé à part dans le dossier (alors on joue toujours sa version muette).
+class RenduDossier(surface: Surface, private val muette: (File) -> Boolean) {
     // EGL = le « branchement » entre OpenGL et l'écran : un affichage, un contexte (la mémoire de dessin
     // d'OpenGL) et une fenêtre (notre surface de fond d'écran).
     private val affichage: EGLDisplay
@@ -252,7 +255,7 @@ class RenduDossier(surface: Surface) {
         sonPermis = permis
         // c'est déjà lui : rien à recharger
         if (f != null && f == fichier && (texPhoto != 0 || lecteur != null)) {
-            if (estVideo && SonFond.fichierAJouer(f, permis).path != joue) son(permis) else montrer(vis)
+            if (estVideo && aJouer(f, permis).path != joue) son(permis) else montrer(vis)
             return
         }
         vider()
@@ -280,7 +283,7 @@ class RenduDossier(surface: Surface) {
     fun son(permis: Boolean) {
         sonPermis = permis
         val f = fichier ?: return
-        if (!estVideo || SonFond.fichierAJouer(f, permis).path == joue) return
+        if (!estVideo || aJouer(f, permis).path == joue) return
         reprise = try { lecteur?.currentPosition ?: 0 } catch (_: Exception) { 0 }
         vider()
         fichier = f
@@ -288,6 +291,9 @@ class RenduDossier(surface: Surface) {
         ouvrirVideo(f)
         dessiner()
     }
+
+    // La version à jouer : avec le son seulement si le son est permis ET que cette vidéo n'est pas coupée.
+    private fun aJouer(f: File, permis: Boolean): File = SonFond.fichierAJouer(f, permis && !muette(f))
 
     // UNE PHOTO : on la charge (réduite si besoin), on la range dans une texture, puis on oublie l'image.
     private fun ouvrirPhoto(f: File) {
@@ -332,7 +338,7 @@ class RenduDossier(surface: Surface) {
         val sv = Surface(st)
         surfaceVideo = sv
         // la version muette, ou celle avec le son si le son est permis (et qu'elle existe)
-        val source = SonFond.fichierAJouer(f, sonPermis)
+        val source = aJouer(f, sonPermis)
         avecSon = source.path != f.path
         joue = source.path
         val mp = MediaPlayer()

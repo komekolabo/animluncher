@@ -19,6 +19,9 @@ import java.io.File
 //    et le dernier montré n'est jamais tiré deux fois de suite.
 //  - LE FOND EN COURS : retenu dans le carnet « dossier_fond » (case « courant »). Quand il change, le service
 //    du fond d'écran le voit tout de suite (il écoute le carnet) et affiche le nouveau.
+//  - (17/11) LE SON VIDÉO PAR VIDÉO : le réglage général « Son des fonds » (SonFond.kt) dit si le son PEUT sortir
+//    (jamais / avec écouteurs / toujours) ; en plus, chaque vidéo du dossier peut être coupée à part (le petit
+//    haut-parleur sur sa miniature). Les vidéos coupées sont retenues dans la case « muettes » du carnet.
 object DossierFond {
     const val MAX = 100                          // au plus 100 photos et vidéos dans le dossier
     const val COURANT = "courant"                // la case du carnet qui dit quel fond est affiché
@@ -79,6 +82,24 @@ object DossierFond {
         e.putString(COURANT, suivant).apply()
     }
 
+    // (17/11) Le son de CETTE vidéo est-il coupé ? (par défaut : non, elle suit le réglage général)
+    const val MUETTES = "muettes"
+    fun estMuette(c: Context, f: File): Boolean = carnet(c).getStringSet(MUETTES, emptySet())?.contains(f.name) == true
+
+    // Coupe ou remet le son d'une vidéo. Renvoie le nouvel état (true = coupée).
+    fun basculerMuette(c: Context, f: File): Boolean {
+        val muettes = HashSet(carnet(c).getStringSet(MUETTES, emptySet()) ?: emptySet())
+        val coupee = if (f.name in muettes) { muettes.remove(f.name); false } else { muettes.add(f.name); true }
+        carnet(c).edit().putStringSet(MUETTES, muettes).apply()
+        return coupee
+    }
+
+    // Coupe (true) ou remet (false) le son de TOUTES les vidéos du dossier d'un coup.
+    fun toutesMuettes(c: Context, couper: Boolean) {
+        val muettes = if (couper) fichiers(c).filter { estVideo(it) }.map { it.name }.toHashSet() else HashSet<String>()
+        carnet(c).edit().putStringSet(MUETTES, muettes).apply()
+    }
+
     // AJOUTER des photos et des vidéos choisies dans la galerie. Renvoie combien ont été ajoutées.
     // (Peut prendre quelques secondes par vidéo : à appeler en arrière-plan.)
     fun ajouter(c: Context, uris: List<Uri>): Int {
@@ -102,6 +123,7 @@ object DossierFond {
     // RETIRER un fond du dossier.
     fun retirer(c: Context, f: File) {
         ImportFond.supprimer(f)                          // (et sa version avec le son, s'il y en a une)
+        if (estMuette(c, f)) basculerMuette(c, f)        // on l'oublie aussi dans la liste des vidéos coupées
         if (carnet(c).getString(COURANT, null) == f.name) {
             carnet(c).edit().putString(COURANT, fichiers(c).firstOrNull()?.name).apply()
         } else signalerChangement(c)
