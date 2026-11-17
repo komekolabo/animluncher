@@ -97,6 +97,8 @@ class DossierFondActivity : Activity() {
                 setOnCheckedChangeListener { _, oui -> DossierFond.mettreAuHasard(this@DossierFondActivity, oui) }
             })
         })
+        // 3 bis) (17/11) le son des vidéos du dossier (le même réglage que dans « Fonds d'écran », voir SonFond.kt)
+        liste.addView(SonFond.vue(this))
         // 4) les miniatures (ou un message si le dossier est vide)
         liste.addView(Style.titreCarte(this, getString(R.string.dfd_nombre, fichiers.size, DossierFond.MAX)).apply {
             setPadding(px(4f), px(16f), 0, px(10f))
