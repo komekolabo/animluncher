@@ -24,11 +24,12 @@ import android.widget.TextView
 // Toutes les apps installées qui ont une icône, avec :
 //  - un POINT DE COULEUR qui dit ce qu'AnimEngine sait faire avec l'app :
 //      vert   = elle a sa propre animation d'ouverture, et elle est allumée ;
-//      bleu   = elle a sa propre animation, mais elle est coupée (de base ou par toi) ;
-//      ambre  = pas d'animation à elle, mais elle est rangée dans une catégorie (IA, Social…) : elle va dans les
-//               dossiers animés et la démo de l'accueil sait la classer ;
-//      gris   = rien de spécial (« Non répertorié ») ;
-//  - son nom, et une 2e ligne qui détaille (variantes, vitesse, catégorie) ;
+//      ambre  = (17/11) pas d'animation à elle, mais elle est rangée dans une catégorie (IA, Social…) : elle reçoit
+//               l'ANIMATION DE SA CATÉGORIE, avec son icône et sa couleur (voir ScenesCategories.kt) ;
+//      bleu   = elle a une animation (à elle ou de catégorie), mais elle est coupée (de base ou par toi) ;
+//      gris   = rien : le protocole de classement n'a trouvé aucune catégorie (« Non répertorié ») ;
+//  - son nom, et une 2e ligne qui détaille (variantes, vitesse, catégorie, et COMMENT la catégorie a été trouvée :
+//    par notre liste, l'éditeur, le nom… voir Classement.kt) ;
 //  - une recherche (même façon de chercher que l'écran « Animations d'apps », voir Rayons.rang) ;
 //  - la LÉGENDE en haut sert aussi de FILTRE : un appui sur une couleur ne montre que ces apps (un 2e appui : toutes) ;
 //  - trois boutons de TRI sous la recherche (17/11) : par couleur (de base), de A à Z, ou les plus récemment
@@ -39,8 +40,8 @@ class CompatiblesActivity : Activity() {
     // Ce que l'app peut faire, du mieux au moins bien (c'est aussi l'ordre de la légende).
     private enum class Etat(val couleur: Int, val texte: Int) {
         ANIMEE(Color.rgb(74, 222, 128), R.string.compat_animee),
+        CATEGORIE(Color.rgb(251, 191, 36), R.string.compat_categorie),
         COUPEE(Color.rgb(96, 165, 250), R.string.compat_coupee),
-        CLASSEE(Color.rgb(251, 191, 36), R.string.compat_classee),
         RIEN(Color.rgb(113, 113, 122), R.string.compat_rien),
     }
 
@@ -148,7 +149,7 @@ class CompatiblesActivity : Activity() {
             // un appui sur une app qui a une animation : ses réglages
             setOnItemClickListener { _, _, position, _ ->
                 val l = lignes[position]
-                if (l.etat == Etat.ANIMEE || l.etat == Etat.COUPEE) {
+                if (l.etat != Etat.RIEN) {
                     startActivity(Intent(this@CompatiblesActivity, ReglageAppActivity::class.java)
                         .putExtra("pkg", l.pkg).putExtra("nom", l.nom))
                 }
@@ -185,7 +186,6 @@ class CompatiblesActivity : Activity() {
     // Toutes les apps qui ont une icône, avec leur état et leur détail.
     private fun charger(): List<Ligne> {
         val pm = packageManager
-        val ajouts = Rayons.ajouts(this)
         val intention = Intent(Intent.ACTION_MAIN).addCategory(Intent.CATEGORY_LAUNCHER)
         val vues = HashSet<String>()
         val resultat = ArrayList<Ligne>()
@@ -193,28 +193,49 @@ class CompatiblesActivity : Activity() {
             val pkg = info.activityInfo.packageName
             if (pkg == packageName || !vues.add(pkg)) continue        // pas nous-mêmes, et chaque app une seule fois
             val nom = info.loadLabel(pm).toString().trim()
-            val categorie = Rayons.categorieDe(this, pkg, nom, ajouts)
-            val nomCategorie = Rayons.nom(this, categorie)
+            // la catégorie, et COMMENT le protocole l'a trouvée (null = aucune catégorie)
+            val trouvee = Classement.categorieFinale(this, pkg)
+            val categorie = trouvee?.first ?: Rayons.AUTRES
             val entree = Catalogue.pour(pkg)
             val etat: Etat
             val morceaux = ArrayList<String>()
             if (entree != null) {
                 val allumee = Reglages.appActive(this, pkg) && Reglages.duree(this, pkg) != 0
-                etat = if (allumee) Etat.ANIMEE else Etat.COUPEE
-                morceaux.add(getString(if (allumee) R.string.compat_animation else R.string.compat_animation_coupee))
+                etat = when {
+                    !allumee -> Etat.COUPEE
+                    entree.parCategorie != null -> Etat.CATEGORIE
+                    else -> Etat.ANIMEE
+                }
+                morceaux.add(getString(when {
+                    entree.parCategorie != null -> R.string.compat_anim_categorie
+                    allumee -> R.string.compat_animation
+                    else -> R.string.compat_animation_coupee
+                }))
                 if (entree.variantes.isNotEmpty()) morceaux.add(getString(R.string.compat_variantes, entree.variantes.size))
                 if (allumee) morceaux.add(vitesse(pkg, entree))
             } else {
-                etat = if (categorie == Rayons.AUTRES) Etat.RIEN else Etat.CLASSEE
-                if (etat == Etat.CLASSEE) morceaux.add(getString(R.string.compat_sans_animation))
+                etat = Etat.RIEN
             }
-            morceaux.add(nomCategorie)
+            morceaux.add(Rayons.nom(this, categorie) + (trouvee?.let { " (" + getString(raison(it.second)) + ")" } ?: ""))
             // la date de 1re installation (si Android refuse de la donner : 0, l'app ira en fin de liste)
             val installe = try { pm.getPackageInfo(pkg, 0).firstInstallTime } catch (_: Exception) { 0L }
             resultat.add(Ligne(nom, pkg, etat, morceaux.joinToString(" · "), installe))
         }
         // l'ordre de la liste est choisi plus tard, dans afficher() (selon le bouton de tri)
         return resultat
+    }
+
+    // Comment la catégorie a été trouvée (voir les 8 questions de Classement.kt), en quelques mots.
+    private fun raison(source: String): Int = when (source) {
+        Classement.CHOIX -> R.string.compat_par_choix
+        Classement.LISTE -> R.string.compat_par_liste
+        Classement.EDITEUR -> R.string.compat_par_editeur
+        Classement.ANDROID -> R.string.compat_par_android
+        Classement.MOTEUR -> R.string.compat_par_moteur
+        Classement.ROLE -> R.string.compat_par_role
+        Classement.PAQUET -> R.string.compat_par_paquet
+        Classement.SERVICE -> R.string.compat_par_service
+        else -> R.string.compat_par_nom
     }
 
     // Le nom de la vitesse choisie pour une app (Rapide, Normale, Lente), comme dans ses réglages.
@@ -244,7 +265,7 @@ class CompatiblesActivity : Activity() {
         lignes = l
         adaptateur.notifyDataSetChanged()
         // le résumé : combien d'apps en tout, et combien de chaque couleur (dans la légende)
-        resume.text = getString(R.string.compat_resume, toutes.size, toutes.count { it.etat == Etat.ANIMEE || it.etat == Etat.COUPEE })
+        resume.text = getString(R.string.compat_resume, toutes.size, toutes.count { it.etat != Etat.RIEN })
         // le bouton de tri choisi a un fond clair, les autres le fond des cartes
         for (b in boutonsTri) {
             val actif = b.tag == tri

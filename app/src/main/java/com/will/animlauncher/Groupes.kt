@@ -113,13 +113,10 @@ object Groupes {
 
     // LA CATÉGORIE D'UNE APP (les 3 tests expliqués en haut du fichier), ou null si aucun ne marche.
     // « code » = la catégorie qu'Android connaît pour l'app ; « nom » = son nom affiché (« Samsung Health »).
-    fun trouver(pkg: String, code: Int, nom: String): Categorie? {
-        CATEGORIES.firstOrNull { pkg in it.connues }?.let { return it }
-        CATEGORIES.firstOrNull { code in it.android }?.let { return it }
-        // le nom découpé en mots : « Samsung Health » → [« samsung », « health »]
-        val mots = AppsActivity.sansAccents(nom).split(Regex("[^\\p{L}\\p{N}]+")).filter { it.isNotEmpty() }
-        return CATEGORIES.firstOrNull { cat -> cat.mots.any { debut -> mots.any { it.startsWith(debut) } } }
-    }
+    // (17/11) Le classement a grandi : c'est maintenant un protocole en 8 questions (notre liste, l'éditeur, la
+    // catégorie déclarée à Android, le moteur de jeu, le rôle de l'app, les mots du nom, du nom technique, les
+    // services). Tout est dans Classement.kt ; les mots ci-dessus (« mots ») y sont toujours utilisés.
+    fun trouver(pkg: String, code: Int, nom: String): Categorie? = Classement.trouver(pkg, code, nom)
 
     // Le nom affiché d'une app (« Claude »), ou son nom technique si on ne le trouve pas.
     fun nomApp(c: Context, pkg: String): String {
@@ -148,7 +145,7 @@ object Groupes {
     private val ecoute = object : BroadcastReceiver() {
         override fun onReceive(c: Context?, intention: Intent?) { oublier() }
     }
-    fun oublier() { memoireTri = null; memoireNoms.clear() }
+    fun oublier() { memoireTri = null; memoireNoms.clear(); Classement.oublier() }
 
     private fun poserEcoute(c: Context) {
         if (ecoutePosee) return
