@@ -39,6 +39,7 @@ import kotlin.math.max
 //  - Fluidité : Éco (30 images/s) ou Fluide (60) — pas pour les vidéos (elles gardent leur vitesse) ;
 //  - « Figer après 10 s sans toucher l'accueil » ;
 //  - Assombrir (0 à 60 %) — pas pour les vidéos ;
+//  - (17/11) le son, pour les vidéos ; le sens du mouvement (comme le téléphone / inversé), pour les fonds 3D ;
 //  - le bouton « Appliquer ».
 // Toucher l'aperçu masque / remontre la feuille, pour voir le fond seul.
 //
@@ -57,6 +58,8 @@ class FondApercuActivity : Activity() {
     private var fluide = false
     private var figer = false
     private var assombrir = 0
+    private var inverse = false              // (17/11) fond 3D : le sens du mouvement est-il inversé ?
+    private var dessinApercu: DessinFond? = null
 
     private val px = { v: Float -> Style.px(this, v) }
     private var lecteur: MediaPlayer? = null
@@ -73,6 +76,7 @@ class FondApercuActivity : Activity() {
         if (actuel.sorte == sorte && actuel.id == ref) {
             fluide = actuel.fluide; figer = actuel.figer; assombrir = actuel.assombrir
         }
+        inverse = CarnetFond.carnet(this).getBoolean(FondProfondeur.CLE_INVERSE, false)
         pleinEcran()
 
         val racine = FrameLayout(this).apply { setBackgroundColor(Color.BLACK) }
@@ -139,7 +143,11 @@ class FondApercuActivity : Activity() {
             setImageBitmap(PeintreFond.chargerImage(ref, max(m.widthPixels, m.heightPixels)))
         }
         CarnetFond.GIF -> VueGif(this, ref)
-        else -> VueDessinFond(this, CarnetFond.dessinPour(this, sorte, ref))
+        else -> CarnetFond.dessinPour(this, sorte, ref).let { d ->
+            dessinApercu = d
+            (d as? FondProfondeur)?.inverse = inverse
+            VueDessinFond(this, d)
+        }
     }
 
     // La vidéo, jouée en boucle, qui « couvre » l'écran sans être déformée.
@@ -315,6 +323,32 @@ class FondApercuActivity : Activity() {
                 getString(R.string.son_fond_pas_de_son), 12f, Style.MUET).apply { setLineSpacing(0f, 1.2f) })
         }
 
+        // (17/11) Fond 3D : le SENS DU MOUVEMENT, « Comme le téléphone » ou « Inversé ». L'aperçu change tout de suite
+        // (penche le téléphone pour essayer) ; le choix est gardé quand on appuie sur « Appliquer ».
+        if (sorte == CarnetFond.PROFONDEUR) {
+            addView(Style.texte(this@FondApercuActivity, getString(R.string.fd_3d_sens), 13f, Style.MUET).apply {
+                setPadding(0, px(14f), 0, px(8f))
+            })
+            lateinit var normal: TextView
+            lateinit var envers: TextView
+            fun peindreSens() {
+                for ((v, on) in listOf(normal to !inverse, envers to inverse)) {
+                    v.background = Style.arrondi(this@FondApercuActivity, if (on) Style.TEXTE else Color.argb(20, 255, 255, 255), 14f,
+                        if (on) null else Color.rgb(63, 63, 70))
+                    v.setTextColor(if (on) Style.ENCRE else Style.TEXTE)
+                }
+                (dessinApercu as? FondProfondeur)?.inverse = inverse
+            }
+            normal = pilule(getString(R.string.fd_3d_sens_normal)) { inverse = false; peindreSens() }
+            envers = pilule(getString(R.string.fd_3d_sens_inverse)) { inverse = true; peindreSens() }
+            addView(LinearLayout(this@FondApercuActivity).apply {
+                orientation = LinearLayout.HORIZONTAL
+                addView(normal, LinearLayout.LayoutParams(0, px(40f), 1f).apply { rightMargin = px(8f) })
+                addView(envers, LinearLayout.LayoutParams(0, px(40f), 1f))
+            })
+            peindreSens()
+        }
+
         // (13/11) un fond 3D se RETOUCHE : on rouvre la gomme avec son détourage
         if (sorte == CarnetFond.PROFONDEUR) addView(Style.boutonDiscret(this@FondApercuActivity, getString(R.string.fd_3d_retoucher)) {
             retoucher()
@@ -374,6 +408,8 @@ class FondApercuActivity : Activity() {
     // ------------------------------ APPLIQUER ------------------------------
 
     private fun appliquer() {
+        // (17/11) fond 3D : le sens du mouvement (avant le reste : le fond d'écran se recharge avec le bon sens)
+        if (sorte == CarnetFond.PROFONDEUR) CarnetFond.carnet(this).edit().putBoolean(FondProfondeur.CLE_INVERSE, inverse).apply()
         CarnetFond.ecrire(this, CarnetFond.Choix(sorte, ref, fluide, figer, assombrir))
         val voulu = CarnetFond.service(this, sorte)
         val actuel = try { WallpaperManager.getInstance(this).wallpaperInfo?.component } catch (_: Exception) { null }
