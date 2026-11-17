@@ -12,4 +12,7 @@
     <string name="compat_animation_coupee">Own animation (off)</string>
     <string name="compat_variantes">%d variants</string>
     <string name="compat_sans_animation">No animation · folders</string>
+    <string name="compat_tri_couleur">By colour</string>
+    <string name="compat_tri_nom">A → Z</string>
+    <string name="compat_tri_date">Recent</string>
 </resources>

@@ -30,7 +30,9 @@ import android.widget.TextView
 //      gris   = rien de spécial (« Non répertorié ») ;
 //  - son nom, et une 2e ligne qui détaille (variantes, vitesse, catégorie) ;
 //  - une recherche (même façon de chercher que l'écran « Animations d'apps », voir Rayons.rang) ;
-//  - la LÉGENDE en haut sert aussi de FILTRE : un appui sur une couleur ne montre que ces apps (un 2e appui : toutes).
+//  - la LÉGENDE en haut sert aussi de FILTRE : un appui sur une couleur ne montre que ces apps (un 2e appui : toutes) ;
+//  - trois boutons de TRI sous la recherche (17/11) : par couleur (de base), de A à Z, ou les plus récemment
+//    installées d'abord (avec la date d'installation sur la 2e ligne). Le choix est gardé pour la prochaine fois.
 // Un appui sur une app qui a une animation ouvre ses réglages.
 class CompatiblesActivity : Activity() {
 
@@ -43,7 +45,8 @@ class CompatiblesActivity : Activity() {
     }
 
     // Une app détectée : son nom, son nom technique, ce qu'elle peut faire, et le détail affiché sous son nom.
-    private class Ligne(val nom: String, val pkg: String, val etat: Etat, val detail: String) {
+    // « installe » = le moment où l'app a été installée la 1re fois (en millisecondes, donné par Android).
+    private class Ligne(val nom: String, val pkg: String, val etat: Etat, val detail: String, val installe: Long) {
         val cle = AppsActivity.sansAccents(nom)
     }
 
@@ -51,6 +54,16 @@ class CompatiblesActivity : Activity() {
     private var lignes = listOf<Ligne>()
     private var cherche = ""
     private var filtre: Etat? = null                     // null = toutes les couleurs
+    private var tri = TRI_COULEUR                       // l'ordre de la liste (voir les 3 boutons de tri)
+    private val boutonsTri = ArrayList<TextView>()
+    private val formatDate = java.text.DateFormat.getDateInstance(java.text.DateFormat.SHORT)
+
+    companion object {
+        private const val TRI_COULEUR = 0               // vert, bleu, ambre, gris, puis A → Z
+        private const val TRI_NOM = 1                   // A → Z
+        private const val TRI_DATE = 2                  // la plus récemment installée en premier
+        private const val CARNET = "compatibles"         // le petit carnet où on retient le tri choisi
+    }
     private val icones = HashMap<String, Drawable?>()
     private val legende = ArrayList<TextView>()
     private lateinit var resume: TextView
@@ -104,6 +117,25 @@ class CompatiblesActivity : Activity() {
             })
         }
 
+        // Les 3 boutons de tri, côte à côte. Le tri choisi est relu dans le carnet (la dernière fois).
+        tri = getSharedPreferences(CARNET, MODE_PRIVATE).getInt("tri", TRI_COULEUR)
+        val rangeeTri = LinearLayout(this).apply { orientation = LinearLayout.HORIZONTAL }
+        for ((i, t) in listOf(TRI_COULEUR to R.string.compat_tri_couleur, TRI_NOM to R.string.compat_tri_nom,
+                TRI_DATE to R.string.compat_tri_date).withIndex()) {
+            val bouton = Style.texte(this, getString(t.second), 13f, Style.TEXTE).apply {
+                gravity = Gravity.CENTER
+                isClickable = true
+                tag = t.first
+                setOnClickListener {
+                    tri = t.first
+                    getSharedPreferences(CARNET, MODE_PRIVATE).edit().putInt("tri", tri).apply()
+                    afficher()
+                }
+            }
+            boutonsTri.add(bouton)
+            rangeeTri.addView(bouton, LinearLayout.LayoutParams(0, px(36f), 1f).apply { if (i < 2) rightMargin = px(8f) })
+        }
+
         adaptateur = Adaptateur()
         val liste = ListView(this).apply {
             adapter = adaptateur
@@ -133,6 +165,8 @@ class CompatiblesActivity : Activity() {
                 addView(resume)
                 addView(blocLegende)
                 addView(recherche)
+                addView(rangeeTri, LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT,
+                    ViewGroup.LayoutParams.WRAP_CONTENT).apply { topMargin = px(10f) })
                 addView(liste, LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, 0, 1f))
             }, LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, 0, 1f))
         })
@@ -175,10 +209,12 @@ class CompatiblesActivity : Activity() {
                 if (etat == Etat.CLASSEE) morceaux.add(getString(R.string.compat_sans_animation))
             }
             morceaux.add(nomCategorie)
-            resultat.add(Ligne(nom, pkg, etat, morceaux.joinToString(" · ")))
+            // la date de 1re installation (si Android refuse de la donner : 0, l'app ira en fin de liste)
+            val installe = try { pm.getPackageInfo(pkg, 0).firstInstallTime } catch (_: Exception) { 0L }
+            resultat.add(Ligne(nom, pkg, etat, morceaux.joinToString(" · "), installe))
         }
-        // rangées par état (vert, bleu, ambre, gris), puis par ordre alphabétique
-        return resultat.sortedWith(compareBy<Ligne>({ it.etat.ordinal }, { it.cle }))
+        // l'ordre de la liste est choisi plus tard, dans afficher() (selon le bouton de tri)
+        return resultat
     }
 
     // Le nom de la vitesse choisie pour une app (Rapide, Normale, Lente), comme dans ses réglages.
@@ -192,14 +228,30 @@ class CompatiblesActivity : Activity() {
     private fun afficher() {
         var l = toutes
         if (filtre != null) l = l.filter { it.etat == filtre }
+        // 1) on range selon le tri choisi
+        l = when (tri) {
+            TRI_NOM -> l.sortedBy { it.cle }
+            TRI_DATE -> l.sortedWith(compareByDescending<Ligne> { it.installe }.thenBy { it.cle })
+            else -> l.sortedWith(compareBy<Ligne>({ it.etat.ordinal }, { it.cle }))
+        }
+        // 2) la recherche ne garde que les apps qui correspondent. En tri « Couleur », les meilleures
+        //    correspondances passent devant (comme avant) ; en tri A → Z ou Récentes, on garde l'ordre choisi.
         if (cherche.isNotEmpty()) {
-            l = l.map { it to Rayons.rang(it.cle, cherche) }.filter { it.second >= 0 }
-                .sortedWith(compareBy<Pair<Ligne, Int>>({ it.second }, { it.first.cle })).map { it.first }
+            val trouvees = l.map { it to Rayons.rang(it.cle, cherche) }.filter { it.second >= 0 }
+            l = if (tri == TRI_COULEUR) trouvees.sortedWith(compareBy<Pair<Ligne, Int>>({ it.second }, { it.first.cle })).map { it.first }
+                else trouvees.map { it.first }
         }
         lignes = l
         adaptateur.notifyDataSetChanged()
         // le résumé : combien d'apps en tout, et combien de chaque couleur (dans la légende)
         resume.text = getString(R.string.compat_resume, toutes.size, toutes.count { it.etat == Etat.ANIMEE || it.etat == Etat.COUPEE })
+        // le bouton de tri choisi a un fond clair, les autres le fond des cartes
+        for (b in boutonsTri) {
+            val actif = b.tag == tri
+            b.background = Style.arrondi(this, if (actif) Color.argb(40, 255, 255, 255) else Style.CARTE, 12f,
+                if (actif) Style.DOUX else Style.BORD)
+            b.setTextColor(if (actif) Style.TEXTE else Style.MUET)
+        }
         for (puce in legende) {
             val e = puce.tag as Etat
             val n = toutes.count { it.etat == e }
@@ -243,7 +295,10 @@ class CompatiblesActivity : Activity() {
             (vue.getChildAt(1) as ImageView).setImageDrawable(icone(l.pkg))
             val textes = vue.getChildAt(2) as LinearLayout
             (textes.getChildAt(0) as TextView).text = l.nom
-            (textes.getChildAt(1) as TextView).text = l.detail
+            // en tri « Récentes », la date d'installation passe en tête de la 2e ligne
+            (textes.getChildAt(1) as TextView).text =
+                if (tri == TRI_DATE && l.installe > 0) formatDate.format(java.util.Date(l.installe)) + " · " + l.detail
+                else l.detail
             return vue
         }
     }
