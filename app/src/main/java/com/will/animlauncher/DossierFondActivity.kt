@@ -34,7 +34,9 @@ import kotlin.math.min
 //  - une phrase d'explication ;
 //  - le bouton « Ajouter des photos et des vidéos » (le sélecteur d'Android, plusieurs à la fois) ;
 //  - l'interrupteur « Ordre au hasard » (éteint : dans l'ordre d'ajout) ;
+//  - le son : le réglage général (sans son / écouteurs / toujours), puis « Tout activer » / « Tout couper » ;
 //  - les miniatures, par 3 (appui long = retirer du dossier) ; celle affichée en ce moment a un badge ;
+//    (17/11) sur chaque vidéo, un petit haut-parleur : un appui coupe ou remet le son de CETTE vidéo ;
 //  - le bouton « Appliquer », qui met ce dossier en fond d'écran.
 // La collection elle-même est gérée par DossierFond.kt, et le fond d'écran par FondDossierService.kt.
 class DossierFondActivity : Activity() {
@@ -99,6 +101,23 @@ class DossierFondActivity : Activity() {
         })
         // 3 bis) (17/11) le son des vidéos du dossier (le même réglage que dans « Fonds d'écran », voir SonFond.kt)
         liste.addView(SonFond.vue(this))
+        // (17/11) le son vidéo par vidéo : tout activer / tout couper d'un coup, puis le haut-parleur de chaque vidéo
+        if (fichiers.any { DossierFond.estVideo(it) }) {
+            liste.addView(LinearLayout(this).apply {
+                orientation = LinearLayout.HORIZONTAL
+                setPadding(0, px(6f), 0, 0)
+                addView(Style.boutonDiscret(this@DossierFondActivity, getString(R.string.dfd_son_tout)) {
+                    DossierFond.toutesMuettes(this@DossierFondActivity, false); construire()
+                }, LinearLayout.LayoutParams(0, px(42f), 1f).apply { rightMargin = px(8f) })
+                addView(Style.boutonDiscret(this@DossierFondActivity, getString(R.string.dfd_muet_tout)) {
+                    DossierFond.toutesMuettes(this@DossierFondActivity, true); construire()
+                }, LinearLayout.LayoutParams(0, px(42f), 1f))
+            })
+            liste.addView(Style.texte(this, getString(R.string.dfd_son_expl), 12f, Style.MUET).apply {
+                setLineSpacing(0f, 1.2f)
+                setPadding(px(4f), px(8f), px(4f), 0)
+            })
+        }
         // 4) les miniatures (ou un message si le dossier est vide)
         liste.addView(Style.titreCarte(this, getString(R.string.dfd_nombre, fichiers.size, DossierFond.MAX)).apply {
             setPadding(px(4f), px(16f), 0, px(10f))
@@ -150,8 +169,33 @@ class DossierFondActivity : Activity() {
         if (enCeMoment) addView(badge(getString(R.string.dfd_maintenant)),
             FrameLayout.LayoutParams(ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT, Gravity.BOTTOM or Gravity.START)
                 .apply { bottomMargin = px(8f); leftMargin = px(8f) })
+        if (DossierFond.estVideo(f)) addView(boutonSon(f),
+            FrameLayout.LayoutParams(px(34f), px(34f), Gravity.TOP or Gravity.START).apply { topMargin = px(6f); leftMargin = px(6f) })
         isLongClickable = true
         setOnLongClickListener { proposerRetrait(f); true }
+    }
+
+    // (17/11) LE HAUT-PARLEUR d'une vidéo : 🔊 son activé, 🔇 son coupé. Un appui bascule.
+    // Une vidéo sans son enregistré (importée avant le 17/11, ou vraiment muette) : 🔇 pâle, et un appui l'explique.
+    private fun boutonSon(f: File): View = Style.texte(this, "", 15f, Style.TEXTE).apply {
+        gravity = Gravity.CENTER
+        background = Style.arrondi(this@DossierFondActivity, Color.argb(160, 0, 0, 0), 17f)
+        val aDuSon = SonFond.avecSon(f).exists()
+        fun peindre() {
+            val coupee = !aDuSon || DossierFond.estMuette(this@DossierFondActivity, f)
+            text = if (coupee) "🔇" else "🔊"
+            alpha = if (aDuSon) 1f else 0.45f
+        }
+        peindre()
+        isClickable = true
+        setOnClickListener {
+            if (!aDuSon) {
+                Toast.makeText(this@DossierFondActivity, getString(R.string.son_fond_pas_de_son), Toast.LENGTH_LONG).show()
+            } else {
+                DossierFond.basculerMuette(this@DossierFondActivity, f)
+                peindre()
+            }
+        }
     }
 
     private fun badge(t: String): View = Style.texte(this, t, 10f, Style.TEXTE, gras = true).apply {
