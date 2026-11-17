@@ -11,6 +11,13 @@
     <uses-permission android:name="android.permission.RECORD_AUDIO" />
     <uses-permission android:name="android.permission.MODIFY_AUDIO_SETTINGS" />
 
+    <!-- (17/11) SON DES FONDS D'ÉCRAN, choix « Avec écouteurs » : pour savoir si l'appareil Bluetooth branché est
+         un casque ou une enceinte, on lit sa « classe ». Android 12 et plus demande pour ça la permission
+         « Appareils à proximité » (BLUETOOTH_CONNECT), demandée seulement quand on choisit ce mode ;
+         avant Android 12, c'est l'ancienne permission BLUETOOTH, accordée d'office. Voir SonFond.kt. -->
+    <uses-permission android:name="android.permission.BLUETOOTH_CONNECT" />
+    <uses-permission android:name="android.permission.BLUETOOTH" android:maxSdkVersion="30" />
+
     <!-- Depuis Android 11, une app ne "voit" pas les autres apps par défaut.
          On demande à voir : les apps qui ont une icône, et l'écran d'accueil. -->
     <queries>
