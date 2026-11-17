@@ -49,6 +49,9 @@ import kotlin.math.min
 // on passe au suivant. Il est donc déjà prêt, et affiché, quand on revient : on ne voit jamais le changement se
 // faire. (Les 0,4 s évitent de changer pour un fond caché une fraction de seconde, par exemple un menu.)
 //
+// LE SON (17/11) : comme le fond « Vidéo », une vidéo est muette, sauf si l'utilisateur permet le son des fonds
+// (sans son / avec écouteurs / toujours, voir SonFond.kt) : on joue alors sa version avec le son.
+//
 // LES ÉCONOMIES : rien ne tourne quand le fond est caché (la vidéo est en pause ; une photo n'est dessinée
 // qu'une fois) ; un seul fichier est chargé à la fois.
 class FondDossierService : WallpaperService() {
@@ -65,6 +68,8 @@ class FondDossierService : WallpaperService() {
         private var rendu: RenduDossier? = null       // lu et écrit seulement sur « fil »
         private var visible = false
         private val gardien = GardienBatterie(ctx) { quandLeGardienChange() }
+        // (17/11) le son permis ou non (écouteurs branchés, choix de l'utilisateur) : on prévient le dessin
+        private val son = SonFond.Veille(ctx) { permis -> gl.post { rendu?.son(permis) } }
         private val changer = Runnable { if (!isPreview) DossierFond.avancer(ctx) }
 
         // SECOURS (comme les autres services) : si Android ne dit jamais si le fond est visible, on suit l'écran.
@@ -75,6 +80,7 @@ class FondDossierService : WallpaperService() {
             super.onCreate(holder)
             DossierFond.carnet(ctx).registerOnSharedPreferenceChangeListener(this)
             gardien.demarrer()
+            son.demarrer()
             // le service démarre (téléphone rallumé après un arrêt, fond tout juste choisi…) : un nouveau fond
             if (!isPreview) DossierFond.avancer(ctx)
         }
@@ -83,13 +89,14 @@ class FondDossierService : WallpaperService() {
             super.onSurfaceCreated(holder)
             val surface = holder.surface
             val vis = visible && !gardien.surchauffe
+            val permis = son.permis
             gl.post {
                 rendu?.liberer()
                 rendu = try { RenduDossier(surface) } catch (e: Exception) {
                     DiagFond.noter(ctx, "f_erreur" to ((e.message ?: e.javaClass.simpleName)).take(80))
                     null
                 }
-                rendu?.charger(DossierFond.courant(ctx), vis)
+                rendu?.charger(DossierFond.courant(ctx), vis, permis)
             }
             principal.postDelayed(secours, 1500L)
         }
@@ -116,6 +123,7 @@ class FondDossierService : WallpaperService() {
             principal.removeCallbacks(changer)
             DossierFond.carnet(ctx).unregisterOnSharedPreferenceChangeListener(this)
             gardien.arreter()
+            son.arreter()
             attendre { rendu?.liberer(); rendu = null }
             fil.quitSafely()
             super.onDestroy()
@@ -156,7 +164,8 @@ class FondDossierService : WallpaperService() {
             if (cle != null && cle != DossierFond.COURANT && cle != "change") return
             val f = DossierFond.courant(ctx)
             val vis = visible && !gardien.surchauffe
-            gl.post { rendu?.charger(f, vis) }
+            val permis = son.permis
+            gl.post { rendu?.charger(f, vis, permis) }
         }
     }
 }
@@ -194,6 +203,10 @@ class RenduDossier(surface: Surface) {
     private var pret = false                          // la vidéo est-elle prête à jouer ?
     private var imageVideoRecue = false               // a-t-on déjà reçu une image de la vidéo ?
     private var visible = false
+    private var sonPermis = false                     // (17/11) le son des fonds est-il permis en ce moment ?
+    private var avecSon = false                       // joue-t-on la version AVEC le son de la vidéo ?
+    private var joue: String? = null                  // le fichier vraiment joué (version muette ou avec le son)
+    private var reprise = 0                           // où reprendre la vidéo après un changement de version (ms)
     private val fil = Handler(Looper.myLooper() ?: Looper.getMainLooper())
     private val matrice = FloatArray(16)
     private val identite = FloatArray(16).also { Matrix.setIdentityM(it, 0) }
@@ -233,10 +246,15 @@ class RenduDossier(surface: Surface) {
     }
 
     // AFFICHER UN FOND (une photo ou une vidéo). « vis » : le fond est-il visible en ce moment ?
-    fun charger(f: File?, vis: Boolean) {
+    // « permis » : le son des fonds est-il permis ?
+    fun charger(f: File?, vis: Boolean, permis: Boolean) {
         visible = vis
+        sonPermis = permis
         // c'est déjà lui : rien à recharger
-        if (f != null && f == fichier && (texPhoto != 0 || lecteur != null)) { montrer(vis); return }
+        if (f != null && f == fichier && (texPhoto != 0 || lecteur != null)) {
+            if (estVideo && SonFond.fichierAJouer(f, permis).path != joue) son(permis) else montrer(vis)
+            return
+        }
         vider()
         fichier = f
         if (f != null && f.exists()) {
@@ -252,8 +270,23 @@ class RenduDossier(surface: Surface) {
         val mp = lecteur ?: return
         if (!pret) return
         try {
+            if (v && avecSon) mp.setVolume(1f, 1f)              // le son ne sort que quand le fond est visible
             if (v && !mp.isPlaying) mp.start() else if (!v && mp.isPlaying) mp.pause()
         } catch (_: Exception) {}
+    }
+
+    // (17/11) Le son vient d'être permis ou interdit. Si c'est une vidéo et que ça change la version à jouer,
+    // on la recharge, à l'endroit où on en était.
+    fun son(permis: Boolean) {
+        sonPermis = permis
+        val f = fichier ?: return
+        if (!estVideo || SonFond.fichierAJouer(f, permis).path == joue) return
+        reprise = try { lecteur?.currentPosition ?: 0 } catch (_: Exception) { 0 }
+        vider()
+        fichier = f
+        estVideo = true
+        ouvrirVideo(f)
+        dessiner()
     }
 
     // UNE PHOTO : on la charge (réduite si besoin), on la range dans une texture, puis on oublie l'image.
@@ -298,16 +331,31 @@ class RenduDossier(surface: Surface) {
         surfaceTex = st
         val sv = Surface(st)
         surfaceVideo = sv
+        // la version muette, ou celle avec le son si le son est permis (et qu'elle existe)
+        val source = SonFond.fichierAJouer(f, sonPermis)
+        avecSon = source.path != f.path
+        joue = source.path
         val mp = MediaPlayer()
         lecteur = mp
         try {
-            mp.setDataSource(f.path)
+            mp.setDataSource(source.path)
             mp.setSurface(sv)
             mp.isLooping = true                                  // en boucle
-            mp.setVolume(0f, 0f)                                 // muette
+            // muette au départ ; le son (s'il est permis) n'est mis que quand le fond est visible (voir montrer)
+            mp.setVolume(0f, 0f)
             // Prête : on la lance, même si le fond est caché. Dès la 1re image reçue, on la remet en pause s'il
             // est caché (voir imageVideo) : comme ça, la 1re image est déjà à l'écran quand on revient.
-            mp.setOnPreparedListener { lu -> if (lu === lecteur) { pret = true; try { lu.start() } catch (_: Exception) {} } }
+            mp.setOnPreparedListener { lu ->
+                if (lu === lecteur) {
+                    pret = true
+                    try {
+                        if (reprise > 0) lu.seekTo(reprise)           // après un changement de son : on reprend là
+                        reprise = 0
+                        if (visible && avecSon) lu.setVolume(1f, 1f)
+                        lu.start()
+                    } catch (_: Exception) {}
+                }
+            }
             mp.setOnErrorListener { _, _, _ -> true }
             mp.prepareAsync()
         } catch (_: Exception) {
@@ -398,6 +446,8 @@ class RenduDossier(surface: Surface) {
         if (texPhoto != 0) { GLES20.glDeleteTextures(1, intArrayOf(texPhoto), 0); texPhoto = 0 }
         imageVideoRecue = false
         estVideo = false
+        avecSon = false
+        joue = null
         fichier = null
     }
 
