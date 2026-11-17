@@ -108,15 +108,17 @@ class FondProfondeur(c: Context, dossier: String) : DessinFond() {
     private var py = 0f
     private val inclinaison = Inclinaison(c) { reveil?.invoke() }
 
-    // (17/11, demande de Will) LE SENS DU MOUVEMENT : « comme le téléphone » (de base : le sujet part du côté où
-    // l'on penche, le fond à l'opposé) ou « inversé » (tout part dans l'autre sens). Le choix est rangé dans le
-    // carnet des fonds (case « dessin_inverse ») ; l'aperçu peut le changer en direct (inverse = true / false).
-    var inverse = CarnetFond.carnet(c).getBoolean(CLE_INVERSE, false)
+    // (17/11, demande de Will) LE SENS DU MOUVEMENT : « comme le téléphone » (le sujet part du côté où l'on penche,
+    // le fond à l'opposé) ou « inversé » (tout part dans l'autre sens ; c'est le choix PAR DÉFAUT, demandé par Will).
+    // Le choix est rangé dans le carnet des fonds (case « dessin_inverse ») ; l'aperçu peut le changer en direct.
+    var inverse = inverseChoisi(c)
     private val sens get() = if (inverse) -1f else 1f
 
     companion object {
         // (le préfixe « dessin_ » fait que le service du fond d'écran se recharge quand le choix change)
         const val CLE_INVERSE = CarnetFond.PREFIXE_DESSIN + "inverse"
+        // le sens choisi (inversé si l'utilisateur n'a encore rien choisi)
+        fun inverseChoisi(c: Context): Boolean = CarnetFond.carnet(c).getBoolean(CLE_INVERSE, true)
     }
 
     private val filtre = Paint(Paint.FILTER_BITMAP_FLAG or Paint.ANTI_ALIAS_FLAG)
