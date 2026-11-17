@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- La « fiche » du fond « dossier » (photos et vidéos qui se relaient), affichée par Android dans sa liste
+     des fonds animés. Voir FondDossierService.kt. -->
+<wallpaper xmlns:android="http://schemas.android.com/apk/res/android"
+    android:thumbnail="@mipmap/ic_launcher"
+    android:description="@string/dfd_desc" />

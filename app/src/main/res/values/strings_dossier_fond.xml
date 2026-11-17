@@ -1,0 +1,25 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Les textes du DOSSIER DE FONDS (English (default)) : photos et vidéos qui se relaient en fond d'écran. Voir DossierFondActivity.kt. -->
+<resources>
+    <string name="dfd_titre">Photo &amp; video folder</string>
+    <string name="dfd_case">Folder</string>
+    <string name="dfd_case_expl">Photos &amp; videos that take turns</string>
+    <string name="dfd_expl">Your photos and videos take turns as your wallpaper: a new one each time you come back to the home screen, after leaving an app or turning the screen back on.</string>
+    <string name="dfd_ajouter">Add photos &amp; videos</string>
+    <string name="dfd_hasard">Random order</string>
+    <string name="dfd_hasard_expl">Off: in the order you added them</string>
+    <string name="dfd_nombre">%1$d / %2$d</string>
+    <string name="dfd_vide">The folder is empty. Add at least 2 photos or videos.</string>
+    <string name="dfd_retirer_q">Remove from the folder?</string>
+    <string name="dfd_retirer">Remove</string>
+    <string name="dfd_en_cours">Adding to the folder…</string>
+    <string name="dfd_rien">Couldn\'t add these files.</string>
+    <string name="dfd_plein">The folder is full (100 max).</string>
+    <string name="dfd_maintenant">NOW</string>
+    <string name="dfd_service">AnimEngine · Folder</string>
+    <string name="dfd_desc">Your photos and videos take turns: a new one each time you return to the home screen.</string>
+    <plurals name="dfd_ajoutes">
+        <item quantity="one">%d added</item>
+        <item quantity="other">%d added</item>
+    </plurals>
+</resources>

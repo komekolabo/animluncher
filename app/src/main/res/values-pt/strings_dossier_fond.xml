@@ -1,0 +1,25 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Les textes du DOSSIER DE FONDS (português) : photos et vidéos qui se relaient en fond d'écran. Voir DossierFondActivity.kt. -->
+<resources>
+    <string name="dfd_titre">Pasta de fotos e vídeos</string>
+    <string name="dfd_case">Pasta</string>
+    <string name="dfd_case_expl">Fotos e vídeos que se alternam</string>
+    <string name="dfd_expl">Suas fotos e vídeos se alternam como papel de parede: um novo a cada vez que você volta à tela inicial, ao sair de um app ou ao ligar a tela de novo.</string>
+    <string name="dfd_ajouter">Adicionar fotos e vídeos</string>
+    <string name="dfd_hasard">Ordem aleatória</string>
+    <string name="dfd_hasard_expl">Desativado: na ordem em que foram adicionados</string>
+    <string name="dfd_nombre">%1$d / %2$d</string>
+    <string name="dfd_vide">A pasta está vazia. Adicione pelo menos 2 fotos ou vídeos.</string>
+    <string name="dfd_retirer_q">Remover da pasta?</string>
+    <string name="dfd_retirer">Remover</string>
+    <string name="dfd_en_cours">Adicionando à pasta…</string>
+    <string name="dfd_rien">Não foi possível adicionar estes arquivos.</string>
+    <string name="dfd_plein">A pasta está cheia (máximo de 100).</string>
+    <string name="dfd_maintenant">AGORA</string>
+    <string name="dfd_service">AnimEngine · Pasta</string>
+    <string name="dfd_desc">Suas fotos e vídeos se alternam: um novo a cada vez que você volta à tela inicial.</string>
+    <plurals name="dfd_ajoutes">
+        <item quantity="one">%d adicionado</item>
+        <item quantity="other">%d adicionados</item>
+    </plurals>
+</resources>

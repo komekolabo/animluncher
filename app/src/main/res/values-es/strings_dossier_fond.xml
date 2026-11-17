@@ -1,0 +1,25 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Les textes du DOSSIER DE FONDS (español) : photos et vidéos qui se relaient en fond d'écran. Voir DossierFondActivity.kt. -->
+<resources>
+    <string name="dfd_titre">Carpeta de fotos y vídeos</string>
+    <string name="dfd_case">Carpeta</string>
+    <string name="dfd_case_expl">Fotos y vídeos que se turnan</string>
+    <string name="dfd_expl">Tus fotos y vídeos se turnan como fondo de pantalla: uno nuevo cada vez que vuelves a la pantalla de inicio, al salir de una app o al volver a encender la pantalla.</string>
+    <string name="dfd_ajouter">Añadir fotos y vídeos</string>
+    <string name="dfd_hasard">Orden aleatorio</string>
+    <string name="dfd_hasard_expl">Desactivado: en el orden en que los añadiste</string>
+    <string name="dfd_nombre">%1$d / %2$d</string>
+    <string name="dfd_vide">La carpeta está vacía. Añade al menos 2 fotos o vídeos.</string>
+    <string name="dfd_retirer_q">¿Quitar de la carpeta?</string>
+    <string name="dfd_retirer">Quitar</string>
+    <string name="dfd_en_cours">Añadiendo a la carpeta…</string>
+    <string name="dfd_rien">No se pudieron añadir estos archivos.</string>
+    <string name="dfd_plein">La carpeta está llena (100 como máximo).</string>
+    <string name="dfd_maintenant">AHORA</string>
+    <string name="dfd_service">AnimEngine · Carpeta</string>
+    <string name="dfd_desc">Tus fotos y vídeos se turnan: uno nuevo cada vez que vuelves a la pantalla de inicio.</string>
+    <plurals name="dfd_ajoutes">
+        <item quantity="one">%d añadido</item>
+        <item quantity="other">%d añadidos</item>
+    </plurals>
+</resources>
