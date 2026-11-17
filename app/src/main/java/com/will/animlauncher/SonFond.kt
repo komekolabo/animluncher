@@ -141,7 +141,8 @@ object SonFond {
     // LE RÉGLAGE À L'ÉCRAN : un titre, les 3 choix côte à côte (celui choisi en blanc), et une phrase.
     // Utilisé par l'écran « Fonds d'écran » et par l'écran du dossier.
     // ------------------------------------------------------------------------------------------
-    fun vue(a: Activity): View {
+    // « explication » : la phrase sous les 3 choix (on la retire dans la petite feuille de l'aperçu).
+    fun vue(a: Activity, explication: Boolean = true): View {
         val px = { v: Float -> Style.px(a, v) }
         val choix = listOf(JAMAIS to R.string.son_fond_jamais, ECOUTEURS to R.string.son_fond_ecouteurs, TOUJOURS to R.string.son_fond_toujours)
         val boutons = ArrayList<TextView>()
@@ -180,7 +181,7 @@ object SonFond {
                     addView(b, LinearLayout.LayoutParams(0, px(42f), 1f).apply { if (i < 2) rightMargin = px(8f) })
                 }
             }, LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT))
-            addView(Style.texte(a, a.getString(R.string.son_fond_expl), 12f, Style.MUET).apply { setLineSpacing(0f, 1.2f) })
+            if (explication) addView(Style.texte(a, a.getString(R.string.son_fond_expl), 12f, Style.MUET).apply { setLineSpacing(0f, 1.2f) })
             peindre()
         }
     }

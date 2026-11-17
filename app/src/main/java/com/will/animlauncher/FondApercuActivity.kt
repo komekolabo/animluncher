@@ -142,31 +142,56 @@ class FondApercuActivity : Activity() {
         else -> VueDessinFond(this, CarnetFond.dessinPour(this, sorte, ref))
     }
 
-    // La vidéo, jouée en boucle et muette, qui « couvre » l'écran sans être déformée.
+    // La vidéo, jouée en boucle, qui « couvre » l'écran sans être déformée.
+    // (17/11) Muette, sauf si le son des fonds est permis (voir SonFond.kt) : on joue alors sa version avec le son.
+    // Si on change le réglage du son dans la feuille, la vidéo repart avec la bonne version, au même endroit.
+    private var vueVideo: TextureView? = null
+    private var surfaceVideo: Surface? = null
     private fun videoApercu(): View = TextureView(this).apply {
         val vue = this
+        vueVideo = vue
         surfaceTextureListener = object : TextureView.SurfaceTextureListener {
             override fun onSurfaceTextureAvailable(st: SurfaceTexture, w: Int, h: Int) {
-                lecteur = MediaPlayer().apply {
-                    try {
-                        setDataSource(ref)
-                        setSurface(Surface(st))
-                        isLooping = true
-                        setVolume(0f, 0f)
-                        setOnVideoSizeChangedListener { _, vw, vh -> couvrir(vue, vw, vh) }
-                        setOnPreparedListener { it.start() }
-                        prepareAsync()
-                    } catch (_: Exception) {}
-                }
+                surfaceVideo = Surface(st)
+                lancerVideo(0)
             }
             override fun onSurfaceTextureSizeChanged(st: SurfaceTexture, w: Int, h: Int) {}
             override fun onSurfaceTextureDestroyed(st: SurfaceTexture): Boolean {
                 lecteur?.release(); lecteur = null
+                surfaceVideo?.release(); surfaceVideo = null
                 return true
             }
             override fun onSurfaceTextureUpdated(st: SurfaceTexture) {}
         }
     }
+
+    // (Re)lance la vidéo de l'aperçu, à partir de « depuis » (en millisecondes).
+    private fun lancerVideo(depuis: Int) {
+        val surface = surfaceVideo ?: return
+        val vue = vueVideo ?: return
+        lecteur?.release(); lecteur = null
+        val f = File(ref)
+        val source = SonFond.fichierAJouer(f, SonFond.permis(this))
+        val avecSon = source.path != f.path
+        lecteur = MediaPlayer().apply {
+            try {
+                setDataSource(source.path)
+                setSurface(surface)
+                isLooping = true
+                if (avecSon) setVolume(1f, 1f) else setVolume(0f, 0f)
+                setOnVideoSizeChangedListener { _, vw, vh -> couvrir(vue, vw, vh) }
+                setOnPreparedListener { if (depuis > 0) it.seekTo(depuis); it.start() }
+                prepareAsync()
+            } catch (_: Exception) {}
+        }
+    }
+
+    // Le réglage du son a changé (ou des écouteurs ont été branchés / retirés) : la vidéo change de version.
+    // (« by lazy » : créée au premier usage, quand l'écran est prêt ; avant, Android ne donne pas encore ses services)
+    private val veilleSon by lazy { SonFond.Veille(this) {
+        val ici = try { lecteur?.currentPosition ?: 0 } catch (_: Exception) { 0 }
+        lancerVideo(ici)
+    } }
 
     // Agrandit la vidéo pour remplir l'écran (ce qui dépasse est coupé), centrée.
     private fun couvrir(vue: TextureView, vw: Int, vh: Int) {
@@ -188,6 +213,7 @@ class FondApercuActivity : Activity() {
     }
 
     override fun onDestroy() {
+        if (sorte == CarnetFond.VIDEO) veilleSon.arreter()
         lecteur?.release(); lecteur = null
         super.onDestroy()
     }
@@ -278,6 +304,15 @@ class FondApercuActivity : Activity() {
                     override fun onStopTrackingTouch(s: SeekBar) {}
                 })
             })
+        }
+
+        // (17/11) Le son des fonds vidéo : sans son / écouteurs / toujours (le même réglage que dans « Fonds d'écran »).
+        // Si cette vidéo n'a pas de version avec le son (importée avant le 17/11, ou vraiment muette), on le dit.
+        if (video) {
+            veilleSon.demarrer()
+            addView(SonFond.vue(this@FondApercuActivity, explication = false).apply { setPadding(0, px(12f), 0, 0) })
+            if (!SonFond.avecSon(File(ref)).exists()) addView(Style.texte(this@FondApercuActivity,
+                getString(R.string.son_fond_pas_de_son), 12f, Style.MUET).apply { setLineSpacing(0f, 1.2f) })
         }
 
         // (13/11) un fond 3D se RETOUCHE : on rouvre la gomme avec son détourage
