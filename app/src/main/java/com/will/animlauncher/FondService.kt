@@ -418,7 +418,10 @@ class FondDessinService : WallpaperService() {
 // 2) LE SERVICE DES FONDS VIDÉO
 // La vidéo est confiée au lecteur d'Android (MediaPlayer), branché DIRECTEMENT sur la surface du fond :
 // c'est la puce vidéo du téléphone qui décode, sans copie intermédiaire (le chemin le plus économe).
-// Le son a été retiré à l'import (FondsActivity) ; par sécurité, le volume est aussi à 0.
+// Le son a été retiré à l'import (ImportFond) ; par sécurité, le volume est aussi à 0.
+// (17/11) SAUF si l'utilisateur permet le son des fonds (voir SonFond.kt) : on joue alors la version d'origine
+// de la vidéo, avec son son. Si le choix change (écouteurs branchés ou retirés…), on passe d'une version à
+// l'autre au même endroit de la vidéo.
 // =============================================================================================
 class FondVideoService : WallpaperService() {
 
@@ -434,6 +437,9 @@ class FondVideoService : WallpaperService() {
         private val minuteur = Handler(Looper.getMainLooper())
         private val figer = Runnable { fige = true; mettreAJour() }
         private val gardien = GardienBatterie(ctx) { quandLeGardienChange() }
+        private val son = SonFond.Veille(ctx) { quandLeSonChange() }
+        private var joue: String? = null         // le fichier vraiment joué (la version muette ou celle avec le son)
+        private var reprise = 0                  // où reprendre la vidéo après un changement de version (en ms)
 
         // SECOURS : même principe que pour les dessins (voir FondDessinService)
         private var signalRecu = false
@@ -459,6 +465,16 @@ class FondVideoService : WallpaperService() {
             setTouchEventsEnabled(true)
             CarnetFond.carnet(ctx).registerOnSharedPreferenceChangeListener(this)
             gardien.demarrer()
+            son.demarrer()
+        }
+
+        // (17/11) Le son vient d'être permis ou interdit : si ça change la version à jouer, on la recharge,
+        // à l'endroit où on en était.
+        private fun quandLeSonChange() {
+            val f = File(choix.id)
+            if (SonFond.fichierAJouer(f, son.permis).path == joue) return
+            reprise = try { lecteur?.currentPosition ?: 0 } catch (_: Exception) { 0 }
+            if (surfaceHolder.surface.isValid) preparer(surfaceHolder)
         }
 
         override fun onDestroy() {
@@ -466,6 +482,7 @@ class FondVideoService : WallpaperService() {
             minuteur.removeCallbacks(secours)
             CarnetFond.carnet(ctx).unregisterOnSharedPreferenceChangeListener(this)
             gardien.arreter()
+            son.arreter()
             liberer()
             super.onDestroy()
         }
@@ -486,6 +503,7 @@ class FondVideoService : WallpaperService() {
             val nouveau = CarnetFond.lire(ctx, CarnetFond.PREFIXE_VIDEO)
             val autreFichier = nouveau.id != choix.id
             choix = nouveau
+            if (autreFichier) reprise = 0
             if (autreFichier && surfaceHolder.surface.isValid) preparer(surfaceHolder) else mettreAJour()
         }
 
@@ -495,16 +513,21 @@ class FondVideoService : WallpaperService() {
             val f = File(choix.id)
             if (!f.exists()) { noterEtat("absent"); return }
             noterEtat("chargement")
+            // (17/11) la version muette, ou celle avec le son si le son est permis (et qu'elle existe)
+            val source = SonFond.fichierAJouer(f, son.permis)
+            val avecSon = source.path != f.path
+            joue = source.path
             val mp = MediaPlayer()
             try {
-                mp.setDataSource(f.path)
+                mp.setDataSource(source.path)
                 mp.setSurface(holder.surface)
                 mp.isLooping = true                    // en boucle
-                mp.setVolume(0f, 0f)                   // muet
+                if (avecSon) mp.setVolume(1f, 1f) else mp.setVolume(0f, 0f)   // muet, sauf si le son est permis
                 mp.setOnPreparedListener {
                     // « couvrir » l'écran sans déformer (ce qui dépasse est coupé)
                     mp.setVideoScalingMode(MediaPlayer.VIDEO_SCALING_MODE_SCALE_TO_FIT_WITH_CROPPING)
-                    mp.seekTo(0)                       // affiche la 1re image même si on ne joue pas encore
+                    mp.seekTo(reprise)                 // affiche la 1re image même si on ne joue pas encore
+                    reprise = 0                        // (ou reprend où on en était, après un changement de son)
                     pret = true
                     mettreAJour()
                 }
