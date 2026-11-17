@@ -372,14 +372,15 @@ object WidgetDossier {
         // l'anneau : il se trace (3,8 s) puis s'efface (5,4 s) derrière les points
         fun anneau(cv: Canvas, t: Double) {
             if (t >= 11.9) return
-            val fin = cle(t, 2.4 to 0.0 by LIN, 3.4 to 1.0 by DOUX)
-            val debut = cle(t, 3.7 to 0.0 by LIN, 4.5 to 1.0 by DOUX)
+            // (17/11, v2) il s'efface un peu plus tard (jusqu'à 4,8 s), comme la rotation des apps, plus longue
+            val fin = cle(t, 2.4 to 0.0 by LIN, 3.5 to 1.0 by DOUX)
+            val debut = cle(t, 3.9 to 0.0 by LIN, 4.8 to 1.0 by DOUX)
             if (fin <= debut) return
             val morceau = Path()
             val L = mesure.length
             mesure.getSegment((debut * L).toFloat(), (fin * L).toFloat(), morceau, true)
             cv.save()
-            cv.rotate(cle(t, 2.3 to -90.0 by LIN, 4.5 to 180.0 by DOUX).toFloat(), CX, CY)
+            cv.rotate(cle(t, 2.0 to -90.0 by LIN, 4.8 to 120.0 by DOUX).toFloat(), CX, CY)   // tourne avec les apps
             p.reset(); p.isAntiAlias = true
             p.style = Paint.Style.STROKE; p.strokeWidth = 1.4f; p.strokeCap = Paint.Cap.ROUND
             p.color = Color.argb(150, 255, 255, 255)
@@ -396,7 +397,11 @@ object WidgetDossier {
         val tailleAnneau = min(16.0, 0.78 * 2 * Math.PI * 22 / n.coerceAtLeast(1))
         fun points(cv: Canvas, t: Double) {
             if (t <= 2.0 || n == 0) return
-            val orbite = cle(t, 2.3 to 0.0 by LIN, 4.5 to 270.0 by DOUX)
+            // (17/11, v2, demande de Will : « plus lent et plus fluide ») la rotation démarre dès que les icônes
+            // sortent (2,0 s au lieu de 2,3), dure plus longtemps (jusqu'à 4,8 s) et fait un peu moins de chemin
+            // (210° au lieu de 270°) : au plus vite, elles vont environ 1,6 fois moins vite, donc chaque image avance moins et
+            // le mouvement paraît plus coulé (le widget n'affiche que 25 images par seconde).
+            val orbite = cle(t, 2.0 to 0.0 by LIN, 4.8 to 210.0 by DOUX)
             val depart = if (n == 4) -135.0 else -90.0      // 4 apps : sur les diagonales, comme l'ancienne animation
             p.reset(); p.isAntiAlias = true; p.isFilterBitmap = true
             val zone = RectF()
@@ -407,9 +412,11 @@ object WidgetDossier {
                 if (sortie <= 0.001) continue
                 val a = Math.toRadians(orbite + depart + 360.0 * i / n)
                 val ox = CX + 22 * sortie * cos(a); val oy = CY + 22 * sortie * sin(a)
-                val vol = cle(t, (4.5 + 0.05 * i) to 0.0 by LIN, fin to 1.0 by DOUX)   // le trajet vers sa place
+                // le trajet vers sa place : il commence un peu AVANT la fin de la rotation (4,45 s), pour que l'icône
+                // passe du cercle à la grille sans s'arrêter, et il dure plus longtemps (0,9 s au lieu de 0,7)
+                val vol = cle(t, debutVol(i) to 0.0 by LIN, fin to 1.0 by DOUX)
                 val x = (ox + (places[i][0] - ox) * vol).toFloat(); val y = (oy + (places[i][1] - oy) * vol).toFloat()
-                val h = (sortie * cle(t, (4.5 + 0.05 * i) to tailleAnneau by LIN, fin to cote.toDouble() by RESSORT) / 2).toFloat()
+                val h = (sortie * cle(t, debutVol(i) to tailleAnneau by LIN, fin to cote.toDouble() by RESSORT) / 2).toFloat()
                 // le halo, qui s'efface pendant le trajet
                 p.color = couleurs[i]; p.alpha = (0.22 * (1 - vol) * 255).toInt()
                 cv.drawCircle(x, y, h * 1.35f, p)
@@ -419,7 +426,8 @@ object WidgetDossier {
             }
         }
         // le moment où l'app « i » arrive à sa place (elles arrivent l'une après l'autre)
-        fun arrivee(i: Int) = 5.2 + 0.05 * i
+        fun debutVol(i: Int) = 4.45 + 0.05 * i
+        fun arrivee(i: Int) = 5.35 + 0.05 * i
 
         // LES ICÔNES à leur place : elles prennent le relais des apps qui tournaient (dès leur arrivée), une vague
         // passe deux fois (espacées : 6,9 et 8,6 s), et elles restent jusqu'à 10,3 s avant de rentrer au centre
