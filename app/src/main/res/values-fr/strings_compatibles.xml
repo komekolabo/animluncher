@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- (17/11) L'écran caché « Apps détectées » (français), pour Will (appui long sur la roue de l'accueil).
+     Voir CompatiblesActivity.kt. Les autres langues prennent les textes anglais. -->
+<resources>
+    <string name="compat_titre">Apps détectées</string>
+    <string name="compat_resume">%1$d apps · %2$d avec leur animation</string>
+    <string name="compat_animee">Animée</string>
+    <string name="compat_coupee">Coupée</string>
+    <string name="compat_classee">Classée</string>
+    <string name="compat_rien">Rien</string>
+    <string name="compat_animation">Animation à elle</string>
+    <string name="compat_animation_coupee">Animation coupée</string>
+    <string name="compat_variantes">%d variantes</string>
+    <string name="compat_sans_animation">Pas d\'animation · dossiers</string>
+</resources>
