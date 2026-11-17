@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Les textes du SON DES FONDS D'ÉCRAN (français) : sans son / avec écouteurs / toujours. Voir SonFond.kt. -->
+<resources>
+    <string name="son_fond_titre">Son des fonds</string>
+    <string name="son_fond_jamais">Sans son</string>
+    <string name="son_fond_ecouteurs">Écouteurs</string>
+    <string name="son_fond_toujours">Toujours</string>
+    <string name="son_fond_expl">Pour les fonds vidéo. « Écouteurs » : seulement quand des écouteurs sont branchés. « Toujours » : aussi par le haut-parleur du téléphone et les enceintes Bluetooth. Les vidéos importées avant cette version n\'ont pas de son : importe-les à nouveau.</string>
+</resources>

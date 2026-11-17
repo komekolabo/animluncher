@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Les textes du SON DES FONDS D'ÉCRAN (Deutsch) : sans son / avec écouteurs / toujours. Voir SonFond.kt. -->
+<resources>
+    <string name="son_fond_titre">Ton der Hintergründe</string>
+    <string name="son_fond_jamais">Aus</string>
+    <string name="son_fond_ecouteurs">Kopfhörer</string>
+    <string name="son_fond_toujours">Immer</string>
+    <string name="son_fond_expl">Für Video-Hintergründe. „Kopfhörer“: nur wenn Kopfhörer verbunden sind. „Immer“: auch über den Lautsprecher des Telefons und Bluetooth-Lautsprecher. Vor dieser Version importierte Videos haben keinen Ton: importiere sie erneut.</string>
+</resources>

@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Les textes du SON DES FONDS D'ÉCRAN (español) : sans son / avec écouteurs / toujours. Voir SonFond.kt. -->
+<resources>
+    <string name="son_fond_titre">Sonido de los fondos</string>
+    <string name="son_fond_jamais">Sin sonido</string>
+    <string name="son_fond_ecouteurs">Auriculares</string>
+    <string name="son_fond_toujours">Siempre</string>
+    <string name="son_fond_expl">Para los fondos de vídeo. «Auriculares»: solo con auriculares conectados. «Siempre»: también por el altavoz del teléfono y los altavoces Bluetooth. Los vídeos importados antes de esta versión no tienen sonido: vuelve a importarlos.</string>
+</resources>

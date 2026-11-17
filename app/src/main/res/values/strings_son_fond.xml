@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Les textes du SON DES FONDS D'ÉCRAN (English (default)) : sans son / avec écouteurs / toujours. Voir SonFond.kt. -->
+<resources>
+    <string name="son_fond_titre">Wallpaper sound</string>
+    <string name="son_fond_jamais">Off</string>
+    <string name="son_fond_ecouteurs">Headphones</string>
+    <string name="son_fond_toujours">Always</string>
+    <string name="son_fond_expl">For video wallpapers. “Headphones”: only when headphones are connected. “Always”: also through the phone speaker and Bluetooth speakers. Videos imported before this version have no sound: import them again.</string>
+</resources>

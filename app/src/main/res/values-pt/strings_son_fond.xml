@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Les textes du SON DES FONDS D'ÉCRAN (português) : sans son / avec écouteurs / toujours. Voir SonFond.kt. -->
+<resources>
+    <string name="son_fond_titre">Som dos papéis de parede</string>
+    <string name="son_fond_jamais">Sem som</string>
+    <string name="son_fond_ecouteurs">Fones</string>
+    <string name="son_fond_toujours">Sempre</string>
+    <string name="son_fond_expl">Para papéis de parede em vídeo. “Fones”: só com fones conectados. “Sempre”: também pelo alto-falante do celular e caixas de som Bluetooth. Vídeos importados antes desta versão não têm som: importe-os de novo.</string>
+</resources>

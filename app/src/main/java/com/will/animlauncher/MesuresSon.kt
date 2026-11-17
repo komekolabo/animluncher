@@ -19,7 +19,8 @@ import android.graphics.Typeface
 //   DROP   = (seulement si c'est le cas) un drop est en cours : les confettis sont permis dès le rouge (voir DropSon.kt)
 // À RETIRER quand les paliers seront réglés : mettre AFFICHER à false (ou supprimer ce fichier et son appel).
 object MesuresSon {
-    const val AFFICHER = true
+    // (17/11) éteint à la demande de Will : les chiffres ne s'affichent plus (remettre true pour régler les paliers)
+    const val AFFICHER = false
 
     private val chiffres = Paint(Paint.ANTI_ALIAS_FLAG).apply {
         color = Color.WHITE
