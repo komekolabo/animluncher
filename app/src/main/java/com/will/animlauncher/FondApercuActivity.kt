@@ -76,7 +76,7 @@ class FondApercuActivity : Activity() {
         if (actuel.sorte == sorte && actuel.id == ref) {
             fluide = actuel.fluide; figer = actuel.figer; assombrir = actuel.assombrir
         }
-        inverse = CarnetFond.carnet(this).getBoolean(FondProfondeur.CLE_INVERSE, false)
+        inverse = FondProfondeur.inverseChoisi(this)   // (inversé par défaut)
         pleinEcran()
 
         val racine = FrameLayout(this).apply { setBackgroundColor(Color.BLACK) }
