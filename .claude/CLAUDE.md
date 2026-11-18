@@ -138,3 +138,6 @@ de chaque fichier envoyé). Au prochain passage tranquille, ces notes pourront �
   et files/galerie (fonds choisis, gardés). Formats : jpg, jpeg, png, webp, gif, mp4. Taille vérifiée.
 - Pour ajouter un fond : Will dépose l'image dans le bon dossier sur github.com (branche galerie) : visible sans nouvelle version
   (dans les 6 h, ou tout de suite avec « Réessayer » quand la galerie est vide).
+- (18/11, 0h) PREMIERS FONDS : 9 images générées par Will avec Gemini (1079 x 1920, ~800 Ko) déposées par Claude (git push sur
+  la branche galerie) : Sea (plage palmiers, éclair, vague, phare), Countryside (3), Winter (2 cabanes). Nouvelle catégorie
+  `Sea` (traduite : `gal_cat_mer`). Une 11e image (forêt sous l'orage) refusée : trouvée dans sa galerie, auteur inconnu.

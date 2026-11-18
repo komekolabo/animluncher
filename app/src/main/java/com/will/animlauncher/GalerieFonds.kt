@@ -108,6 +108,7 @@ object GalerieFonds {
         "japan" -> c.getString(R.string.gal_cat_japon)
         "winter" -> c.getString(R.string.gal_cat_hiver)
         "night" -> c.getString(R.string.gal_cat_nuit)
+        "sea" -> c.getString(R.string.gal_cat_mer)   // (18/11) mer, plages, vagues, côtes
         else -> dossier.replace('_', ' ').replace('-', ' ')
     }
 
