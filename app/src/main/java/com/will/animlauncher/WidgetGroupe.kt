@@ -73,7 +73,7 @@ class WidgetGroupe : AppWidgetProvider() {
             // échoue), le widget montre l'ancienne animation de l'étoile, préparée juste en dessous.
             WidgetDossier.demander(c, groupe, forcer = true)
             val v = RemoteViews(c.packageName, R.layout.widget_groupe)
-            v.setTextViewText(R.id.widget_groupe_nom, Groupes.categorie(groupe)?.nom ?: "?")
+            Polices.poserNom(c, v, R.id.widget_groupe_nom, R.id.widget_groupe_nom_image, groupe)
             // LA COULEUR CHOISIE (roue du dossier) : on « teinte » le galet et l'étoile animée.
             // Mode SRC_ATOP : la couleur ne se pose QUE là où il y a déjà du dessin (la forme arrondie du galet,
             // la forme de l'étoile). Le 09/11, le mode COLOR remplissait aussi les coins transparents : le

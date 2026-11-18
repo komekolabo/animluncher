@@ -38,4 +38,16 @@
         android:text="Games"
         android:textColor="#FFFFFF"
         android:textSize="13sp" />
+
+    <!-- (18/11) LE NOM DANS UNE AUTRE POLICE (gothique, pixel…) : un widget ne peut pas changer la police d'un texte,
+         alors l'app dessine le nom dans une image, affichée ici À LA PLACE du texte du dessus (voir Polices.poserNom).
+         Caché tant que le dossier garde la police du téléphone. (marge de 1 dp : l'image contient déjà l'ombre) -->
+    <ImageView
+        android:id="@+id/top_nom_image"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="1dp"
+        android:adjustViewBounds="true"
+        android:scaleType="fitCenter"
+        android:visibility="gone" />
 </LinearLayout>

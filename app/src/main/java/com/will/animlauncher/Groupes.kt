@@ -283,7 +283,7 @@ object Groupes {
         if (id !in persos(c)) return
         c.getSharedPreferences(CARNET, Context.MODE_PRIVATE).edit()
             .putString("persos", persos(c).filter { it != id }.joinToString(","))
-            .remove("nom_$id").remove("logo_$id").remove("avec_$id").remove("sans_$id").remove("ordre_$id").remove("couleur_$id")
+            .remove("nom_$id").remove("logo_$id").remove("avec_$id").remove("sans_$id").remove("ordre_$id").remove("couleur_$id").remove("police_$id")
             .apply()
         LogosDossier.oublierChoix()
     }
@@ -298,6 +298,14 @@ object Groupes {
         val propre = nom.trim().take(30)
         if (propre.isEmpty()) { if (id !in persos(c)) carnet.edit().remove("nom_$id").apply() }
         else carnet.edit().putString("nom_$id", propre).apply()
+    }
+
+    // (18/11) La police d'écriture du nom d'un dossier (voir Polices.kt) : « classique » si on n'en a jamais choisi.
+    fun police(c: Context, id: String): String =
+        c.getSharedPreferences(CARNET, Context.MODE_PRIVATE).getString("police_$id", null) ?: Polices.CLASSIQUE
+
+    fun definirPolice(c: Context, id: String, police: String) {
+        c.getSharedPreferences(CARNET, Context.MODE_PRIVATE).edit().putString("police_$id", police).apply()
     }
 
     // Le logo choisi pour un dossier (« nuit », « cafe »… voir LogosDossier.LISTE), ou null = celui de sa catégorie.

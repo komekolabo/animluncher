@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- (18/11) LES POLICES DES DOSSIERS (français) : la grille de la fenêtre « Renommer ». Voir Polices.kt. -->
+<resources>
+    <string name="dossier_police">Police</string>
+    <string name="police_classique">Classique</string>
+    <string name="police_gothique">Gothique</string>
+    <string name="police_fraktur">Fraktur</string>
+    <string name="police_horreur">Horreur</string>
+    <string name="police_manuscrite">Manuscrite</string>
+    <string name="police_elegante">Élégante</string>
+    <string name="police_futuriste">Futuriste</string>
+    <string name="police_pixel">Pixel</string>
+</resources>
