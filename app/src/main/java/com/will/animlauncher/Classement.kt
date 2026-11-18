@@ -258,7 +258,7 @@ object Classement {
             principale("APP_MARKET") to "shopping",
             principale("APP_FITNESS") to "sante",
             principale("APP_WEATHER") to "infos",
-            principale("APP_BROWSER") to "infos",
+            principale("APP_BROWSER") to "internet",
         )
     }
 
@@ -327,9 +327,13 @@ object Classement {
             "com.cloudflare.", "com.avast.", "com.avg.", "com.kms.", "com.authy.", "com.microsoft.launcher",
             "com.teslacoilsw.launcher") +
         editeurs("infos", "com.google.android.apps.magazines", "fr.lemonde.", "fr.playsoft.lefigaro", "com.cnn.",
-            "bbc.", "uk.co.bbc.", "flipboard.", "com.android.chrome", "org.mozilla.", "com.opera.", "com.brave.",
-            "com.microsoft.emmx", "com.sec.android.app.sbrowser", "com.duckduckgo.", "com.accuweather.",
-            "com.weather.", "fr.meteo", "com.meteofrance", "fr.francetv.") +
+            "bbc.", "uk.co.bbc.", "flipboard.", "com.accuweather.", "com.weather.", "fr.meteo", "com.meteofrance",
+            "fr.francetv.") +
+        // (18/11) le groupe Internet : navigateurs et moteurs de recherche
+        editeurs("internet", "com.android.chrome", "com.chrome.", "org.mozilla.", "com.opera.", "com.brave.",
+            "com.microsoft.emmx", "com.sec.android.app.sbrowser", "com.duckduckgo.", "com.google.android.googlequicksearchbox",
+            "com.microsoft.bing", "com.qwant.", "org.ecosia.", "com.vivaldi.", "com.kiwibrowser.", "org.torproject.",
+            "com.yandex.browser", "mark.via", "com.ucmobile.", "com.mi.globalbrowser", "com.startpage.") +
         // (18/11) les 4 nouveaux groupes : Sport, Cuisine, Apprendre, Maison
         editeurs("sport", "com.fivemobile.thescore", "com.espn.", "fr.lequipe.", "com.onefootball.", "com.sofascore.",
             "com.flashscore.", "com.nba.", "com.nfl.", "com.uefa.", "com.fifa.", "com.eurosport.", "com.dazn",
@@ -393,8 +397,10 @@ object Classement {
             "calculat", "clock", "horloge", "alarm", "reveil", "flashlight", "lampe", "torch", "qr", "wifi",
             "bluetooth", "boussole", "compass", "config", "system", "systeme", "update"),
         "infos" to setOf("journal", "presse", "press", "monde", "figaro", "liberation", "franceinfo", "bfm", "cnn",
-            "bbc", "reuters", "magazine", "flipboard", "feed", "rss", "meteo", "weather", "wiki", "browser",
-            "navigateur", "chrome", "firefox", "opera", "brave", "internet", "duckduckgo", "actualit", "headline"),
+            "bbc", "reuters", "magazine", "flipboard", "feed", "rss", "meteo", "weather", "wiki", "actualit", "headline"),
+        // (18/11) navigateurs et moteurs de recherche
+        "internet" to setOf("browser", "navigateur", "chrome", "firefox", "opera", "brave", "internet", "duckduckgo",
+            "search", "recherche", "web", "bing", "qwant", "ecosia", "vivaldi", "torbrowser", "startpage"),
         // (18/11) les 4 nouveaux groupes
         "sport" to setOf("sport", "score", "thescore", "espn", "lequipe", "onefootball", "sofascore", "flashscore",
             "ligue", "foot", "basket", "nba", "nfl", "rugby", "tennis", "f1", "formula", "motogp", "eurosport", "dazn",
