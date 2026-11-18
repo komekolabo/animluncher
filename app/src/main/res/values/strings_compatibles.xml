@@ -27,4 +27,5 @@
     <string name="compat_par_paquet">package name</string>
     <string name="compat_par_service">service</string>
     <string name="compat_tri_groupe">Groups</string>
+    <string name="compat_ranger">Put “%s” in…</string>
 </resources>

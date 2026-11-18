@@ -27,4 +27,5 @@
     <string name="compat_par_paquet">nom technique</string>
     <string name="compat_par_service">service</string>
     <string name="compat_tri_groupe">Groupes</string>
+    <string name="compat_ranger">Ranger « %s » dans…</string>
 </resources>
