@@ -20,4 +20,16 @@
     <string name="gal_cat_hiver">Inverno</string>
     <string name="gal_cat_nuit">Noite</string>
     <string name="gal_cat_mer">Mar</string>
+    <!-- (19/11) les « dossiers prêts » (GalerieActivity.carteDossierPret) -->
+    <string name="gal_prets_titre">Pastas prontas</string>
+    <string name="gal_un_par_un">Um por um</string>
+    <string name="gal_pret_paysages">Paisagens anime</string>
+    <string name="gal_pret_nombre">%1$d fundos · um novo cada vez que voltas ao início</string>
+    <string name="gal_pret_question">Definir estes %1$d fundos? A imagem muda sempre que voltas ao ecrã inicial.</string>
+    <string name="gal_pret_poser">Definir como fundo</string>
+    <string name="gal_pret_remplacer">Substituir a minha pasta (%1$d)</string>
+    <string name="gal_pret_ajouter">Adicionar à minha pasta</string>
+    <string name="gal_pret_progres">A transferir fundos… %1$d / %2$d</string>
+    <string name="gal_pret_plein">A tua pasta de fundos está cheia (100 no máximo).</string>
+    <string name="gal_pret_partiel">%1$d de %2$d fundos adicionados (os outros não puderam ser transferidos ou a pasta está cheia).</string>
 </resources>

@@ -20,4 +20,16 @@
     <string name="gal_cat_hiver">Invierno</string>
     <string name="gal_cat_nuit">Noche</string>
     <string name="gal_cat_mer">Mar</string>
+    <!-- (19/11) les « dossiers prêts » (GalerieActivity.carteDossierPret) -->
+    <string name="gal_prets_titre">Carpetas listas</string>
+    <string name="gal_un_par_un">Uno a uno</string>
+    <string name="gal_pret_paysages">Paisajes anime</string>
+    <string name="gal_pret_nombre">%1$d fondos · uno nuevo cada vez que vuelves al inicio</string>
+    <string name="gal_pret_question">¿Poner estos %1$d fondos de pantalla? La imagen cambiará cada vez que vuelvas a la pantalla de inicio.</string>
+    <string name="gal_pret_poser">Poner de fondo</string>
+    <string name="gal_pret_remplacer">Reemplazar mi carpeta (%1$d)</string>
+    <string name="gal_pret_ajouter">Añadir a mi carpeta</string>
+    <string name="gal_pret_progres">Descargando fondos… %1$d / %2$d</string>
+    <string name="gal_pret_plein">Tu carpeta de fondos está llena (100 como máximo).</string>
+    <string name="gal_pret_partiel">%1$d de %2$d fondos añadidos (los demás no se pudieron descargar o la carpeta está llena).</string>
 </resources>

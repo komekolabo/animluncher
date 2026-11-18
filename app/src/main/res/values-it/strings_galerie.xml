@@ -20,4 +20,16 @@
     <string name="gal_cat_hiver">Inverno</string>
     <string name="gal_cat_nuit">Notte</string>
     <string name="gal_cat_mer">Mare</string>
+    <!-- (19/11) les « dossiers prêts » (GalerieActivity.carteDossierPret) -->
+    <string name="gal_prets_titre">Cartelle pronte</string>
+    <string name="gal_un_par_un">Uno alla volta</string>
+    <string name="gal_pret_paysages">Paesaggi anime</string>
+    <string name="gal_pret_nombre">%1$d sfondi · uno nuovo ogni volta che torni alla home</string>
+    <string name="gal_pret_question">Impostare questi %1$d sfondi? L’immagine cambierà ogni volta che torni alla schermata Home.</string>
+    <string name="gal_pret_poser">Imposta come sfondo</string>
+    <string name="gal_pret_remplacer">Sostituisci la mia cartella (%1$d)</string>
+    <string name="gal_pret_ajouter">Aggiungi alla mia cartella</string>
+    <string name="gal_pret_progres">Download degli sfondi… %1$d / %2$d</string>
+    <string name="gal_pret_plein">La tua cartella di sfondi è piena (massimo 100).</string>
+    <string name="gal_pret_partiel">%1$d sfondi su %2$d aggiunti (gli altri non sono stati scaricati o la cartella è piena).</string>
 </resources>

@@ -24,6 +24,11 @@ import java.net.URLEncoder
 //    manque de place : on les retéléchargera) ;
 //  - files/galerie : les images CHOISIES (appui sur une vignette) : elles restent, car le fond d'écran
 //    posé en a besoin tout le temps.
+// LES « DOSSIERS PRÊTS » (19/11, demande de Will) : un dossier de la branche dont le nom commence par
+// « Dossier_ » (ex. « Dossier_Anime_Landscapes ») n'est PAS une catégorie : c'est une collection toute faite.
+// Dans la galerie, il apparaît comme une grande carte ; un appui met TOUTES ses images dans le « dossier de
+// fonds » du téléphone (DossierFond.kt), le fond qui change à chaque retour sur l'accueil.
+//
 // Chaque fichier est nommé d'après son « sha » (l'empreinte que GitHub donne au contenu) : si Will
 // remplace une image par une autre du même nom, l'empreinte change et l'app télécharge la nouvelle.
 object GalerieFonds {
@@ -42,7 +47,11 @@ object GalerieFonds {
     class Fond(val chemin: String, val categorie: String, val sha: String, val octets: Long) {
         val extension: String get() = chemin.substringAfterLast('.', "jpg").lowercase()
         val nomFichier: String get() = "$sha.$extension"
+        // (19/11) vrai si ce fond fait partie d'un « dossier prêt » (et non d'une catégorie)
+        val estDossierPret: Boolean get() = categorie.lowercase().startsWith(GalerieFonds.PREFIXE_DOSSIER)
     }
+
+    const val PREFIXE_DOSSIER = "dossier_"
 
     // Le résultat d'une lecture de la liste.
     //  - fonds : la liste (vide si la galerie est vide OU si on n'a rien pu lire) ;
@@ -94,7 +103,7 @@ object GalerieFonds {
     // puis les autres par ordre alphabétique.
     private val ORDRE = listOf("nature", "mountains", "lakes", "countryside", "forest", "japan", "winter", "night")
     fun categories(fonds: List<Fond>): List<String> =
-        fonds.map { it.categorie }.distinct().sortedWith(compareBy({
+        fonds.filter { !it.estDossierPret }.map { it.categorie }.distinct().sortedWith(compareBy({
             val i = ORDRE.indexOf(it.lowercase()); if (i < 0) ORDRE.size else i
         }, { it.lowercase() }))
 
@@ -110,6 +119,20 @@ object GalerieFonds {
         "night" -> c.getString(R.string.gal_cat_nuit)
         "sea" -> c.getString(R.string.gal_cat_mer)   // (18/11) mer, plages, vagues, côtes
         else -> dossier.replace('_', ' ').replace('-', ' ')
+    }
+
+    // (19/11) Les « dossiers prêts » : le nom du dossier GitHub -> ses fonds (dans l'ordre alphabétique des noms).
+    fun dossiersPrets(fonds: List<Fond>): List<Pair<String, List<Fond>>> =
+        fonds.filter { it.estDossierPret }.groupBy { it.categorie }.toList()
+            .sortedBy { it.first.lowercase() }.map { (nom, l) -> nom to l.sortedBy { it.chemin } }
+
+    // Le nom affiché d'un dossier prêt : traduit s'il est connu, sinon le nom du dossier sans « Dossier_ ».
+    fun nomDossierPret(c: Context, dossier: String): String {
+        val reste = dossier.substring(PREFIXE_DOSSIER.length)
+        return when (reste.lowercase()) {
+            "anime_landscapes" -> c.getString(R.string.gal_pret_paysages)
+            else -> reste.replace('_', ' ').replace('-', ' ')
+        }
     }
 
     // ------------------------------ LES FICHIERS ------------------------------

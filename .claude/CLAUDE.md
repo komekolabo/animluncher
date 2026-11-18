@@ -141,3 +141,8 @@ de chaque fichier envoyé). Au prochain passage tranquille, ces notes pourront �
 - (18/11, 0h) PREMIERS FONDS : 9 images générées par Will avec Gemini (1079 x 1920, ~800 Ko) déposées par Claude (git push sur
   la branche galerie) : Sea (plage palmiers, éclair, vague, phare), Countryside (3), Winter (2 cabanes). Nouvelle catégorie
   `Sea` (traduite : `gal_cat_mer`). Une 11e image (forêt sous l'orage) refusée : trouvée dans sa galerie, auteur inconnu.
+- (19/11) DOSSIERS PRÊTS (ce que Will voulait vraiment) : un dossier de la branche galerie nommé `Dossier_<Nom>` n'est pas
+  une catégorie mais une collection : grande carte en haut de « Tout » (`GalerieActivity.carteDossierPret`), appui ->
+  « Mettre en fond » (ou Remplacer / Ajouter si le dossier de fonds n'est pas vide) -> téléchargement dans le cache, copie
+  dans `DossierFond` (`remplirAvec`), puis `DossierFond.mettreEnFond` (FondDossierService). 1er : `Dossier_Anime_Landscapes`
+  (les 9 images de Will, nom traduit `gal_pret_paysages`). Les images restent aussi dans leurs catégories (git ne stocke qu'une fois).

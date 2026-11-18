@@ -20,4 +20,16 @@
     <string name="gal_cat_hiver">Winter</string>
     <string name="gal_cat_nuit">Nacht</string>
     <string name="gal_cat_mer">Meer</string>
+    <!-- (19/11) les « dossiers prêts » (GalerieActivity.carteDossierPret) -->
+    <string name="gal_prets_titre">Fertige Ordner</string>
+    <string name="gal_un_par_un">Einzeln</string>
+    <string name="gal_pret_paysages">Anime-Landschaften</string>
+    <string name="gal_pret_nombre">%1$d Hintergründe · bei jeder Rückkehr zum Startbildschirm ein neuer</string>
+    <string name="gal_pret_question">Diese %1$d Hintergründe festlegen? Das Bild wechselt jedes Mal, wenn du zum Startbildschirm zurückkehrst.</string>
+    <string name="gal_pret_poser">Als Hintergrund festlegen</string>
+    <string name="gal_pret_remplacer">Meinen Ordner ersetzen (%1$d)</string>
+    <string name="gal_pret_ajouter">Zu meinem Ordner hinzufügen</string>
+    <string name="gal_pret_progres">Hintergründe werden geladen… %1$d / %2$d</string>
+    <string name="gal_pret_plein">Dein Hintergrund-Ordner ist voll (max. 100).</string>
+    <string name="gal_pret_partiel">%1$d von %2$d Hintergründen hinzugefügt (die anderen konnten nicht geladen werden oder der Ordner ist voll).</string>
 </resources>

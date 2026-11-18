@@ -20,4 +20,16 @@
     <string name="gal_cat_hiver">Winter</string>
     <string name="gal_cat_nuit">Night</string>
     <string name="gal_cat_mer">Sea</string>
+    <!-- (19/11) les « dossiers prêts » (GalerieActivity.carteDossierPret) -->
+    <string name="gal_prets_titre">Ready-made folders</string>
+    <string name="gal_un_par_un">One by one</string>
+    <string name="gal_pret_paysages">Anime landscapes</string>
+    <string name="gal_pret_nombre">%1$d wallpapers · a new one each time you go home</string>
+    <string name="gal_pret_question">Set these %1$d wallpapers as your background? The picture will change every time you go back to the home screen.</string>
+    <string name="gal_pret_poser">Set as wallpaper</string>
+    <string name="gal_pret_remplacer">Replace my folder (%1$d)</string>
+    <string name="gal_pret_ajouter">Add to my folder</string>
+    <string name="gal_pret_progres">Downloading wallpapers… %1$d / %2$d</string>
+    <string name="gal_pret_plein">Your wallpaper folder is full (100 max).</string>
+    <string name="gal_pret_partiel">%1$d of %2$d wallpapers added (the others could not be downloaded or the folder is full).</string>
 </resources>

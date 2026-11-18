@@ -34,6 +34,10 @@ import kotlin.math.max
 // Les vignettes arrivent une à une (chaque image est téléchargée à part). Un appui sur une vignette range
 // l'image sur le téléphone puis ouvre l'aperçu plein écran habituel (FondApercuActivity), avec « Appliquer ».
 //
+// (19/11) En haut de « Tout » : les DOSSIERS PRÊTS (voir GalerieFonds.kt), une grande carte chacun avec
+// quelques images côte à côte. Un appui : on télécharge toutes ses images et on les met dans le « dossier de
+// fonds » du téléphone (le fond qui change à chaque retour sur l'accueil), puis on le pose en fond d'écran.
+//
 // Si la galerie est vide (Will n'a pas encore déposé d'images) : un message « bientôt ».
 // Si Internet ne répond pas : un message et un bouton « Réessayer ».
 class GalerieActivity : Activity() {
@@ -144,7 +148,21 @@ class GalerieActivity : Activity() {
     // La grille des fonds de la catégorie choisie (ou de toutes), en lignes de 3.
     private fun construireGrille() {
         liste.removeAllViews()
-        val visibles = if (categorie == null) fonds else fonds.filter { it.categorie == categorie }
+        // (19/11) les images des dossiers prêts ne sont pas dans la grille : elles ont leur carte à part
+        val visibles = if (categorie == null) fonds.filter { !it.estDossierPret } else fonds.filter { it.categorie == categorie }
+        if (categorie == null) {
+            val prets = GalerieFonds.dossiersPrets(fonds)
+            if (prets.isNotEmpty()) {
+                liste.addView(Style.texte(this, getString(R.string.gal_prets_titre), 13f, Style.MUET, gras = true).apply {
+                    setPadding(px(4f), px(4f), 0, px(10f))
+                })
+                for ((nom, images) in prets) liste.addView(carteDossierPret(nom, images),
+                    LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, px(170f)).apply { bottomMargin = px(12f) })
+                if (visibles.isNotEmpty()) liste.addView(Style.texte(this, getString(R.string.gal_un_par_un), 13f, Style.MUET, gras = true).apply {
+                    setPadding(px(4f), px(10f), 0, px(10f))
+                })
+            }
+        }
         val largeurEcran = resources.displayMetrics.widthPixels
         val ecart = px(10f)
         val cote = (largeurEcran - px(32f) - 2 * ecart) / 3
@@ -195,6 +213,88 @@ class GalerieActivity : Activity() {
                 }
             }
         } catch (_: Exception) {}    // (l'écran est en train de se fermer)
+    }
+
+    // (19/11) LA CARTE D'UN DOSSIER PRÊT : jusqu'à 4 images côte à côte (en « bandes » verticales), un voile
+    // sombre en bas, le nom du dossier et le nombre de fonds, avec le symbole ⧉ du dossier de fonds.
+    private fun carteDossierPret(nom: String, images: List<GalerieFonds.Fond>): View = FrameLayout(this).apply {
+        background = Style.arrondi(this@GalerieActivity, Style.CARTE, 18f, Style.BORD)
+        outlineProvider = ViewOutlineProvider.BACKGROUND
+        clipToOutline = true
+        // les bandes d'images
+        val bandes = LinearLayout(this@GalerieActivity).apply { orientation = LinearLayout.HORIZONTAL }
+        for (f in images.take(4)) {
+            val image = ImageView(this@GalerieActivity).apply { scaleType = ImageView.ScaleType.CENTER_CROP; alpha = 0f }
+            bandes.addView(image, LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.MATCH_PARENT, 1f))
+            try {
+                ouvriers.execute {
+                    val b = GalerieFonds.pourVignette(this@GalerieActivity, f)?.let { miniature(it, f.extension) }
+                    runOnUiThread {
+                        if (ferme || b == null) return@runOnUiThread
+                        image.setImageBitmap(b)
+                        image.animate().alpha(1f).setDuration(250).start()
+                    }
+                }
+            } catch (_: Exception) {}
+        }
+        addView(bandes, FrameLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT))
+        // le voile sombre en bas (pour lire le texte sur n'importe quelle image)
+        addView(View(this@GalerieActivity).apply {
+            background = android.graphics.drawable.GradientDrawable(
+                android.graphics.drawable.GradientDrawable.Orientation.BOTTOM_TOP,
+                intArrayOf(Color.argb(220, 0, 0, 0), Color.argb(0, 0, 0, 0)))
+        }, FrameLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, px(90f), Gravity.BOTTOM))
+        // le nom et le nombre de fonds
+        addView(LinearLayout(this@GalerieActivity).apply {
+            orientation = LinearLayout.VERTICAL
+            setPadding(px(14f), 0, px(14f), px(12f))
+            addView(Style.texte(this@GalerieActivity, "⧉  " + GalerieFonds.nomDossierPret(this@GalerieActivity, nom), 16f, Style.TEXTE, gras = true))
+            addView(Style.texte(this@GalerieActivity, getString(R.string.gal_pret_nombre, images.size), 12f, Style.DOUX))
+        }, FrameLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT, Gravity.BOTTOM))
+        isClickable = true
+        setOnClickListener { proposerDossierPret(nom, images) }
+    }
+
+    // Appui sur un dossier prêt : on demande confirmation. Si le dossier de fonds du téléphone contient déjà des
+    // fonds, on propose de le REMPLACER ou d'y AJOUTER ces images ; s'il est vide, simplement « Mettre en fond ».
+    private fun proposerDossierPret(nom: String, images: List<GalerieFonds.Fond>) {
+        val deja = DossierFond.fichiers(this).size
+        val d = AlertDialog.Builder(this)
+            .setTitle(GalerieFonds.nomDossierPret(this, nom))
+            .setMessage(getString(R.string.gal_pret_question, images.size))
+            .setNegativeButton(android.R.string.cancel, null)
+        if (deja == 0) d.setPositiveButton(getString(R.string.gal_pret_poser)) { _, _ -> poserDossierPret(images, remplacer = true) }
+        else {
+            d.setPositiveButton(getString(R.string.gal_pret_remplacer, deja)) { _, _ -> poserDossierPret(images, remplacer = true) }
+            d.setNeutralButton(getString(R.string.gal_pret_ajouter)) { _, _ -> poserDossierPret(images, remplacer = false) }
+        }
+        d.show()
+    }
+
+    // Télécharge toutes les images (dans le cache : souvent déjà là grâce aux vignettes), les recopie dans le
+    // dossier de fonds, puis pose le dossier en fond d'écran. Une fenêtre montre l'avancée « 3 / 9 ».
+    private fun poserDossierPret(images: List<GalerieFonds.Fond>, remplacer: Boolean) {
+        val attente = AlertDialog.Builder(this).setMessage(getString(R.string.gal_pret_progres, 0, images.size))
+            .setCancelable(false).show()
+        Thread {
+            val fichiers = mutableListOf<File>()
+            for ((i, f) in images.withIndex()) {
+                GalerieFonds.pourVignette(this, f)?.let { fichiers.add(it) }
+                runOnUiThread { if (!ferme) attente.setMessage(getString(R.string.gal_pret_progres, i + 1, images.size)) }
+            }
+            // rien n'a pu être téléchargé : on ne touche PAS au dossier (surtout pas le vider)
+            val ajoutes = if (fichiers.isEmpty()) 0 else DossierFond.remplirAvec(this, fichiers, remplacer)
+            runOnUiThread {
+                if (ferme) return@runOnUiThread
+                attente.dismiss()
+                if (ajoutes == 0) {
+                    Toast.makeText(this, getString(if (fichiers.isEmpty()) R.string.gal_rate else R.string.gal_pret_plein), Toast.LENGTH_LONG).show()
+                    return@runOnUiThread
+                }
+                if (ajoutes < images.size) Toast.makeText(this, getString(R.string.gal_pret_partiel, ajoutes, images.size), Toast.LENGTH_LONG).show()
+                DossierFond.mettreEnFond(this)
+            }
+        }.start()
     }
 
     // Une petite image (au plus 360 pixels de côté) tirée du fichier : l'image elle-même, la 1re image d'un GIF,

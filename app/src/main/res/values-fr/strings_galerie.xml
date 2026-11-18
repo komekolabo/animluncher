@@ -20,4 +20,16 @@
     <string name="gal_cat_hiver">Hiver</string>
     <string name="gal_cat_nuit">Nuit</string>
     <string name="gal_cat_mer">Mer</string>
+    <!-- (19/11) les « dossiers prêts » (GalerieActivity.carteDossierPret) -->
+    <string name="gal_prets_titre">Dossiers prêts</string>
+    <string name="gal_un_par_un">Un par un</string>
+    <string name="gal_pret_paysages">Paysages anime</string>
+    <string name="gal_pret_nombre">%1$d fonds · un nouveau à chaque retour sur l’accueil</string>
+    <string name="gal_pret_question">Mettre ces %1$d fonds en fond d’écran ? L’image changera à chaque fois que tu reviens sur l’écran d’accueil.</string>
+    <string name="gal_pret_poser">Mettre en fond</string>
+    <string name="gal_pret_remplacer">Remplacer mon dossier (%1$d)</string>
+    <string name="gal_pret_ajouter">Ajouter à mon dossier</string>
+    <string name="gal_pret_progres">Téléchargement des fonds… %1$d / %2$d</string>
+    <string name="gal_pret_plein">Ton dossier de fonds est plein (100 au maximum).</string>
+    <string name="gal_pret_partiel">%1$d fonds sur %2$d ajoutés (les autres n’ont pas pu être téléchargés, ou le dossier est plein).</string>
 </resources>

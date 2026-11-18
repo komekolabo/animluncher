@@ -1,9 +1,14 @@
 package com.will.animlauncher
 
+import android.app.Activity
+import android.app.WallpaperManager
+import android.content.ComponentName
 import android.content.Context
+import android.content.Intent
 import android.content.SharedPreferences
 import android.net.Uri
 import android.os.SystemClock
+import android.widget.Toast
 import java.io.File
 
 // LE DOSSIER DE FONDS (17/11, demande de Will) : une collection de photos et de vidéos qui servent de fond
@@ -118,6 +123,53 @@ object DossierFond {
         }
         signalerChangement(c)
         return ajoutes
+    }
+
+    // (19/11) REMPLIR le dossier avec des fichiers DÉJÀ sur le téléphone : les images d'un « dossier prêt » de la
+    // galerie, téléchargées juste avant (voir GalerieActivity). Elles sont déjà à la bonne taille et sans son :
+    // on les recopie simplement, avec un nom « d_heure_numéro » comme les ajouts depuis la galerie du téléphone.
+    //  - remplacer = true : on vide d'abord le dossier (les anciens fonds sont supprimés) ;
+    //  - remplacer = false : on ajoute à la suite (dans la limite de MAX).
+    // Renvoie combien de fonds ont été ajoutés. (À appeler en arrière-plan : ça écrit des fichiers.)
+    fun remplirAvec(c: Context, sources: List<File>, remplacer: Boolean): Int {
+        if (remplacer) {
+            fichiers(c).forEach { ImportFond.supprimer(it) }
+            carnet(c).edit().remove(COURANT).remove("pioche").remove(MUETTES).apply()
+        }
+        val heure = System.currentTimeMillis()
+        val place = MAX - fichiers(c).size
+        var ajoutes = 0
+        for ((i, source) in sources.take(place.coerceAtLeast(0)).withIndex()) {
+            val ext = source.extension.lowercase().ifEmpty { "jpg" }
+            val vers = File(dossier(c), "d_" + heure + "_" + i.toString().padStart(3, '0') + "." + ext)
+            try { source.copyTo(vers, overwrite = true); ajoutes++ } catch (_: Exception) { vers.delete() }
+        }
+        // le dossier était vide (ou vient d'être vidé) : le premier fond devient le fond en cours
+        if (carnet(c).getString(COURANT, null) == null) fichiers(c).firstOrNull()?.let {
+            carnet(c).edit().putString(COURANT, it.name).apply()
+        }
+        signalerChangement(c)
+        return ajoutes
+    }
+
+    // (19/11) METTRE LE DOSSIER EN FOND D'ÉCRAN, depuis n'importe quel écran. Si c'est déjà lui : rien à faire,
+    // il suit tout seul les changements du dossier. Sinon : l'écran de confirmation d'Android.
+    fun mettreEnFond(a: Activity) {
+        val voulu = ComponentName(a, FondDossierService::class.java)
+        val actuel = try { WallpaperManager.getInstance(a).wallpaperInfo?.component } catch (_: Exception) { null }
+        if (actuel == voulu) {
+            Toast.makeText(a, a.getString(R.string.fd_applique), Toast.LENGTH_SHORT).show()
+            return
+        }
+        try {
+            a.startActivity(Intent(WallpaperManager.ACTION_CHANGE_LIVE_WALLPAPER)
+                .putExtra(WallpaperManager.EXTRA_LIVE_WALLPAPER_COMPONENT, voulu))
+            Toast.makeText(a, a.getString(R.string.fd_choisir_ecran), Toast.LENGTH_LONG).show()
+        } catch (_: Exception) {
+            try { a.startActivity(Intent(WallpaperManager.ACTION_LIVE_WALLPAPER_CHOOSER)) } catch (_: Exception) {
+                Toast.makeText(a, a.getString(R.string.fd_pas_possible), Toast.LENGTH_LONG).show()
+            }
+        }
     }
 
     // RETIRER un fond du dossier.
