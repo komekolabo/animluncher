@@ -232,9 +232,8 @@ object WidgetDossier {
     // LES 3 COULEURS DU LOGO : celles de sa catégorie (voir LogosDossier), ou des voisines de la couleur choisie avec la roue.
     private fun couleursLogo(groupe: String, hsv: FloatArray?): IntArray {
         if (hsv == null) return LogosDossier.couleurs(groupe)
-        val (h, s, v) = Triple(hsv[0], hsv[1], hsv[2].coerceAtLeast(0.6f))
-        return intArrayOf(Color.HSVToColor(floatArrayOf((h + 335f) % 360f, s, v)), Color.HSVToColor(floatArrayOf(h, s, v)),
-                          Color.HSVToColor(floatArrayOf((h + 40f) % 360f, s * 0.8f, v)))
+        // (18/11) exactement le dégradé du logo dans le dossier ouvert (calculé en OKLCH, voir Teinte.depuis)
+        return Teinte.depuis(hsv).logo
     }
 
     // ---------------- LE CHEF D'ORCHESTRE (appelé par le service d'AnimLauncher) ----------------

@@ -82,7 +82,7 @@ class WidgetGroupe : AppWidgetProvider() {
             // Android 12 et plus seulement (avant, un widget ne peut pas changer de teinte).
             val hsv = Groupes.couleur(c, groupe)
             if (hsv != null && Build.VERSION.SDK_INT >= 31) {
-                val vive = Teinte.avecAlpha(Color.HSVToColor(hsv), 190f)
+                val vive = Teinte.avecAlpha(Teinte.vitrine(hsv), 190f)   // (18/11) la même couleur que dans le dossier
                 val sombre = Teinte.avecAlpha(Teinte.depuis(hsv).haut, 175f)
                 v.setColorStateList(R.id.widget_groupe_etoile, "setIndeterminateTintList", ColorStateList.valueOf(vive))
                 v.setBlendMode(R.id.widget_groupe_etoile, "setIndeterminateTintBlendMode", BlendMode.SRC_ATOP)

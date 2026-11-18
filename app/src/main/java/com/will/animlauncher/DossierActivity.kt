@@ -236,7 +236,7 @@ class DossierVue(
 
     // LA ROUE CHROMATIQUE : roue = vrai tant qu'elle est affichée ; roueA = l'instant où on l'a ouverte,
     // roueFermeA = celui où on la referme (-1 = pas encore) ; prise = ce qu'on fait glisser (0 rien,
-    // 1 la poignée de l'anneau, 2 celle du carré) ; ouvertureRoue = 0 (fermée) à 1 (ouverte), pour estomper
+    // 1 la poignée de l'anneau, 2 celle du carré, 3 un rond des couleurs proposées) ; ouvertureRoue = 0 (fermée) à 1 (ouverte), pour estomper
     // les apps dessous.
     private var roue = false
     private var roueA = 0f
@@ -389,6 +389,17 @@ class DossierVue(
     private val r2 get() = 118f * k          // … et bord intérieur
     private val c2 get() = 74f * k           // la moitié du côté du carré
     private fun boutonDone() = RectF(roueX() + 20f * k, roueY() + 178f * k, roueX() + 130f * k, roueY() + 214f * k)
+
+    // LES COULEURS PROPOSÉES (18/11) : 8 petits ronds en ligne, au-dessus de la roue (voir Teinte.PROPOSEES).
+    // ecartRonds = la distance entre deux centres ; rondChoisiA = l'instant du dernier appui (pour la petite onde).
+    private val ecartRonds get() = 40f * k
+    private fun rondY() = roueY() - r1 - 44f * k
+    private fun rondX(i: Int) = roueX() + (i - (Teinte.PROPOSEES.size - 1) / 2f) * ecartRonds
+    private var rondChoisiA = -10f
+    private var rondChoisi = -1
+    // Quel rond correspond à la couleur actuelle de la roue ? -1 = aucun (couleur réglée à la main).
+    private fun rondActuel(): Int = Teinte.PROPOSEES.indexOfFirst {
+        abs(it[0] - hsv[0]) < 0.5f && abs(it[1] - hsv[1]) < 0.005f && abs(it[2] - hsv[2]) < 0.005f }
 
     private fun ouvrirRoue() {
         if (roue) return
@@ -885,7 +896,7 @@ class DossierVue(
         c.drawCircle(hx, hy, 13f * k, pinceau)
         // la poignée du carré
         val qx = mix(-c2, c2, hsv[1]); val qy = mix(c2, -c2, hsv[2])
-        pinceau.color = Teinte.avecAlpha(Color.HSVToColor(hsv), 255 * o)
+        pinceau.color = Teinte.avecAlpha(teinte.logo[1], 255 * o)
         c.drawCircle(qx, qy, 9f * k, pinceau)
         pinceau.style = Paint.Style.STROKE
         pinceau.strokeWidth = 3f * k
@@ -893,10 +904,11 @@ class DossierVue(
         c.drawCircle(qx, qy, 12f * k, pinceau)
         pinceau.style = Paint.Style.FILL
         c.restore()
+        dessinerRonds(c, t, o)
         // le code de la couleur (#6BDEF3) et le bouton « Done », une fois la roue ouverte
         val a = ((o - 0.6f) / 0.4f).coerceIn(0f, 1f)
         if (a > 0) {
-            val couleur = Color.HSVToColor(hsv)
+            val couleur = teinte.logo[1]       // (18/11) la VRAIE couleur du logo, pas la couleur brute de la roue
             val code = String.format("#%06X", couleur and 0xFFFFFF)
             texte.typeface = Typeface.DEFAULT
             texte.textSize = 17f * k
@@ -912,6 +924,59 @@ class DossierVue(
         }
     }
 
+    // LES RONDS DES COULEURS PROPOSÉES. Ils apparaissent l'un après l'autre (de gauche à droite, avec le même
+    // petit ressort que la roue), juste après elle, et s'effacent avec elle. Derrière : une bande sombre
+    // arrondie, comme le disque de la roue. Le rond de la couleur actuelle porte un anneau blanc (comme la
+    // poignée du carré) ; un appui fait partir une onde douce et pâle (pas de flash).
+    private fun dessinerRonds(c: Canvas, t: Float, o: Float) {
+        val n = Teinte.PROPOSEES.size
+        val y = rondY()
+        val fond = ((o - 0.3f) / 0.7f).coerceIn(0f, 1f)
+        if (fond <= 0f) return
+        pinceau.shader = null
+        pinceau.style = Paint.Style.FILL
+        pinceau.color = Color.argb((110 * fond).toInt(), 0, 0, 0)
+        val demi = (n - 1) / 2f * ecartRonds + 26f * k
+        c.drawRoundRect(RectF(roueX() - demi, y - 26f * k, roueX() + demi, y + 26f * k), 26f * k, 26f * k, pinceau)
+        val actuel = rondActuel()
+        for (i in 0 until n) {
+            // l'apparition : chaque rond part 40 ms après son voisin de gauche
+            val depart = roueA + 0.18f + 0.04f * i
+            val e = if (roueFermeA >= 0) o else ressort(((t - depart) / 0.3f).coerceIn(0f, 1f), 2.2f)
+            if (e <= 0.01f) continue
+            val a = if (roueFermeA >= 0) o else ((t - depart) / 0.15f).coerceIn(0f, 1f)
+            val x = rondX(i)
+            val couleur = Teinte.vitrine(Teinte.PROPOSEES[i])
+            // l'onde après un appui (0,5 s), très transparente
+            if (i == rondChoisi) {
+                val v = ((t - rondChoisiA) / 0.5f).coerceIn(0f, 1f)
+                if (v < 1f) {
+                    pinceau.style = Paint.Style.STROKE
+                    pinceau.strokeWidth = 2f * k
+                    pinceau.color = Teinte.avecAlpha(couleur, 120 * (1 - v) * a)
+                    c.drawCircle(x, y, (14f + 16f * freine(v)) * k, pinceau)
+                    pinceau.style = Paint.Style.FILL
+                }
+            }
+            pinceau.color = Teinte.avecAlpha(couleur, 255 * a)
+            c.drawCircle(x, y, 13f * k * e, pinceau)
+            if (i == actuel) {
+                pinceau.style = Paint.Style.STROKE
+                pinceau.strokeWidth = 3f * k
+                pinceau.color = Color.argb((255 * a).toInt(), 255, 255, 255)
+                c.drawCircle(x, y, 18f * k * e, pinceau)
+                pinceau.style = Paint.Style.FILL
+            }
+        }
+    }
+
+    // Le doigt est-il sur un des ronds ? Renvoie son numéro, ou -1.
+    private fun rondSous(x: Float, y: Float): Int {
+        if (abs(y - rondY()) > 24f * k) return -1
+        val i = ((x - rondX(0)) / ecartRonds).roundToInt()
+        return if (i in Teinte.PROPOSEES.indices && abs(x - rondX(i)) <= ecartRonds / 2) i else -1
+    }
+
     // LES APPUIS PENDANT QUE LA ROUE EST OUVERTE : on fait glisser la poignée de l'anneau ou celle du carré ;
     // « Done » ou un appui en dehors de la roue la referme (la couleur est gardée).
     private fun toucherRoue(e: MotionEvent) {
@@ -920,6 +985,17 @@ class DossierVue(
         val d = kotlin.math.hypot(dx, dy)
         when (e.actionMasked) {
             MotionEvent.ACTION_DOWN -> {
+                // (18/11) un appui sur un rond : la roue saute sur cette couleur (prise = 3 : rien à faire glisser,
+                // mais le doigt qui se relève ne doit pas refermer la roue)
+                val rond = rondSous(e.x, e.y)
+                if (rond >= 0) {
+                    prise = 3
+                    val choisie = Teinte.PROPOSEES[rond]
+                    hsv[0] = choisie[0]; hsv[1] = choisie[1]; hsv[2] = choisie[2]
+                    rondChoisi = rond; rondChoisiA = maintenant()
+                    appliquerCouleur()
+                    return
+                }
                 prise = when {
                     d >= r2 - 18f * k && d <= r1 + 18f * k -> 1
                     abs(dx) <= c2 + 10f * k && abs(dy) <= c2 + 10f * k -> 2
@@ -927,7 +1003,7 @@ class DossierVue(
                 }
                 if (prise != 0) glisserRoue(dx, dy)
             }
-            MotionEvent.ACTION_MOVE -> if (prise != 0) glisserRoue(dx, dy)
+            MotionEvent.ACTION_MOVE -> if (prise == 1 || prise == 2) glisserRoue(dx, dy)
             MotionEvent.ACTION_UP, MotionEvent.ACTION_CANCEL -> {
                 if (prise != 0) { prise = 0; enregistrerCouleur(true); return }
                 if (e.actionMasked == MotionEvent.ACTION_UP &&
