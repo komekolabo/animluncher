@@ -41,3 +41,23 @@ de chaque fichier envoyé). Au prochain passage tranquille, ces notes pourront �
 - Générer de faux `R` et `BuildConfig` (objets Kotlin avec des `const val … = 0`) à partir des noms trouvés dans
   res/, puis : `kotlinc -J-Xmx4g -cp android.jar -jvm-target 17 -nowarn -d out stubs.kt $(find app/src/main/java -name '*.kt')`
   (~50 s). Ne vérifie QUE le Kotlin : ni les ressources, ni le manifeste.
+
+## AMÉLIORER UNE IMAGE (18/11 — PAS ENCORE TESTÉ PAR WILL SUR LE TÉLÉPHONE)
+- Demande de Will : un « dépixeliseur » local, optionnel, pour les photos importées comme fonds d'écran.
+- `AmeliorationImage.kt` : `AmeliorationImage` (outil + calcul par carreaux de 192 avec 16 de marge, x4) et
+  `AmeliorationUi` (la ligne « Netteté : Originale / Améliorée » ajoutée dans la feuille de `FondApercuActivity`,
+  seulement pour les images). Textes : `res/values*/strings_net.xml` (6 langues).
+- Modèle : Real-ESRGAN `realesr-general-x4v3` (BSD 3 clauses), converti en TFLite poids 16 bits = 2,5 Mo
+  (`outils/convertir_amelioration.py` + `outils/lire_pth.py`, sans PyTorch : download.pytorch.org est bloqué).
+  Entrée [1,192,192,3] float 0..1, sortie [1,768,768,3] bornée 0..1. Téléchargé à la demande depuis la branche
+  `modeles` (`amelioration_photos_v1.tflite`, taille exacte vérifiée : 2 480 168 octets). Même moteur que
+  `DetourageDessins` (TFLite des services Google, 4 fils).
+- UN SEUL modèle : le modèle « anime » (`realesr-animevideov3`) a été essayé, le général fait aussi bien sur les
+  dessins, et aucun test simple ne distingue photo et dessin de façon fiable (aplats / contours : essayé, raté).
+- Fichiers : l'originale `X.jpg` n'est jamais modifiée ; l'améliorée = `X_net.jpg` à côté. `CarnetFond.importes`
+  cache l'originale quand l'améliorée existe ; supprimer l'améliorée (appui long) fait réapparaître l'originale.
+- Taille de travail : au plus 40 % du grand côté de l'écran en entrée (résultat ramené à l'écran). Vitesse mesurée
+  seulement sur le serveur de Claude (0,5 s par carreau sur 2 cœurs) : À MESURER sur le téléphone de Will.
+- Le connecteur GitHub ne sait pas envoyer un fichier binaire : c'est Will qui dépose le `.tflite` dans la branche
+  `modeles` (github.com → branche modeles → Add file → Upload files). Tant qu'il n'y est pas : « Téléchargement impossible ».
+- Pas fait : fonds 3D, dossier de fonds, GIF / vidéos ; bouton pour supprimer l'outil (2,5 Mo seulement).

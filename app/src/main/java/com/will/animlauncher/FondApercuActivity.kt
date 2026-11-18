@@ -39,6 +39,7 @@ import kotlin.math.max
 //  - Fluidité : Éco (30 images/s) ou Fluide (60) — pas pour les vidéos (elles gardent leur vitesse) ;
 //  - « Figer après 10 s sans toucher l'accueil » ;
 //  - Assombrir (0 à 60 %) — pas pour les vidéos ;
+//  - (18/11) Netteté : Originale / Améliorée, pour les images (voir AmeliorationImage.kt) ;
 //  - (17/11) le son, pour les vidéos ; le sens du mouvement (comme le téléphone / inversé), pour les fonds 3D ;
 //  - le bouton « Appliquer ».
 // Toucher l'aperçu masque / remontre la feuille, pour voir le fond seul.
@@ -60,6 +61,7 @@ class FondApercuActivity : Activity() {
     private var assombrir = 0
     private var inverse = false              // (17/11) fond 3D : le sens du mouvement est-il inversé ?
     private var dessinApercu: DessinFond? = null
+    private var vueImage: ImageView? = null   // (18/11) l'image affichée, pour passer de l'originale à l'améliorée
 
     private val px = { v: Float -> Style.px(this, v) }
     private var lecteur: MediaPlayer? = null
@@ -141,6 +143,7 @@ class FondApercuActivity : Activity() {
             scaleType = ImageView.ScaleType.CENTER_CROP
             val m = resources.displayMetrics
             setImageBitmap(PeintreFond.chargerImage(ref, max(m.widthPixels, m.heightPixels)))
+            vueImage = this
         }
         CarnetFond.GIF -> VueGif(this, ref)
         else -> CarnetFond.dessinPour(this, sorte, ref).let { d ->
@@ -311,6 +314,16 @@ class FondApercuActivity : Activity() {
                     override fun onStartTrackingTouch(s: SeekBar) {}
                     override fun onStopTrackingTouch(s: SeekBar) {}
                 })
+            })
+        }
+
+        // (18/11) NETTETÉ, pour une image importée : « Originale / Améliorée » (voir AmeliorationImage.kt).
+        // Quand on change de version, l'aperçu l'affiche, et « ref » la retient : c'est elle que « Appliquer » mettra en fond.
+        if (sorte == CarnetFond.IMAGE) {
+            addView(AmeliorationUi.vue(this@FondApercuActivity, File(ref)) { f ->
+                ref = f.path
+                val m = resources.displayMetrics
+                vueImage?.setImageBitmap(PeintreFond.chargerImage(ref, max(m.widthPixels, m.heightPixels)))
             })
         }
 

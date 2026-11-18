@@ -244,8 +244,12 @@ object CarnetFond {
     fun dossier(c: Context): File = File(c.filesDir, "fonds").apply { mkdirs() }
 
     // Les fonds importés, du plus récent au plus ancien.
+    // (18/11) Une image qui a une version améliorée (AmeliorationImage.kt) n'est montrée qu'une fois : l'améliorée.
+    // L'originale reste sur le téléphone (l'aperçu permet d'y revenir ; supprimer l'améliorée la fait réapparaître).
     fun importes(c: Context): List<File> =
-        (dossier(c).listFiles() ?: emptyArray()).filter { it.isFile && it.length() > 0 }.sortedByDescending { it.lastModified() }
+        (dossier(c).listFiles() ?: emptyArray())
+            .filter { it.isFile && it.length() > 0 && !AmeliorationImage.estRemplacee(it) }
+            .sortedByDescending { it.lastModified() }
 
     // La sorte d'un fichier importé, d'après sa fin de nom.
     fun sorteDe(f: File): String = when (f.extension.lowercase()) {

@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- (18/11) AMÉLIORER UNE IMAGE (Deutsch) : la ligne « Netteté » de l'aperçu d'un fond. Voir AmeliorationImage.kt. -->
+<resources>
+    <string name="net_titre">Schärfe:</string>
+    <string name="net_originale">Original</string>
+    <string name="net_amelioree">Verbessert</string>
+    <string name="net_info">Für kleine, unscharfe oder verpixelte Bilder. Dein Original bleibt erhalten: Vergleiche beide und wende das an, das dir besser gefällt.</string>
+    <string name="net_outil_titre">Werkzeug zur Bildverbesserung</string>
+    <string name="net_outil_texte">Um dieses Bild schärfer zu machen, muss AnimEngine ein kleines Werkzeug herunterladen: %1$d MB, nur einmal.\n\nDanach passiert alles auf deinem Handy: Dein Bild wird nirgendwohin gesendet.</string>
+    <string name="net_calcul">Bild wird verbessert…</string>
+    <string name="net_calcul_texte">Von wenigen Sekunden bis etwa einer Minute, je nach Bild und Handy.</string>
+    <string name="net_rate">Das Bild konnte nicht verbessert werden. Versuch es noch einmal.</string>
+</resources>

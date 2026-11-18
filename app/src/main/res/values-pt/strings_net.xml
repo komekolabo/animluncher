@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- (18/11) AMÉLIORER UNE IMAGE (português) : la ligne « Netteté » de l'aperçu d'un fond. Voir AmeliorationImage.kt. -->
+<resources>
+    <string name="net_titre">Nitidez:</string>
+    <string name="net_originale">Original</string>
+    <string name="net_amelioree">Melhorada</string>
+    <string name="net_info">Para imagens pequenas, desfocadas ou pixeladas. A original é mantida: compare as duas e aplique a que preferir.</string>
+    <string name="net_outil_titre">Ferramenta de melhoria de imagens</string>
+    <string name="net_outil_texte">Para tornar esta imagem mais nítida, o AnimEngine precisa baixar uma pequena ferramenta: %1$d MB, uma única vez.\n\nDepois tudo acontece no seu celular: sua imagem não é enviada a lugar nenhum.</string>
+    <string name="net_calcul">Melhorando a imagem…</string>
+    <string name="net_calcul_texte">De alguns segundos a cerca de um minuto, dependendo da imagem e do celular.</string>
+    <string name="net_rate">Não foi possível melhorar a imagem. Tente de novo.</string>
+</resources>

@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- (18/11) AMÉLIORER UNE IMAGE (français) : la ligne « Netteté » de l'aperçu d'un fond. Voir AmeliorationImage.kt. -->
+<resources>
+    <string name="net_titre">Netteté :</string>
+    <string name="net_originale">Originale</string>
+    <string name="net_amelioree">Améliorée</string>
+    <string name="net_info">Pour les images petites, floues ou pixelisées. Ton originale est gardée : compare les deux et applique celle que tu préfères.</string>
+    <string name="net_outil_titre">Outil d’amélioration des images</string>
+    <string name="net_outil_texte">Pour rendre cette image plus nette, AnimEngine doit télécharger un petit outil : %1$d Mo, une seule fois.\n\nEnsuite tout se passe sur ton téléphone : ton image n’est envoyée nulle part.</string>
+    <string name="net_calcul">Amélioration de l’image…</string>
+    <string name="net_calcul_texte">De quelques secondes à une minute environ, selon l’image et ton téléphone.</string>
+    <string name="net_rate">L’image n’a pas pu être améliorée. Réessaie.</string>
+</resources>
