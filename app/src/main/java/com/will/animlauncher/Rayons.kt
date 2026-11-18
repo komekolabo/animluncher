@@ -31,6 +31,7 @@ object Rayons {
         "cuisine" -> R.string.cat_cuisine
         "ecole" -> R.string.cat_ecole
         "maison" -> R.string.cat_maison
+        "internet" -> R.string.cat_internet        // (18/11) navigateurs et moteurs de recherche
         else -> R.string.cat_autres
     })
 

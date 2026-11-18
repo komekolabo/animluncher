@@ -5,4 +5,5 @@
     <string name="cat_cuisine">Comida e bebida</string>
     <string name="cat_ecole">Aprender e ler</string>
     <string name="cat_maison">Casa e vida</string>
+    <string name="cat_internet">Internet</string>
 </resources>
