@@ -97,6 +97,11 @@ object Groupes {
         Categorie("cuisine", "Food & Drink", emptySet()),
         Categorie("ecole", "Learning", emptySet()),
         Categorie("maison", "Home & Life", setOf("com.samsung.android.oneconnect", "com.google.android.apps.chromecast.app")),
+        // (18/11) les navigateurs et les moteurs de recherche (avant, ils étaient rangés dans News)
+        Categorie("internet", "Web", setOf(
+            "com.android.chrome", "com.sec.android.app.sbrowser", "com.google.android.googlequicksearchbox",
+            "org.mozilla.firefox", "com.brave.browser", "com.duckduckgo.mobile.android", "com.microsoft.emmx",
+            "com.opera.browser", "com.microsoft.bing", "com.qwant.liberty", "org.mozilla.focus")),
         Categorie("reglages", "Settings", setOf(
             "com.android.settings", "com.google.android.gms", "com.samsung.android.app.tips",
             "com.google.android.apps.authenticator2", "com.samsung.android.lool",
