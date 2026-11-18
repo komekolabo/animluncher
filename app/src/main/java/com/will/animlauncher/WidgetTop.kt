@@ -66,7 +66,7 @@ object WidgetTop {
     // La base du widget : le nom du dossier, et « un appui = ouvrir le dossier ». (Les images arrivent ensuite.)
     fun base(c: Context, id: Int, groupe: String): RemoteViews {
         val v = RemoteViews(c.packageName, R.layout.widget_top)
-        v.setTextViewText(R.id.top_nom, Groupes.categorie(groupe)?.nom ?: "?")
+        Polices.poserNom(c, v, R.id.top_nom, R.id.top_nom_image, groupe)
         v.setOnClickPendingIntent(R.id.top_racine, WidgetGroupe.clic(c, id, groupe))
         return v
     }
