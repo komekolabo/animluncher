@@ -283,8 +283,8 @@ class DossierVue(
     private var degradeEtoile = LinearGradient(-1f, -1f, 1f, 1f, teinte.logo, floatArrayOf(0f, 0.5f, 1f), Shader.TileMode.CLAMP)
 
     // LA TRANSITION D'OUVERTURE propre au dossier (11/11 : Maps, Health, Photos, Finance ; voir TransitionsDossier.kt).
-    // null = l'ouverture d'origine (les traînées de poussière).
-    private val effet: EffetOuverture? = TransitionsDossier.pour(groupe)
+    // (18/11) Les autres dossiers tirent au hasard, à chaque ouverture : la poussière d'origine (null), Orbite ou Cartes.
+    private val effet: EffetOuverture? = TransitionsDossier.pour(c, groupe)
 
     private fun lisse(x: Float) = x * x * (3 - 2 * x)               // départ et arrêt en douceur
     private fun seg(t: Float, a: Float, b: Float) = lisse(((t - a) / (b - a)).coerceIn(0f, 1f))
@@ -296,8 +296,8 @@ class DossierVue(
 
     override fun onSizeChanged(w: Int, h: Int, ow: Int, oh: Int) {
         k = w / 540f
-        miseEnPage()
         // Le départ de l'étoile : le galet du widget (en haut de la case, au-dessus du nom).
+        // (18/11 : calculé AVANT la mise en page, car Orbite et Cartes ont besoin de savoir d'où part le logo)
         val ici = IntArray(2); getLocationOnScreen(ici)
         val d = resources.displayMetrics.density
         if (depart != null) {
@@ -305,6 +305,7 @@ class DossierVue(
             sy = depart.exactCenterY() - ici[1] - 10.5f * d
         } else { sx = w / 2f; sy = h * 0.75f }
         r0 = 16f * d
+        miseEnPage()
         // Les icônes, dessinées une fois pour toutes à la bonne taille.
         val taille = icone.toInt().coerceAtLeast(1)
         for (case in cases) case.image = case.icone?.let {
@@ -355,7 +356,7 @@ class DossierVue(
             ef.preparer(CadreDossier(RectF(panneau), k, colonnes, lignes, celluleL, celluleH,
                 FloatArray(m) { panneau.left + 20f * k + celluleL * (it % colonnes + 0.5f) },
                 FloatArray(m) { haut + celluleH * (it / colonnes) + icone / 2 + 6f * k },
-                panneau.centerX() - (41f * k + tw) / 2 + 19f * k, panneau.top + 44f * k, teinte))
+                panneau.centerX() - (41f * k + tw) / 2 + 19f * k, panneau.top + 44f * k, teinte, sx, sy))
         } catch (_: Exception) {}
     }
 
@@ -479,6 +480,13 @@ class DossierVue(
             val ef = effet
             if (ef != null && ef.deplie) {
                 deplier(c, p, t, fer, titreX)
+            } else if (ef != null && ef.panneauDuCentre) {
+                // Orbite : la fenêtre grandit doucement depuis son centre (c'est l'anneau qui sort du widget)
+                val e = 0.92f + 0.08f * freine(p)
+                c.save()
+                c.scale(e, e, panneau.centerX(), panneau.centerY() + 20f * k)
+                dessinerPanneau(c, p, t, titreX)
+                c.restore()
             } else {
                 val e = 0.25f + 0.75f * freine(p)
                 c.save()
@@ -508,6 +516,9 @@ class DossierVue(
             val d = if (i < parPage) 0.2f + pas * i else 0.3f
             // la transition du dossier (s'il en a une) décide de l'apparition des apps de la 1re page
             if (effet != null && i < parPage && !edition && case !== presse && case.retireeA < 0) {
+                // (18/11) Orbite et Cartes : ces apps viennent de loin (du widget, du logo) ; on les dessine
+                // après, HORS du cadre (sinon elles seraient coupées tant qu'elles ne sont pas dans la fenêtre)
+                if (effet.horsCadre && page < 0.5f) { horsCadre.add(i); continue }
                 val arr = effet.arrivee(i, t)
                 if (arr.alpha <= 0.004f && arr.nv <= 0f) continue
                 dessinerCase(c, case, i, ax, ay, 1f, fer, t, arr = arr)
@@ -533,6 +544,14 @@ class DossierVue(
             dessinerCase(c, case, i, ax, ay, v, fer, t)
         }
         c.restore()
+        // (18/11) les apps d'Orbite / Cartes, sans le cadre
+        for (i in horsCadre) {
+            val ef = effet ?: break
+            val arr = ef.arrivee(i, t)
+            if (arr.alpha <= 0.004f && arr.nv <= 0f) continue
+            dessinerCase(c, cases[i], i, cases[i].dx, cases[i].dy, 1f, fer, t, arr = arr)
+        }
+        horsCadre.clear()
         // l'app qu'on déplace : sous le doigt, un peu plus grande, par-dessus tout
         tiree?.let { dessinerCase(c, it, cases.indexOf(it), doigtX, doigtY - 20f * k, 1f, 0f, t, souleve = true) }
 
@@ -585,6 +604,9 @@ class DossierVue(
         }
         postInvalidateOnAnimation()
     }
+
+    // (18/11) les apps à dessiner hors du cadre pendant cette image (Orbite, Cartes) ; réutilisée à chaque image
+    private val horsCadre = ArrayList<Int>()
 
     // LA FENÊTRE DU DOSSIER : le fond, son liseré, la transition (la carte de Maps), le titre, le point multicolore…
     private fun dessinerPanneau(c: Canvas, p: Float, t: Float, titreX: Float) {
@@ -669,10 +691,11 @@ class DossierVue(
     private fun dessinerCase(c: Canvas, case: Case, i: Int, ax: Float, ay0: Float, v: Float, fer: Float, t: Float,
                              souleve: Boolean = false, arr: Arrivee? = null) {
         val ay = ay0 + (arr?.decalY ?: 0f)               // Finance : les apps montent depuis un peu plus bas
+        val ix = ax + (arr?.decalX ?: 0f)                // (18/11) Orbite, Cartes : l'icône peut être loin de sa place
         val retrait = if (case.retireeA >= 0) 1 - ((t - case.retireeA) / 0.25f).coerceIn(0f, 1f) else 1f
         val attenue = 1 - 0.75f * ouvertureRoue           // les apps s'estompent sous la roue
         val alpha = (arr?.alpha ?: (v / 0.25f).coerceIn(0f, 1f)) * (1 - fer) * retrait * attenue
-        val flot = if (edition) 0f else 4f * k * sin(t * 2f + i * 1.6f)
+        val flot = if (edition) 0f else 4f * k * sin(t * 2f + i * 1.6f) * (arr?.flot ?: 1f)
         val appui = if (case === presse) 1 - 0.08f * sin(PI.toFloat() * ((t - presseA) / 0.15f).coerceIn(0f, 1f)) else 1f
         val e = (arr?.echelle ?: (0.2f + 0.8f * ressort(v))) * appui * retrait * (if (souleve) 1.12f else 1f)
         var penche = arr?.penche ?: (-14f * (1 - freine(v)))
@@ -686,9 +709,18 @@ class DossierVue(
             pinceau.style = Paint.Style.FILL
         }
         c.save()
-        c.rotate(penche, ax, ay + flot)
-        c.scale(e, e, ax, ay + flot)
-        case.image?.let { b ->
+        c.translate(ix, ay + flot)
+        c.rotate(penche)
+        // (18/11) Cartes : la perspective de la carte qui se retourne (cisaille) et sa largeur qui diminue
+        if (arr != null && arr.cisaille != 0f) c.skew(0f, arr.cisaille)
+        c.scale(e * (arr?.largeur ?: 1f), e)
+        c.translate(-ix, -(ay + flot))
+        if (arr != null && arr.dos) {
+            // le DOS de la carte (dessiné par l'effet, centré en 0, 0)
+            c.save(); c.translate(ix, ay + flot)
+            effet?.dessinerDos(c, icone, alpha)
+            c.restore()
+        } else case.image?.let { b ->
             pinceau.color = Color.WHITE
             pinceau.alpha = (255 * alpha).toInt()
             // Photos : l'icône commence en noir et blanc, assombrie, et se « développe » vers la couleur
@@ -699,9 +731,10 @@ class DossierVue(
                 filtre.postConcat(android.graphics.ColorMatrix().apply { setScale(l, l, l, 1f) })
                 pinceau.colorFilter = android.graphics.ColorMatrixColorFilter(filtre)
             }
-            c.drawBitmap(b, ax - b.width / 2f, ay + flot - b.height / 2f, pinceau)
+            c.drawBitmap(b, ix - b.width / 2f, ay + flot - b.height / 2f, pinceau)
             pinceau.colorFilter = null
             pinceau.alpha = 255
+            if (arr != null) effet?.surIcone(c, i, t, ix, ay + flot, icone)     // le reflet des Cartes
         }
         // la petite croix (mode édition), en haut à gauche de l'icône
         if (edition && !souleve) {

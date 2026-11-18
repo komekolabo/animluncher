@@ -1,5 +1,6 @@
 package com.will.animlauncher
 
+import android.content.Context
 import android.graphics.Bitmap
 import android.graphics.Canvas
 import android.graphics.Color
@@ -48,7 +49,9 @@ class CadreDossier(
     val celluleL: Float, val celluleH: Float,
     val appX: FloatArray, val appY: FloatArray,      // le centre de chaque app de la 1re page
     val titreX: Float, val titreY: Float,            // l'endroit où le logo se pose, à côté du titre
-    val teinte: Teinte
+    val teinte: Teinte,
+    // (18/11) l'endroit d'où part le logo : le galet du widget sur l'accueil (Orbite et Cartes partent de là)
+    val departX: Float = 0f, val departY: Float = 0f
 )
 
 // L'apparition d'une app à l'instant t (un seul objet, réutilisé à chaque fois : pas de déchets à ramasser).
@@ -59,6 +62,12 @@ class Arrivee {
     var decalY = 0f        // décalage vers le bas (en pixels)
     var gris = 0f          // 0 = couleurs normales, 1 = noir et blanc assombri
     var nv = 0f            // l'apparition du nom (0 à 1)
+    // (18/11, pour Orbite et Cartes)
+    var decalX = 0f        // décalage vers la droite (en pixels) : l'app peut être loin de sa place (sur l'anneau)
+    var largeur = 1f       // la largeur (1 = normale) : une carte qui se retourne devient très étroite
+    var cisaille = 0f      // l'effet de perspective quand la carte se retourne (le bord qui s'éloigne rapetisse)
+    var dos = false        // vrai = on voit le DOS de la carte (dessiné par l'effet), pas encore l'icône
+    var flot = 1f          // le petit flottement des apps (0 = immobile, 1 = normal)
 }
 
 abstract class EffetOuverture {
@@ -77,6 +86,13 @@ abstract class EffetOuverture {
     open fun avantApps(c: Canvas, t: Float, fer: Float, p: Float) {}
     abstract fun arrivee(i: Int, t: Float): Arrivee
     open fun battementLogo(t: Float) = 1f
+    // (18/11) Orbite et Cartes :
+    open val panneauDuCentre = false   // vrai = la fenêtre grandit depuis son centre (au lieu de sortir du widget)
+    open val horsCadre = false         // vrai = les apps de la 1re page peuvent être dessinées HORS de la fenêtre
+    // le dos d'une carte, centré en (0, 0), de côté « taille » (appelé quand Arrivee.dos est vrai)
+    open fun dessinerDos(c: Canvas, taille: Float, alpha: Float) {}
+    // dessiné PAR-DESSUS l'icône de l'app i, centrée en (x, y), de côté « taille » (le reflet des Cartes)
+    open fun surIcone(c: Canvas, i: Int, t: Float, x: Float, y: Float, taille: Float) {}
 
     // les petites formules de mouvement (les mêmes que dans DossierVue et les démos)
     protected fun lisse(x: Float) = x * x * (3 - 2 * x)
@@ -95,13 +111,21 @@ abstract class EffetOuverture {
 }
 
 object TransitionsDossier {
-    // Le dossier « groupe » a-t-il sa transition ? (null = l'ouverture d'origine)
-    fun pour(groupe: String): EffetOuverture? = when (groupe) {
+    // La transition du dossier « groupe ».
+    // Maps, Health, Photos et Finance ont la leur. (18/11) Les autres dossiers TIRENT AU HASARD une des 3 ouvertures
+    // « générales » à chaque ouverture : la poussière d'origine (null), Orbite ou Cartes (voir OuverturesDossier.kt).
+    // C'est le même TIRAGE ÉQUILIBRÉ que les variantes des animations d'apps (Reglages.tirerVariante) : celle qui
+    // vient de passer a peu de chances de retomber tout de suite, les autres en gagnent un peu à chaque tour.
+    fun pour(c: Context, groupe: String): EffetOuverture? = when (groupe) {
         "trajets" -> EffetCarte()
         "sante" -> EffetBattement()
         "photo" -> EffetObjectif()
         "finance" -> EffetCourbe()
-        else -> null
+        else -> when (Reglages.tirerVariante(c, "ouverture_dossier", 3, listOf(0, 1, 2))) {
+            1 -> EffetOrbite()
+            2 -> EffetCartes()
+            else -> null
+        }
     }
 }
 
