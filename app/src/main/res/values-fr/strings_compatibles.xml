@@ -26,4 +26,5 @@
     <string name="compat_par_nom">nom</string>
     <string name="compat_par_paquet">nom technique</string>
     <string name="compat_par_service">service</string>
+    <string name="compat_tri_groupe">Groupes</string>
 </resources>

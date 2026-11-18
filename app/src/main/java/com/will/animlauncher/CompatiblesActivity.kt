@@ -32,8 +32,9 @@ import android.widget.TextView
 //    par notre liste, l'éditeur, le nom… voir Classement.kt) ;
 //  - une recherche (même façon de chercher que l'écran « Animations d'apps », voir Rayons.rang) ;
 //  - la LÉGENDE en haut sert aussi de FILTRE : un appui sur une couleur ne montre que ces apps (un 2e appui : toutes) ;
-//  - trois boutons de TRI sous la recherche (17/11) : par couleur (de base), de A à Z, ou les plus récemment
-//    installées d'abord (avec la date d'installation sur la 2e ligne). Le choix est gardé pour la prochaine fois.
+//  - quatre boutons de TRI sous la recherche (17/11) : par couleur (de base), de A à Z, les plus récemment
+//    installées d'abord (avec la date d'installation sur la 2e ligne), ou (18/11) PAR GROUPE : une section par
+//    catégorie (IA, Social…, puis « Non répertorié »), avec un titre et le nombre d'apps. Le choix est gardé.
 // Un appui sur une app qui a une animation ouvre ses réglages.
 class CompatiblesActivity : Activity() {
 
@@ -47,12 +48,17 @@ class CompatiblesActivity : Activity() {
 
     // Une app détectée : son nom, son nom technique, ce qu'elle peut faire, et le détail affiché sous son nom.
     // « installe » = le moment où l'app a été installée la 1re fois (en millisecondes, donné par Android).
-    private class Ligne(val nom: String, val pkg: String, val etat: Etat, val detail: String, val installe: Long) {
+    // « categorie » = son groupe (« jeux », « social »… ou Rayons.AUTRES), pour le tri par groupe.
+    private class Ligne(val nom: String, val pkg: String, val etat: Etat, val detail: String, val installe: Long,
+                        val categorie: String) {
         val cle = AppsActivity.sansAccents(nom)
     }
 
+    // (18/11) Le titre d'une section, dans le tri par groupe : le nom du groupe et son nombre d'apps.
+    private class Titre(val texte: String)
+
     private var toutes = listOf<Ligne>()
-    private var lignes = listOf<Ligne>()
+    private var lignes = listOf<Any>()                   // ce que montre la liste : des Ligne (et des Titre en tri par groupe)
     private var cherche = ""
     private var filtre: Etat? = null                     // null = toutes les couleurs
     private var tri = TRI_COULEUR                       // l'ordre de la liste (voir les 3 boutons de tri)
@@ -63,6 +69,7 @@ class CompatiblesActivity : Activity() {
         private const val TRI_COULEUR = 0               // vert, bleu, ambre, gris, puis A → Z
         private const val TRI_NOM = 1                   // A → Z
         private const val TRI_DATE = 2                  // la plus récemment installée en premier
+        private const val TRI_GROUPE = 3                // (18/11) par groupe, avec un titre par groupe
         private const val CARNET = "compatibles"         // le petit carnet où on retient le tri choisi
     }
     private val icones = HashMap<String, Drawable?>()
@@ -122,8 +129,8 @@ class CompatiblesActivity : Activity() {
         tri = getSharedPreferences(CARNET, MODE_PRIVATE).getInt("tri", TRI_COULEUR)
         val rangeeTri = LinearLayout(this).apply { orientation = LinearLayout.HORIZONTAL }
         for ((i, t) in listOf(TRI_COULEUR to R.string.compat_tri_couleur, TRI_NOM to R.string.compat_tri_nom,
-                TRI_DATE to R.string.compat_tri_date).withIndex()) {
-            val bouton = Style.texte(this, getString(t.second), 13f, Style.TEXTE).apply {
+                TRI_DATE to R.string.compat_tri_date, TRI_GROUPE to R.string.compat_tri_groupe).withIndex()) {
+            val bouton = Style.texte(this, getString(t.second), 12.5f, Style.TEXTE).apply {
                 gravity = Gravity.CENTER
                 isClickable = true
                 tag = t.first
@@ -134,7 +141,7 @@ class CompatiblesActivity : Activity() {
                 }
             }
             boutonsTri.add(bouton)
-            rangeeTri.addView(bouton, LinearLayout.LayoutParams(0, px(36f), 1f).apply { if (i < 2) rightMargin = px(8f) })
+            rangeeTri.addView(bouton, LinearLayout.LayoutParams(0, px(36f), 1f).apply { if (i < 3) rightMargin = px(6f) })
         }
 
         adaptateur = Adaptateur()
@@ -148,7 +155,7 @@ class CompatiblesActivity : Activity() {
             isVerticalScrollBarEnabled = false
             // un appui sur une app qui a une animation : ses réglages
             setOnItemClickListener { _, _, position, _ ->
-                val l = lignes[position]
+                val l = lignes[position] as? Ligne ?: return@setOnItemClickListener    // un titre : rien à ouvrir
                 if (l.etat != Etat.RIEN) {
                     startActivity(Intent(this@CompatiblesActivity, ReglageAppActivity::class.java)
                         .putExtra("pkg", l.pkg).putExtra("nom", l.nom))
@@ -219,7 +226,7 @@ class CompatiblesActivity : Activity() {
             morceaux.add(Rayons.nom(this, categorie) + (trouvee?.let { " (" + getString(raison(it.second)) + ")" } ?: ""))
             // la date de 1re installation (si Android refuse de la donner : 0, l'app ira en fin de liste)
             val installe = try { pm.getPackageInfo(pkg, 0).firstInstallTime } catch (_: Exception) { 0L }
-            resultat.add(Ligne(nom, pkg, etat, morceaux.joinToString(" · "), installe))
+            resultat.add(Ligne(nom, pkg, etat, morceaux.joinToString(" · "), installe, categorie))
         }
         // l'ordre de la liste est choisi plus tard, dans afficher() (selon le bouton de tri)
         return resultat
@@ -251,7 +258,7 @@ class CompatiblesActivity : Activity() {
         if (filtre != null) l = l.filter { it.etat == filtre }
         // 1) on range selon le tri choisi
         l = when (tri) {
-            TRI_NOM -> l.sortedBy { it.cle }
+            TRI_NOM, TRI_GROUPE -> l.sortedBy { it.cle }
             TRI_DATE -> l.sortedWith(compareByDescending<Ligne> { it.installe }.thenBy { it.cle })
             else -> l.sortedWith(compareBy<Ligne>({ it.etat.ordinal }, { it.cle }))
         }
@@ -262,7 +269,18 @@ class CompatiblesActivity : Activity() {
             l = if (tri == TRI_COULEUR) trouvees.sortedWith(compareBy<Pair<Ligne, Int>>({ it.second }, { it.first.cle })).map { it.first }
                 else trouvees.map { it.first }
         }
-        lignes = l
+        // 3) (18/11) en tri par groupe : une section par groupe, dans l'ordre des dossiers (IA, Social…), puis
+        //    « Non répertorié ». Dans chaque section, les apps restent dans l'ordre ci-dessus (A → Z, ou la recherche).
+        lignes = if (tri == TRI_GROUPE) {
+            val parGroupe = l.groupBy { it.categorie }
+            val sections = ArrayList<Any>()
+            for (id in Groupes.CATEGORIES.map { it.id } + Rayons.AUTRES) {
+                val apps = parGroupe[id] ?: continue
+                sections.add(Titre(Rayons.nom(this, id) + "  ·  " + apps.size))
+                sections.addAll(apps)
+            }
+            sections
+        } else l
         adaptateur.notifyDataSetChanged()
         // le résumé : combien d'apps en tout, et combien de chaque couleur (dans la légende)
         resume.text = getString(R.string.compat_resume, toutes.size, toutes.count { it.etat != Etat.RIEN })
@@ -292,9 +310,23 @@ class CompatiblesActivity : Activity() {
         override fun getCount() = lignes.size
         override fun getItem(position: Int): Any = lignes[position]
         override fun getItemId(position: Int) = position.toLong()
+        // deux sortes de lignes : les apps (0) et les titres de groupe (1). Android recycle chaque sorte à part.
+        override fun getViewTypeCount() = 2
+        override fun getItemViewType(position: Int) = if (lignes[position] is Titre) 1 else 0
+        override fun isEnabled(position: Int) = lignes[position] is Ligne      // un titre ne s'appuie pas
 
         override fun getView(position: Int, recyclee: View?, parent: ViewGroup?): View {
-            val l = lignes[position]
+            val element = lignes[position]
+            if (element is Titre) {
+                // le titre d'un groupe : petit, gris, en majuscules espacées, avec de l'air au-dessus
+                val t = (recyclee as? TextView) ?: Style.texte(this@CompatiblesActivity, "", 12f, Style.MUET, gras = true).apply {
+                    letterSpacing = 0.08f
+                    setPadding(px(6f), px(14f), 0, px(2f))
+                }
+                t.text = element.texte.uppercase()
+                return t
+            }
+            val l = element as Ligne
             // une ligne : [point] [icône] [nom / détail]
             val vue = (recyclee as? LinearLayout) ?: LinearLayout(this@CompatiblesActivity).apply {
                 orientation = LinearLayout.HORIZONTAL
