@@ -14,6 +14,8 @@ import java.util.concurrent.ConcurrentHashMap
 //   2. ÉDITEUR   : son nom technique commence comme celui d'un éditeur connu (« com.supercell. » → Jeux,
 //                  « com.boursorama. » → Finance…). Le début le plus long gagne (« com.ubercab.eats » bat « com.ubercab ») ;
 //   3. ANDROID   : l'app a déclaré sa catégorie à Android (jeu, audio, vidéo, cartes…) ;
+//   3 bis. PLAY STORE (18/11) : la catégorie officielle de l'app sur le Play Store, si on l'a déjà demandée
+//                  (on la demande seulement pour les apps qui restent sans catégorie, voir PlayStore.kt) ;
 //   4. MOTEUR    : son écran de départ vient d'un moteur de jeu (Unity, Unreal, Godot…) : c'est un jeu ;
 //   5. RÔLE      : l'app se propose à Android pour un rôle (lecteur de musique, galerie, appareil photo,
 //                  navigateur, messagerie, agenda, calculatrice, météo…) ;
@@ -37,6 +39,7 @@ object Classement {
     const val NOM = "nom"
     const val PAQUET = "paquet"
     const val SERVICE = "service"
+    const val PLAY = "play"
 
     // La mémoire : nom technique -> « catégorie|comment », ou "" si aucune catégorie.
     private val memoire = ConcurrentHashMap<String, String>()
@@ -53,6 +56,30 @@ object Classement {
         memoire.clear()
         lanceables.clear()
         gardees = null
+        // (18/11) une app vient peut-être d'être installée : si elle reste sans catégorie, on demande au Play Store
+        AnimApp.contexte?.let { c -> Thread { completerParPlayStore(c) }.start() }
+    }
+
+    // (18/11) LES APPS SANS CATÉGORIE : on demande leur catégorie au Play Store (en arrière-plan, par Internet).
+    // Si au moins une est trouvée, on oublie tout (Groupes.oublier) pour que dossiers et écrans se refassent.
+    // Renvoie true si une app a été classée grâce au Play Store.
+    @Volatile private var enCours = false
+    fun completerParPlayStore(c: Context): Boolean {
+        if (enCours) return false
+        enCours = true
+        try {
+            val intention = Intent(Intent.ACTION_MAIN).addCategory(Intent.CATEGORY_LAUNCHER)
+            val sans = c.packageManager.queryIntentActivities(intention, 0).map { it.activityInfo.packageName }
+                .distinct().filter { it != c.packageName && categorieFinale(c, it) == null }
+            if (sans.isEmpty()) return false
+            val trouve = PlayStore.demander(c, sans)
+            if (trouve) Groupes.oublier()
+            return trouve
+        } catch (_: Throwable) {
+            return false
+        } finally {
+            enCours = false
+        }
     }
 
     // Prépare tout en avance (appelée en arrière-plan au démarrage, voir Catalogue) : les tables, puis la
@@ -66,6 +93,7 @@ object Classement {
                 categorieFinale(c, pkg)
                 lanceable(c, pkg)
             }
+            completerParPlayStore(c)
         } catch (_: Throwable) {}
     }
 
@@ -115,6 +143,8 @@ object Classement {
         @Suppress("DEPRECATION")
         val jeuDeclare = info != null && (info.flags and ApplicationInfo.FLAG_IS_GAME) != 0
         if (jeuDeclare) return "jeux" to ANDROID
+        // 3 bis. la catégorie du Play Store (si on l'a déjà demandée)
+        if (c != null) PlayStore.groupe(c, pkg)?.let { id -> if (Groupes.CATEGORIES.any { it.id == id }) return id to PLAY }
         // 4. un moteur de jeu
         if (c != null && moteurDeJeu(c, pkg)) return "jeux" to MOTEUR
         // 5. un rôle proposé à Android
@@ -276,10 +306,10 @@ object Classement {
             "com.discord", "com.tinder", "com.bumble.", "co.hinge.", "com.viber.", "com.skype.", "com.pinterest",
             "com.tumblr", "jp.naver.line.", "com.kakao.", "com.zhiliaoapp.", "com.ss.android.ugc.", "org.thoughtcrime.",
             "org.joinmastodon.", "com.reddit.") +
-        editeurs("shopping", "com.amazon.mshop", "com.ubercab.eats", "com.deliveroo.", "com.justeat.", "fr.vinted",
+        editeurs("shopping", "com.amazon.mshop", "fr.vinted",
             "com.zzkko", "com.shein", "com.einnovation.", "com.alibaba.aliexpress", "com.ebay.", "com.cdiscount.",
             "com.fnac.", "com.darty.", "com.ikea.", "com.decathlon.", "com.carrefour.", "com.lidl.", "fr.leclerc.",
-            "com.mcdonalds.", "com.contextlogic.", "com.zalando.", "com.asos.") +
+            "com.contextlogic.", "com.zalando.", "com.asos.") +
         editeurs("trajets", "com.ubercab", "com.waze", "com.bolt.", "ee.mtakso.", "com.citymapper.", "com.sncf.",
             "com.vsct.", "com.blablacar.", "com.booking", "com.airbnb.", "com.tripadvisor.", "com.expedia.",
             "com.limebike", "com.flixbus.", "com.ryanair.", "com.airfrance.", "com.trainline.", "net.mappy.") +
@@ -299,8 +329,21 @@ object Classement {
         editeurs("infos", "com.google.android.apps.magazines", "fr.lemonde.", "fr.playsoft.lefigaro", "com.cnn.",
             "bbc.", "uk.co.bbc.", "flipboard.", "com.android.chrome", "org.mozilla.", "com.opera.", "com.brave.",
             "com.microsoft.emmx", "com.sec.android.app.sbrowser", "com.duckduckgo.", "com.accuweather.",
-            "com.weather.", "fr.meteo", "com.meteofrance", "fr.francetv.", "com.fivemobile.thescore", "com.espn.",
-            "fr.lequipe.", "com.onefootball.", "com.sofascore.", "com.flashscore.") +
+            "com.weather.", "fr.meteo", "com.meteofrance", "fr.francetv.") +
+        // (18/11) les 4 nouveaux groupes : Sport, Cuisine, Apprendre, Maison
+        editeurs("sport", "com.fivemobile.thescore", "com.espn.", "fr.lequipe.", "com.onefootball.", "com.sofascore.",
+            "com.flashscore.", "com.nba.", "com.nfl.", "com.uefa.", "com.fifa.", "com.eurosport.", "com.dazn",
+            "fr.ligue1.", "com.formula1.", "com.motogp.") +
+        editeurs("cuisine", "com.ubercab.eats", "com.deliveroo.", "com.justeat.", "com.mcdonalds.", "fr.marmiton",
+            "com.app.tgtg", "com.burgerking.", "com.kfc.", "com.dominos", "com.yummly.", "com.tasty.", "com.hellofresh.",
+            "com.foodvisor.", "io.yuka.") +
+        editeurs("ecole", "com.amazon.kindle", "com.wattpad", "com.naver.linewebtoon", "org.khanacademy.",
+            "com.quizlet.", "com.babbel.", "org.wikipedia", "com.memrise.", "com.busuu.", "com.photomath.",
+            "com.google.android.apps.books", "com.google.android.apps.classroom", "com.kobobooks.",
+            "com.pronote", "net.index_education", "com.ecoledirecte") +
+        editeurs("maison", "com.google.android.apps.chromecast.app", "com.philips.lighting.", "com.tuya.smart",
+            "com.xiaomi.smarthome", "com.ikea.home.smart", "com.netatmo.", "com.ring.", "com.leroymerlin.",
+            "com.sephora.") +
         // (18/11) les eSIM de voyage, et les apps nature (on photographie une plante, un oiseau…)
         editeurs("trajets", "com.saily.", "com.airalo.", "com.holafly.") +
         editeurs("photo", "org.inaturalist.", "com.plantnet", "cn.danatech.xingseus", "org.ebird.", "com.labs.merlinbirdid")
@@ -337,22 +380,34 @@ object Classement {
         "travail" to setOf("office", "word", "excel", "powerpoint", "docs", "document", "sheet", "drive", "cloud",
             "note", "todo", "task", "tache", "agenda", "calendar", "calendrier", "mail", "outlook", "teams", "slack",
             "zoom", "notion", "trello", "scan", "pdf", "file", "fichier", "dropbox", "onedrive", "keep", "memo",
-            "translat", "tradu", "diction", "learn", "school", "ecole", "study", "edu", "job", "emploi", "indeed",
-            "work", "travail", "project", "projet", "terminal", "github", "gitlab"),
+            "translat", "tradu", "job", "emploi", "indeed", "work", "travail", "project", "projet", "terminal", "github",
+            "gitlab"),
         "sante" to setOf("doctor", "docteur", "medecin", "hopital", "hospital", "soin", "yoga", "workout", "gym",
             "training", "running", "step", "meditat", "calm", "headspace", "period", "cycle", "pill", "diet", "nutri",
             "calorie", "mental", "therap", "coach", "muscle", "mutuelle", "cardio", "heart", "coeur"),
         "shopping" to setOf("boutique", "deal", "promo", "coupon", "cashback", "fnac", "darty", "ikea", "zara",
-            "decathlon", "lidl", "carrefour", "auchan", "leclerc", "intermarche", "deliveroo", "eats", "food", "resto",
-            "restaurant", "pizza", "burger", "mcdo", "mcdonald", "kfc", "courses", "panier", "achat", "buy", "solde"),
+            "decathlon", "lidl", "carrefour", "auchan", "leclerc", "intermarche", "courses", "panier", "achat", "buy",
+            "solde"),
         "reglages" to setOf("tool", "outil", "util", "clean", "nettoy", "battery", "batterie", "security", "securit",
             "antivirus", "password", "passw", "bitwarden", "vault", "backup", "sauvegarde", "widget", "theme", "icon",
             "calculat", "clock", "horloge", "alarm", "reveil", "flashlight", "lampe", "torch", "qr", "wifi",
-            "bluetooth", "remote", "telecommande", "home", "smart", "boussole", "compass", "config", "system",
-            "systeme", "update"),
+            "bluetooth", "boussole", "compass", "config", "system", "systeme", "update"),
         "infos" to setOf("journal", "presse", "press", "monde", "figaro", "liberation", "franceinfo", "bfm", "cnn",
             "bbc", "reuters", "magazine", "flipboard", "feed", "rss", "meteo", "weather", "wiki", "browser",
-            "navigateur", "chrome", "firefox", "opera", "brave", "internet", "duckduckgo", "actualit", "headline",
-            "sport", "score", "thescore", "espn", "lequipe", "onefootball", "sofascore", "flashscore", "ligue"),
+            "navigateur", "chrome", "firefox", "opera", "brave", "internet", "duckduckgo", "actualit", "headline"),
+        // (18/11) les 4 nouveaux groupes
+        "sport" to setOf("sport", "score", "thescore", "espn", "lequipe", "onefootball", "sofascore", "flashscore",
+            "ligue", "foot", "basket", "nba", "nfl", "rugby", "tennis", "f1", "formula", "motogp", "eurosport", "dazn",
+            "golf", "uefa"),
+        "cuisine" to setOf("food", "resto", "restaurant", "pizza", "burger", "mcdo", "mcdonald", "kfc", "deliveroo",
+            "eats", "recette", "recipe", "cuisine", "cook", "marmiton", "tgtg", "toogoodtogo", "kitchen", "chef",
+            "boisson", "drink", "cafe", "coffee", "starbucks", "sushi", "tacos", "yuka", "nutriscore"),
+        "ecole" to setOf("learn", "school", "ecole", "study", "edu", "cours", "lesson", "lecon", "langue", "language",
+            "duolingo", "babbel", "quizlet", "khan", "math", "book", "livre", "lecture", "kindle", "wattpad",
+            "webtoon", "manga", "comic", "dictionar", "diction", "encyclop", "wikipedia", "pronote", "classroom",
+            "university", "universit", "college", "lycee", "flashcard", "anki"),
+        "maison" to setOf("home", "maison", "house", "smart", "remote", "telecommande", "deco", "jardin", "garden",
+            "lifestyle", "beaute", "beauty", "makeup", "maquillage", "parent", "bebe", "baby", "enfant", "animal",
+            "chien", "domotique", "light", "lumiere", "hue", "thermostat", "aspirateur", "vacuum", "sephora", "fashion"),
     )
 }
