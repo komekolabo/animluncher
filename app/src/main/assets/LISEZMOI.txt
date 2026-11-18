@@ -1,0 +1,5 @@
+Fichiers rangés tels quels dans l'app (Android les appelle des « assets »).
+
+- polices.zip : les 7 polices d'écriture des dossiers (Gothique, Fraktur, Horreur, Manuscrite, Élégante, Futuriste,
+  Pixel), réduites aux lettres latines avec accents, et le texte de leurs licences (SIL Open Font License 1.1).
+  Déposé à la main sur github.com (le connecteur de Claude ne sait pas envoyer de fichier binaire). Voir Polices.kt.
