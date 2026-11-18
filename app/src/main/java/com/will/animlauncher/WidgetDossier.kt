@@ -76,14 +76,31 @@ import kotlin.math.sqrt
 //    devant = grandes et nettes, derrière = petites et estompées (elles passent derrière le logo) ;
 //  - MOSAÏQUE : le logo se fend en tuiles (une par app), une vague en diagonale les retourne côté app, un reflet
 //    doux traverse la grille, puis la vague repasse dans l'autre sens et le logo se ressoude.
-// Un widget ne garde qu'UNE boucle de 12 s en mémoire : chaque dossier tire donc son style au sort quand on dessine
-// ses images, puis ALTERNE (Carrousel <-> Mosaïque) au plus une fois toutes les 30 min, en arrivant sur l'accueil.
+// Un widget ne garde qu'UNE boucle de 12 s en mémoire. (18/11 au soir, demande de Will) TOUS les dossiers jouent le
+// MÊME style en même temps : un seul tirage au sort pour tout l'accueil, puis tous ALTERNENT ensemble
+// (Carrousel <-> Mosaïque) au plus une fois toutes les 30 min, en arrivant sur l'accueil (voir styleDuMoment).
 // L'ancienne boucle (apps qui tournent puis grille) reste dans le code (style ANCIENNE), mais n'est plus tirée.
 object WidgetDossier {
     const val CARROUSEL = 0
     const val MOSAIQUE = 1
     const val ANCIENNE = 2
     private const val ALTERNANCE = 30 * 60 * 1000L     // changer de style au plus toutes les 30 min
+
+    // LE STYLE COMMUN À TOUS LES DOSSIERS (18/11 au soir). Retenu dans un petit carnet (« widgets_dossier »), avec
+    // l'heure où il a été choisi : il survit si Android ferme AnimLauncher ou si on redémarre le téléphone.
+    // - la toute première fois : tirage au sort entre Carrousel et Mosaïque ;
+    // - ensuite : au bout de 30 min, on passe à l'autre style (pour TOUS les dossiers à la fois).
+    private fun styleDuMoment(c: Context): Int {
+        val carnet = c.getSharedPreferences("widgets_dossier", Context.MODE_PRIVATE)
+        val maintenant = System.currentTimeMillis()      // l'heure « réelle » (continue même après un redémarrage)
+        var style = carnet.getInt("style", -1)
+        val depuis = carnet.getLong("style_depuis", 0L)
+        if (style !in listOf(CARROUSEL, MOSAIQUE)) style = if (Math.random() < 0.5) CARROUSEL else MOSAIQUE
+        else if (maintenant - depuis < ALTERNANCE && maintenant >= depuis) return style
+        else style = 1 - style
+        carnet.edit().putInt("style", style).putLong("style_depuis", maintenant).apply()
+        return style
+    }
     private const val PAS = 40L                  // une image toutes les 40 ms (25 images par seconde)
     private const val DUREE = 12.0               // la boucle dure 12 s
     private const val N = 300                    // 12 s / 40 ms = 300 images
@@ -232,13 +249,10 @@ object WidgetDossier {
         val hsv = Groupes.couleur(c, groupe)
         val signature = ids.joinToString(",") + "|" + apps.joinToString(",") + "|" + hsv?.joinToString(",")
         val ancien = etats[groupe]
-        val maintenant = SystemClock.uptimeMillis()
-        // rien n'a changé et le style est encore « frais » : on ne redessine pas
-        if (!forcer && ancien != null && ancien.signature == signature && maintenant - ancien.dessineA < ALTERNANCE) return
-        // LE STYLE (18/11) : rien n'a changé mais ça fait 30 min -> l'autre style ; sinon tirage au sort équilibré
-        // (comme les variantes des animations d'apps : voir Reglages.tirerVariante)
-        val style = if (ancien != null && ancien.signature == signature && !forcer) 1 - ancien.style
-                    else Reglages.tirerVariante(c, "widget_$groupe", 2, listOf(CARROUSEL, MOSAIQUE))
+        // LE STYLE : le même pour tous les dossiers (il change pour tous à la fois, toutes les 30 min au plus)
+        val style = styleDuMoment(c)
+        // rien n'a changé (mêmes apps, mêmes couleurs, même style) : on ne redessine pas
+        if (!forcer && ancien != null && ancien.signature == signature && ancien.style == style) return
 
         // les apps par paquets de 9 (un dossier vide = une page vide : on ne voit que l'étoile)
         val pages = if (apps.isEmpty()) listOf(emptyList()) else apps.chunked(PAR_PAGE)
