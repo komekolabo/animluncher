@@ -68,10 +68,16 @@ object GalerieFonds {
         val p = carnet(c)
         val gardee = p.getString("arbre", null)
         val age = System.currentTimeMillis() - p.getLong("arbre_ms", 0L)
-        if (!forcer && gardee != null && age < GARDER_MS) return Liste(lire(gardee), false)
+        // (19/11) Après l'installation d'une NOUVELLE VERSION de l'app, on redemande toujours la liste : sinon la
+        // liste gardée (jusqu'à 6 h) peut dater d'avant, et une nouveauté de la galerie (ex. un « dossier prêt »)
+        // n'apparaît pas. On reconnaît une nouvelle version à sa date d'installation (« lastUpdateTime »).
+        val installee = try { c.packageManager.getPackageInfo(c.packageName, 0).lastUpdateTime } catch (_: Exception) { 0L }
+        val memeVersion = p.getLong("arbre_version", -1L) == installee
+        if (!forcer && gardee != null && age < GARDER_MS && memeVersion) return Liste(lire(gardee), false)
         val fraiche = try { telechargerTexte(ARBRE) } catch (_: Exception) { null }
         if (fraiche != null) {
-            p.edit().putString("arbre", fraiche).putLong("arbre_ms", System.currentTimeMillis()).apply()
+            p.edit().putString("arbre", fraiche).putLong("arbre_ms", System.currentTimeMillis())
+                .putLong("arbre_version", installee).apply()
             return Liste(lire(fraiche), false)
         }
         // Internet ne répond pas : on se contente de l'ancienne liste, s'il y en a une

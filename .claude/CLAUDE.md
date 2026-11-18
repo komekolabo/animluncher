@@ -146,3 +146,5 @@ de chaque fichier envoyé). Au prochain passage tranquille, ces notes pourront �
   « Mettre en fond » (ou Remplacer / Ajouter si le dossier de fonds n'est pas vide) -> téléchargement dans le cache, copie
   dans `DossierFond` (`remplirAvec`), puis `DossierFond.mettreEnFond` (FondDossierService). 1er : `Dossier_Anime_Landscapes`
   (les 9 images de Will, nom traduit `gal_pret_paysages`). Les images restent aussi dans leurs catégories (git ne stocke qu'une fois).
+  Will ne voyait pas la carte (liste gardée 6 h, lue avant la création du dossier) -> la liste est redemandée après chaque
+  nouvelle installation de l'app (`arbre_version` = lastUpdateTime).
