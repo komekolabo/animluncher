@@ -61,3 +61,15 @@ de chaque fichier envoyé). Au prochain passage tranquille, ces notes pourront �
 - Le connecteur GitHub ne sait pas envoyer un fichier binaire : c'est Will qui dépose le `.tflite` dans la branche
   `modeles` (github.com → branche modeles → Add file → Upload files). Tant qu'il n'y est pas : « Téléchargement impossible ».
 - Pas fait : fonds 3D, dossier de fonds, GIF / vidéos ; bouton pour supprimer l'outil (2,5 Mo seulement).
+
+## OUVERTURES DES DOSSIERS TIRÉES AU HASARD (18/11 — PAS ENCORE TESTÉ PAR WILL SUR LE TÉLÉPHONE)
+- Les dossiers sans transition à eux (tous sauf Maps, Health, Photos, Finance) tirent à chaque ouverture entre la
+  poussière d'origine, ORBITE et CARTES (`OuverturesDossier.kt`), par `Reglages.tirerVariante(c, "ouverture_dossier", 3, …)`.
+- Orbite : l'anneau d'icônes sort du widget (anneau de poussière en comète), les apps le quittent une à une.
+  Cartes : le logo distribue des cartes de verre fumé, une vague les retourne (perspective = `skew`, reflet doux).
+- Hooks ajoutés à `EffetOuverture` : `panneauDuCentre`, `horsCadre` (apps dessinées hors du cadre),
+  `dessinerDos`, `surIcone` ; `Arrivee` a `decalX`, `largeur`, `cisaille`, `dos`, `flot` ; `CadreDossier` a `departX/Y`.
+- Aperçu (JavaScript dans Chrome + ffmpeg, pas skia) : /home/claude/apercu_dossier/propositions.html (pas dans le repo).
+  Will a vu et validé la v2 d'Orbite et de Cartes ; « Goutte » (liquide) proposée, non retenue.
+- `git push` marche dans cette session une fois le dépôt ajouté (add_repo) : plus besoin de push_files ici.
+- Compilation en échec « 429 Too Many Requests » sur repo.maven.apache.org = Maven surchargé : relancer (`gh run rerun`).
