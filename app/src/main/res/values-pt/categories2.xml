@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- (18/11) Les noms des 4 groupes ajoutés le 18/11 (voir Groupes.kt et Rayons.nom). -->
+<resources>
+    <string name="cat_sport">Desporto</string>
+    <string name="cat_cuisine">Comida e bebida</string>
+    <string name="cat_ecole">Aprender e ler</string>
+    <string name="cat_maison">Casa e vida</string>
+</resources>

@@ -27,6 +27,10 @@ object Rayons {
         "shopping" -> R.string.cat_shopping
         "reglages" -> R.string.cat_reglages
         "infos" -> R.string.cat_infos
+        "sport" -> R.string.cat_sport              // les 4 groupes ajoutés le 18/11
+        "cuisine" -> R.string.cat_cuisine
+        "ecole" -> R.string.cat_ecole
+        "maison" -> R.string.cat_maison
         else -> R.string.cat_autres
     })
 

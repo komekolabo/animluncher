@@ -28,4 +28,5 @@
     <string name="compat_par_service">service</string>
     <string name="compat_tri_groupe">Groups</string>
     <string name="compat_ranger">Put “%s” in…</string>
+    <string name="compat_par_play">Play Store</string>
 </resources>
