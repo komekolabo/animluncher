@@ -62,11 +62,16 @@
             android:indeterminateOnly="true"
             android:indeterminateDrawable="@drawable/widget_galet_reflet_anime" />
 
+        <!-- (18/11, 23h : Will a vu la pastille « 1 » de l'IA passer DERRIÈRE le galet) les deux infos ont une
+             ÉLÉVATION de 3 dp : Android dessine toujours une vue surélevée au-dessus de ses voisines à plat, quel que
+             soit l'ordre ou ce que le lanceur fait pendant un changement d'images (et ça leur donne une petite ombre). -->
         <!-- (18/11) LES INFOS UTILES, par-dessus la boucle. Ce sont des vues à part (pas dans les 300 images) :
              les mettre à jour est instantané (voir WidgetDossier.poserInfos).
              En haut à droite : le nombre d'apps du dossier encore OUVERTES (point vert + chiffre), cachée s'il n'y en a pas. -->
         <LinearLayout
             android:id="@+id/dossier_ouvertes"
+            android:elevation="3dp"
+            android:translationZ="3dp"
             android:layout_width="wrap_content"
             android:layout_height="11dp"
             android:layout_gravity="top|end"
@@ -104,6 +109,8 @@
              dossier d'une seule app, et tant qu'aucune n'a été ouverte). -->
         <FrameLayout
             android:id="@+id/dossier_derniere"
+            android:elevation="3dp"
+            android:translationZ="3dp"
             android:layout_width="16dp"
             android:layout_height="16dp"
             android:layout_gravity="bottom|end"
