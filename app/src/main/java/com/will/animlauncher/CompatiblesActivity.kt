@@ -194,6 +194,12 @@ class CompatiblesActivity : Activity() {
         Thread {
             val l = charger()
             runOnUiThread { if (!isDestroyed) { toutes = l; afficher() } }
+            // (18/11) s'il reste des apps grises, on demande leur catégorie au Play Store (par Internet), puis on
+            // refait la liste si au moins une a été trouvée (voir PlayStore.kt)
+            if (l.any { it.categorie == Rayons.AUTRES } && Classement.completerParPlayStore(this)) {
+                val l2 = charger()
+                runOnUiThread { if (!isDestroyed) { toutes = l2; afficher() } }
+            }
         }.start()
     }
 
@@ -266,6 +272,7 @@ class CompatiblesActivity : Activity() {
         Classement.ROLE -> R.string.compat_par_role
         Classement.PAQUET -> R.string.compat_par_paquet
         Classement.SERVICE -> R.string.compat_par_service
+        Classement.PLAY -> R.string.compat_par_play
         else -> R.string.compat_par_nom
     }
 
