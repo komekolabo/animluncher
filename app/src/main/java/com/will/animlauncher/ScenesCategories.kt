@@ -27,7 +27,8 @@ import kotlin.math.sqrt
 // Le motif dépend de la catégorie : réseau de neurones (IA), bulles de conversation (Social), égaliseur (Musique),
 // diaphragme (Photos), pixels (Jeux), courbe et pièces (Finance), itinéraire (Trajets), liste cochée (Travail),
 // pouls (Santé), sacs (Shopping), engrenages (Réglages), titres qui défilent (Infos), et depuis le 18/11 :
-// piste de course (Sport), vapeur et assiette (Cuisine), livre qui tourne ses pages (Apprendre), maison (Maison).
+// piste de course (Sport), vapeur et assiette (Cuisine), livre qui tourne ses pages (Apprendre), maison (Maison),
+// globe qui tourne avec des satellites (Internet).
 // Thème sombre, lumières douces : jamais de flash.
 
 // L'APPARENCE D'UNE APP : son icône (en image) et sa couleur principale. Calculée une fois, gardée pour les
@@ -102,7 +103,7 @@ class AnimCategorie(private val id: String, apparence: Apparence) : Scene() {
     companion object {
         // les catégories qui ont un motif
         val IDS = setOf("ia", "social", "musique", "photo", "jeux", "finance", "trajets", "travail", "sante",
-            "shopping", "reglages", "infos", "sport", "cuisine", "ecole", "maison")
+            "shopping", "reglages", "infos", "sport", "cuisine", "ecole", "maison", "internet")
 
         // la couleur de la catégorie, quand l'icône de l'app n'en a pas (icône noire et blanche)
         fun couleurDe(id: String): Int = when (id) {
@@ -121,6 +122,7 @@ class AnimCategorie(private val id: String, apparence: Apparence) : Scene() {
             "cuisine" -> rgb(240, 106, 90)
             "ecole" -> rgb(242, 194, 62)
             "maison" -> rgb(242, 143, 92)
+            "internet" -> rgb(79, 184, 240)
             else -> rgb(165, 180, 252)
         }
     }
@@ -162,6 +164,7 @@ class AnimCategorie(private val id: String, apparence: Apparence) : Scene() {
             "cuisine" -> vapeur(c, o, cx, cy, m, s, f)
             "ecole" -> livre(c, o, cx, cy, m, s, f)
             "maison" -> maison(c, o, cx, cy, m, s, f)
+            "internet" -> globe(c, o, cx, cy, m, s, f)
             else -> titres(c, o, cx, cy, m, s, f)
         }
         // 3) l'icône de l'app, au centre
@@ -667,6 +670,40 @@ class AnimCategorie(private val id: String, apparence: Apparence) : Scene() {
                 c.drawLine(fx, fy - t, fx, fy + t, o.lumiere(avecAlpha(couleur, 0.35f * allume), 1f * o.dp))
                 c.drawLine(fx - t, fy, fx + t, fy, o.lumiere(avecAlpha(couleur, 0.35f * allume), 1f * o.dp))
             }
+        }
+    }
+
+    // ------------------------------ INTERNET : un globe qui tourne, et des satellites (18/11) ------------------------------
+    // Le globe est fait de fils (méridiens qui tournent, parallèles fixes) ; trois petits points lumineux font le tour
+    // de la Terre sur des orbites penchées, comme des messages qui voyagent.
+    private fun globe(c: Canvas, o: Outils, cx: Float, cy: Float, m: Float, s: Float, f: Float) {
+        val r = m * 0.27f
+        val p = o.lumiere(avecAlpha(couleur, 0.32f * f), 1.4f * o.dp)
+        c.drawCircle(cx, cy, r, p)
+        // les méridiens : 4 ellipses qui s'élargissent et se resserrent, comme si la boule tournait
+        for (k in 0 until 4) {
+            val rx = r * abs(cos(s * 0.8f + k * PI_F / 4f))
+            cadre.set(cx - rx, cy - r, cx + rx, cy + r)
+            c.drawOval(cadre, p)
+        }
+        // les parallèles
+        for (h in floatArrayOf(-0.6f, -0.3f, 0.3f, 0.6f)) {
+            val y = cy + h * r
+            val demi = r * sqrt(1f - h * h)
+            c.drawLine(cx - demi, y, cx + demi, y, p)
+        }
+        // trois satellites sur des orbites penchées (une ellipse qu'on fait tourner)
+        for (k in 0 until 3) {
+            val inclinaison = -30f + k * 30f
+            val an = s * (1.3f + 0.25f * k) + k * 2.1f
+            val ox = cos(an) * r * 1.3f
+            val oy = sin(an) * r * 0.35f
+            val incl = inclinaison * PI_F / 180f
+            val x = cx + ox * cos(incl) - oy * sin(incl)
+            val y = cy + ox * sin(incl) + oy * cos(incl)
+            val devant = 0.5f + 0.5f * sin(an)                    // plus pâle quand il passe derrière le globe
+            o.halo(c, x, y, 10f * o.dp, 0.3f * f * devant, couleur)
+            c.drawCircle(x, y, 2.6f * o.dp, o.lumiere(avecAlpha(couleur, (0.3f + 0.5f * devant) * f)))
         }
     }
 }
