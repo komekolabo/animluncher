@@ -91,9 +91,15 @@ object Groupes {
             "fr.vinted", "fr.leboncoin", "com.einnovation.temu", "com.alibaba.aliexpresshd", "com.zzkko",
             "com.ebay.mobile", "com.cdiscount.android", "com.samsung.ecomm.global", "com.samsung.android.shop"),
             emptySet(), setOf("shop", "store", "amazon", "vinted", "leboncoin", "temu", "aliexpress", "shein", "ebay")),
+        // les 4 groupes ajoutés le 18/11 (demande de Will) : leurs mots et leurs éditeurs sont dans Classement.kt.
+        // (Leurs logos de dossier existaient déjà : « sport », « cuisine », « ecole », « maison », voir LogosQuotidien.)
+        Categorie("sport", "Sports", emptySet()),
+        Categorie("cuisine", "Food & Drink", emptySet()),
+        Categorie("ecole", "Learning", emptySet()),
+        Categorie("maison", "Home & Life", setOf("com.samsung.android.oneconnect", "com.google.android.apps.chromecast.app")),
         Categorie("reglages", "Settings", setOf(
             "com.android.settings", "com.google.android.gms", "com.samsung.android.app.tips",
-            "com.samsung.android.oneconnect", "com.google.android.apps.authenticator2", "com.samsung.android.lool",
+            "com.google.android.apps.authenticator2", "com.samsung.android.lool",
             "com.sec.android.app.popupcalculator", "com.sec.android.app.clockpackage", "com.samsung.android.app.galaxyfinder",
             "app.revanced.manager.flutter", "app.revanced.manager"),
             emptySet(), setOf("settings", "parametre", "reglage", "manager", "authenticator", "vpn", "launcher", "clavier", "keyboard")),

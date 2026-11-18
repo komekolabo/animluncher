@@ -18,6 +18,10 @@
     <uses-permission android:name="android.permission.BLUETOOTH_CONNECT" />
     <uses-permission android:name="android.permission.BLUETOOTH" android:maxSdkVersion="30" />
 
+    <!-- (18/11) INTERNET, pour une seule chose : demander au Play Store la catégorie d'une app que le protocole de
+         classement n'a pas su ranger (voir PlayStore.kt). On n'envoie que le nom technique de ces apps-là. -->
+    <uses-permission android:name="android.permission.INTERNET" />
+
     <!-- Depuis Android 11, une app ne "voit" pas les autres apps par défaut.
          On demande à voir : les apps qui ont une icône, et l'écran d'accueil. -->
     <queries>
