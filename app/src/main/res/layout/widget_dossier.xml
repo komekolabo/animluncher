@@ -39,17 +39,14 @@
             android:indeterminateOnly="true"
             android:indeterminateDrawable="@drawable/dossier_lueur_anime" />
 
-        <!-- le folioscope ne couvre que le MILIEU du galet (54 dp sur 62 depuis le 18/11, 42 avant ; centré sur
+        <!-- (18/11 au soir) le folioscope couvre TOUT le galet (62 dp ; avant : 54 dp, puis 42, au milieu, centré sur
              l'étoile, qui est à 31 dp du bord gauche et 29,76 dp du haut) : tout ce qui bouge y tient -> 25 images par
              seconde (une toutes les 40 ms) -->
         <ViewFlipper
             android:id="@+id/dossier_film"
-            android:layout_width="54dp"
-            android:layout_height="54dp"
+            android:layout_width="62dp"
+            android:layout_height="62dp"
             android:layout_gravity="top|start"
-            android:layout_marginStart="4dp"
-            android:layout_marginLeft="4dp"
-            android:layout_marginTop="2.76dp"
             android:autoStart="true"
             android:flipInterval="40" />
 

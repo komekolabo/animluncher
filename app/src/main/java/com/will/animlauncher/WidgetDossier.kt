@@ -6,12 +6,14 @@ import android.content.res.ColorStateList
 import android.graphics.BlendMode
 import android.graphics.Bitmap
 import android.graphics.Canvas
+import android.graphics.LinearGradient
 import android.graphics.Color
 import android.graphics.Paint
 import android.graphics.Path
 import android.graphics.PathMeasure
 import android.graphics.Point
 import android.graphics.RectF
+import android.graphics.Shader
 import android.hardware.display.DisplayManager
 import android.os.Build
 import android.os.Handler
@@ -107,12 +109,27 @@ object WidgetDossier {
     // (18/11, demande de Will : « les icônes sont trop petites, illisibles ») la boîte passe de 42 à 54 dp : les icônes
     // y sont bien plus grandes. Revers : Android limite la mémoire d'images d'un widget, on était déjà au maximum ;
     // les images sont donc un peu moins fines (environ 113 px pour 54 dp au lieu de 110 px pour 42 dp sur le Flip6).
-    private const val COTE_DP = 54
-    // LA BOÎTE : le carré du milieu du galet couvert par les images (54 dp sur 62), dans le repère 100 x 100
-    // du dessin. Elle est centrée sur l'étoile (50, 48) : de 16,13 à 83,87 en largeur, de 14,13 à 81,87 en hauteur.
-    private const val BOITE = COTE_DP / 62f * 100f   // = 87,1 unités de côté
+    // (18/11 au soir, « prends la place maximale ») les images couvrent maintenant TOUT le galet (62 dp sur 62) ;
+    // ce qui dépasse de sa forme arrondie est coupé (voir FORME_GALET). Même revers mémoire : environ 113 px pour 62 dp.
+    private const val COTE_DP = 62
+    // LA BOÎTE : la partie du galet couverte par les images, dans le repère 100 x 100 du dessin (= tout le galet)
+    private const val BOITE = COTE_DP / 62f * 100f   // = 100 unités de côté
     private const val BOITE_X = 50f - BOITE / 2
-    private const val BOITE_Y = 48f - BOITE / 2
+    private const val BOITE_Y = 50f - BOITE / 2
+    // le logo des nouvelles boucles, plus grand qu'avant (rayon 34 au lieu de 26, sur 100)
+    private const val LOGO_ECH = 1.3f
+    // LA FORME DU GALET (celle de widget_galet*.xml : un « super-cercle » d'exposant 2,6, de rayon 49,3, centré en
+    // 50, 50) : on coupe chaque image avec, pour que rien ne dépasse dans les coins.
+    private val FORME_GALET: Path = Path().apply {
+        for (i in 0..120) {
+            val a = 2 * Math.PI * i / 120
+            val c = cos(a); val s = sin(a)
+            val x = 50 + 49.3 * Math.signum(c) * Math.pow(kotlin.math.abs(c), 2 / 2.6)
+            val y = 50 + 49.3 * Math.signum(s) * Math.pow(kotlin.math.abs(s), 2 / 2.6)
+            if (i == 0) moveTo(x.toFloat(), y.toFloat()) else lineTo(x.toFloat(), y.toFloat())
+        }
+        close()
+    }
     const val PAR_PAGE = 9                       // 9 apps au plus par boucle
 
     // les dessins se font à part, sans bloquer l'app, et en priorité basse (« BACKGROUND » = travail de fond)
@@ -433,6 +450,7 @@ object WidgetDossier {
             // on ne dessine que la boîte du milieu : on agrandit, puis on décale pour que son coin soit en (0, 0)
             cv.scale(px / BOITE, px / BOITE)
             cv.translate(-BOITE_X, -BOITE_Y)
+            cv.clipPath(FORME_GALET)            // rien ne dépasse de la forme du galet
             when (style) {
                 CARROUSEL -> carrousel(cv, t)
                 MOSAIQUE -> mosaique(cv, t)
@@ -498,9 +516,9 @@ object WidgetDossier {
         private val zone = RectF()
         private val tuile = Path()
 
-        // ============ (18/11) A · CARROUSEL (v2, « grandes icônes ») ============
-        // Le logo fait son geste, puis devient tout petit au centre (un point de lumière). Les apps tournent autour
-        // sur un anneau INCLINÉ (une ellipse, vue en 3D) qui tourne doucement (36° par seconde : à 25 images par
+        // ============ (18/11) A · CARROUSEL (v3, « toute la place ») ============
+        // Le logo (plus grand) fait son geste, puis devient tout petit au centre (un point de lumière). Les apps tournent
+        // autour sur un anneau INCLINÉ (une ellipse, vue en 3D) qui tourne doucement (36° par seconde : à 25 images par
         // seconde, chaque image avance peu, donc ça reste coulé). Devant (bas de l'ellipse) : grandes, nettes, avec
         // une petite ombre ; derrière (haut) : plus petites, un peu estompées, elles passent derrière le logo.
         // AU PLUS 4 APPS sur l'anneau, pour qu'elles soient GRANDES. S'il y en a plus, chaque fois qu'une app passe
@@ -513,20 +531,20 @@ object WidgetDossier {
         private val quelle = IntArray(m)          // l'app montrée à chaque place de l'anneau
         private val presence = FloatArray(m)      // 0 = effacée (le temps d'être remplacée), 1 = visible
         fun carrousel(cv: Canvas, t: Double) {
-            val taille = cle(t, 0.0 to 1.0 by LIN, 0.9 to 1.06 by DOUX, 1.8 to 1.0 by DOUX, 2.6 to 0.3 by DOUX,
-                             10.1 to 0.3 by LIN, 11.2 to 1.0 by RESSORT)
+            val taille = LOGO_ECH * cle(t, 0.0 to 1.0 by LIN, 0.9 to 1.06 by DOUX, 1.8 to 1.0 by DOUX, 2.6 to 0.28 by DOUX,
+                                        10.1 to 0.28 by LIN, 11.2 to 1.0 by RESSORT)
             val ouv = cle(t, 1.9 to 0.0 by LIN, 2.9 to 1.0 by DOUX, 9.9 to 1.0 by LIN, 10.8 to 0.0 by DOUX)
             if (m == 0 || ouv <= 0.001) { logoSimple(cv, t, taille); return }
             val avance = Math.toRadians(36.0) * maxOf(0.0, t - 1.9) + Math.toRadians(30.0) * ouv
-            val rx = (if (m <= 1) 10.0 else 25.0) * ouv
-            val ry = (if (m <= 1) 5.0 else 15.0 + 1.5 * sin(t * 0.8)) * ouv
-            val base = when (m) { 1 -> 50.0; 2 -> 34.0; else -> min(34.0, 2 * Math.PI * 25 / m * 0.8) }
+            val rx = (if (m <= 1) 12.0 else 28.0) * ouv
+            val ry = (if (m <= 1) 6.0 else 17.0 + 1.5 * sin(t * 0.8)) * ouv
+            val base = when (m) { 1 -> 60.0; 2 -> 40.0; else -> min(38.0, 2 * Math.PI * 28 / m * 0.8) }
             for (k in 0 until m) {
                 val tourne = avance + 2 * Math.PI * k / m
                 val a = -Math.PI / 2 + tourne
                 profondeur[k] = ((sin(a) + 1) / 2).toFloat()           // 0 = tout au fond, 1 = tout devant
-                posX[k] = (CX + rx * cos(a)).toFloat()
-                posY[k] = (49.0 + ry * sin(a)).toFloat()
+                posX[k] = (50.0 + rx * cos(a)).toFloat()
+                posY[k] = (50.0 + ry * sin(a)).toFloat()
                 // le nombre de tours faits par cette place = combien de fois elle est passée au fond
                 val tours = kotlin.math.floor(tourne / (2 * Math.PI)).toInt()
                 quelle[k] = if (n > m) (k + tours * m) % n else k
@@ -542,7 +560,7 @@ object WidgetDossier {
                 p.reset(); p.isAntiAlias = true; p.isFilterBitmap = true
                 if (pr > 0.5f) {                                       // une ombre douce sous les apps de devant
                     p.color = Color.argb((0.22f * (pr - 0.5f) * 2 * ouv.toFloat() * 255).toInt(), 0, 0, 0)
-                    zone.set(posX[k] - h * 0.75f, posY[k] + h - 0.4f, posX[k] + h * 0.75f, posY[k] + h + 2.4f)
+                    zone.set(posX[k] - h * 0.75f, posY[k] + h - 0.4f, posX[k] + h * 0.75f, posY[k] + h + 2.6f)
                     cv.drawOval(zone, p)
                 }
                 p.alpha = (255 * alpha).toInt().coerceIn(0, 255)
@@ -554,26 +572,32 @@ object WidgetDossier {
             for (k in ordre) if (profondeur[k] >= 0.5f) app(k)         // devant le logo
         }
 
-        // ============ (18/11) B · MOSAÏQUE (v2, « grandes icônes ») ============
-        // Le logo se FEND en tuiles : au plus 4 (2 x 2), pour qu'elles soient GRANDES. Chaque tuile montre le morceau
-        // du logo qui tombe sur elle. Une vague en diagonale RETOURNE les tuiles : la tuile rétrécit en largeur jusqu'à
-        // n'être qu'un trait (on la voit de profil), s'assombrit, puis ré-élargit de l'autre côté.
-        // Les retournements servent aussi de PAGES : logo -> apps 1 à 4 -> apps 5 à 8 -> app 9 -> logo. Une tuile sans
-        // app sur une page (ex. la page de l'app 9 seule) montre son morceau de logo.
-        // (correction du saut) Au moment de la fente, toute la grille est ramenée à la TAILLE DU LOGO : les morceaux
-        // tombent pile sur le logo, collés entre eux ; puis la grille grandit jusqu'à sa vraie taille et les espaces
-        // s'ouvrent. Le logo entier reste dessous et s'efface en douceur (les tuiles ne le couvrent pas forcément tout).
-        private val pages = maxOf(1, (n + 3) / 4)
-        private val nb = min(n, 4).coerceAtLeast(1)
-        private val coteT = if (nb == 1) 54f else 37f                  // le côté d'une tuile
+        // ============ (18/11) B · MOSAÏQUE (v3, « toute la place », une tuile par app) ============
+        // Le logo (plus grand) se FEND en tuiles, UNE PAR APP, rangées selon leur nombre :
+        //   1 = une grande tuile ; 2, 3, 4 = tuiles moyennes sur 2 colonnes (2 / 2+1 / 2+2) ;
+        //   5 à 9 = 3 colonnes, rangées centrées : 5 = 3+2, 6 = 3+3, 7 = 2+3+2, 8 = 3+2+3, 9 = 3+3+3.
+        // Pendant la fente, une PLAQUE DE VERRE teintée (dégradé aux couleurs du logo) apparaît derrière lui : elle
+        // s'étend sur toute la grille, donc chaque tuile a un vrai fond, même là où le logo ne passe presque pas
+        // (sans elle, les logos qui ne remplissent pas leur carré — la courbe de Finance, l'appareil photo… —
+        // laissaient des tuiles vides). Une vague en diagonale RETOURNE les tuiles : la tuile rétrécit en largeur
+        // jusqu'à n'être qu'un trait (on la voit de profil), s'assombrit, puis ré-élargit côté app. Puis la vague
+        // repasse dans l'autre sens, les tuiles redeviennent le logo, qui se ressoude avec un petit ressort.
+        // (corrections) Au départ, toute la grille est ramenée à la TAILLE DU LOGO : les morceaux tombent pile sur lui,
+        // collés entre eux, puis la grille grandit et les espaces s'ouvrent. Le logo entier, dessous, grandit EN MÊME
+        // TEMPS que les morceaux (sinon on voyait 2 logos décalés pendant le fondu : le bug de l'appareil photo).
+        private val nb = min(n, PAR_PAGE).coerceAtLeast(1)
+        private val coteT = when { nb == 1 -> 70f; nb <= 4 -> 38f; else -> 25f }   // le côté d'une tuile
         private val placesT: List<FloatArray> = run {
-            val d = (coteT + 3f) / 2
-            when (nb) {
-                1 -> listOf(floatArrayOf(CX, CY))
-                2 -> listOf(floatArrayOf(CX - d, CY), floatArrayOf(CX + d, CY))
-                3 -> listOf(floatArrayOf(CX - d, CY - d), floatArrayOf(CX + d, CY - d), floatArrayOf(CX, CY + d))
-                else -> listOf(floatArrayOf(CX - d, CY - d), floatArrayOf(CX + d, CY - d), floatArrayOf(CX - d, CY + d), floatArrayOf(CX + d, CY + d))
+            val rangs = when (nb) { 1 -> intArrayOf(1); 2 -> intArrayOf(2); 3 -> intArrayOf(2, 1); 4 -> intArrayOf(2, 2)
+                5 -> intArrayOf(3, 2); 6 -> intArrayOf(3, 3); 7 -> intArrayOf(2, 3, 2); 8 -> intArrayOf(3, 2, 3)
+                else -> intArrayOf(3, 3, 3) }
+            val pas = coteT + if (nb <= 4) 3f else 2.5f
+            val liste = ArrayList<FloatArray>()
+            rangs.forEachIndexed { r, combien ->
+                for (j in 0 until combien)
+                    liste.add(floatArrayOf(CX + (j - (combien - 1) / 2f) * pas, CY + (r - (rangs.size - 1) / 2f) * pas))
             }
+            liste
         }
         // le carré qui contient la grille : gauche, haut, droite, bas, et son côté
         private val bord: FloatArray = run {
@@ -584,60 +608,69 @@ object WidgetDossier {
             }
             floatArrayOf(x0, y0, x1, y1, maxOf(x1 - x0, y1 - y0))
         }
-        // ce que montre la tuile j après le retournement numéro f : -1 = son morceau de logo, sinon le numéro de l'app
-        private fun face(f: Int, j: Int): Int {
-            if (f <= 0 || f > pages) return -1
-            val a = (f - 1) * 4 + j
-            return if (a < n) a else -1
-        }
+        // les deux couleurs de la plaque de verre : un brun très sombre mélangé aux couleurs du logo
+        private fun melange(a: Int, b: Int, u: Float) = Color.rgb(
+            (Color.red(a) + (Color.red(b) - Color.red(a)) * u).toInt(),
+            (Color.green(a) + (Color.green(b) - Color.green(a)) * u).toInt(),
+            (Color.blue(a) + (Color.blue(b) - Color.blue(a)) * u).toInt())
+        private val plaque1 = melange(Color.rgb(34, 24, 22), teintes[0], 0.42f)
+        private val plaque2 = melange(Color.rgb(34, 24, 22), teintes[2], 0.30f)
+        private val trait = Paint(Paint.ANTI_ALIAS_FLAG).also { it.style = Paint.Style.STROKE; it.strokeWidth = 0.7f }
         fun mosaique(cv: Canvas, t: Double) {
             val taille = cle(t, 0.0 to 1.0 by LIN, 0.9 to 1.05 by DOUX, 1.8 to 1.0 by DOUX,
                              11.1 to 1.0 by LIN, 11.35 to 1.06 by DEC, 11.7 to 1.0 by DOUX)
             val fendu = cle(t, 2.1 to 0.0 by LIN, 2.7 to 1.0 by DOUX, 10.5 to 1.0 by LIN, 11.1 to 0.0 by DOUX).toFloat()
-            if (n == 0 || fendu <= 0.001f) { logoSimple(cv, t, taille); return }
-            // le logo entier, dessous, qui s'efface en douceur
+            if (n == 0 || fendu <= 0.001f) { logoSimple(cv, t, LOGO_ECH * taille); return }
             val lisse = fendu * fendu * (3 - 2 * fendu)
-            logoSimple(cv, t, taille, (255 * (1 - lisse)).toInt())
             val g = gesteVisible(t)
             val x0 = bord[0]; val y0 = bord[1]; val x1 = bord[2]; val y1 = bord[3]; val s = bord[4]
-            val k2 = s / 52f                     // le logo (52 unités utiles, de 24 à 76) étalé sur toute la grille
-            val zoomG = 52f / s + (1 - 52f / s) * lisse     // la grille : taille du logo -> sa vraie taille
-            val pas = 6.5 / pages                // le temps entre deux retournements
+            // le logo (52 unités utiles, de 24 à 76) étalé sur la grille, avec une marge sur la plaque (x 1,14)
+            val k2 = s / 52f / (1f + 0.14f * lisse)
+            // la grille : à la taille du logo affiché au départ, puis à sa vraie taille
+            val depart = 52f * LOGO_ECH / s
+            val zoomG = depart + (1 - depart) * lisse
+            // le logo entier, dessous : il grandit comme les morceaux et s'efface en douceur
+            logoSimple(cv, t, (k2 * zoomG).toDouble(), (255 * (1 - lisse)).toInt())
             for (j in 0 until nb) {
                 val px = placesT[j][0]; val py = placesT[j][1]
                 val diag = ((px - x0) / (x1 - x0 + 0.01f) + (py - y0) / (y1 - y0 + 0.01f)) * 0.3
-                // où en est cette tuile : le dernier retournement commencé (f) et son avancement (0 à 1)
-                var f = -1; var prog = 1.0
-                for (q in 0..pages) {
-                    val t0 = 2.9 + q * pas + diag
-                    if (t >= t0) { f = q; prog = ((t - t0) / 0.55).coerceIn(0.0, 1.0) }
-                }
-                val ang = Math.PI * DOUX(prog)                       // 0 -> PI : un demi-tour
-                val montre = if (f < 0) -1 else if (ang < Math.PI / 2) face(f, j) else face(f + 1, j)
+                // aller : logo -> app (vers 2,9 s) ; retour : app -> logo (vers 9,4 s), en vague diagonale
+                val aller = cle(t, (2.9 + diag) to 0.0 by LIN, (3.45 + diag) to 1.0 by DOUX)
+                val retour = cle(t, (9.4 + 0.6 - diag) to 0.0 by LIN, (9.95 + 0.6 - diag) to 1.0 by DOUX)
+                val ang = Math.PI * maxOf(0.0, aller - retour)          // 0 = côté logo, PI = côté app
                 val sn = sin(ang).toFloat()
                 val largeur = maxOf(0.02f, kotlin.math.abs(cos(ang)).toFloat())
                 val h = (coteT / 2 + 1.5f * (1 - fendu)) * (1 + 0.06f * sn)   // collées au départ, puis l'espace s'ouvre
-                val cx = CX + (px - CX) * zoomG
-                val cy = CY + (py - CY) * zoomG
                 cv.save()
-                cv.translate(cx, cy)
+                cv.translate(CX + (px - CX) * zoomG, CY + (py - CY) * zoomG)
                 cv.scale(largeur * zoomG, zoomG)
                 tuile.reset()
                 p.reset(); p.isAntiAlias = true; p.isFilterBitmap = true
-                if (montre < 0) {
-                    // le morceau de logo : on découpe la tuile, puis on y dessine le logo étalé sur toute la grille
-                    tuile.addRoundRect(-h, -h, h, h, h * 0.45f * fendu + 0.01f, h * 0.45f * fendu + 0.01f, Path.Direction.CW)
+                val arrondi = h * 0.45f * fendu + 0.01f
+                if (ang < Math.PI / 2 || j >= n) {
+                    tuile.addRoundRect(-h, -h, h, h, arrondi, arrondi, Path.Direction.CW)
                     cv.save()
                     cv.clipPath(tuile)
+                    // la plaque de verre : son dégradé couvre toute la grille (il continue d'une tuile à l'autre)
+                    p.shader = LinearGradient(x0 - px, y0 - py, x1 - px, y1 - py,
+                        Teinte.avecAlpha(plaque1, 255 * fendu), Teinte.avecAlpha(plaque2, 255 * fendu), Shader.TileMode.CLAMP)
+                    cv.drawRect(-h, -h, h, h, p)
+                    p.shader = LinearGradient(0f, -h, 0f, 0f, Color.argb((0.14f * fendu * 255).toInt(), 255, 255, 255),
+                        Color.TRANSPARENT, Shader.TileMode.CLAMP)
+                    cv.drawRect(-h, -h, h, 0f, p)                         // le reflet en haut de la tuile
+                    p.shader = null
+                    // le morceau de logo : le logo étalé sur toute la grille, vu à travers la tuile
                     cv.translate(-px, -py)
-                    cv.translate(CX - s / 2, CY - s / 2); cv.scale(k2, k2); cv.translate(-24f, -22f)
+                    cv.translate(CX, CY); cv.scale(k2, k2); cv.translate(-CX, -CY)
                     LogosDossier.dessiner(cv, groupe, g, teintes)
                     cv.restore()
-                    p.color = Color.argb((0.35f * sn * 255).toInt(), 0, 0, 0)       // elle s'assombrit en tournant
+                    trait.color = Color.argb((0.16f * fendu * 255).toInt(), 255, 255, 255)   // le liseré de verre
+                    cv.drawPath(tuile, trait)
+                    p.color = Color.argb((0.35f * sn * 255).toInt(), 0, 0, 0)               // elle s'assombrit en tournant
                     cv.drawPath(tuile, p)
                 } else {
                     zone.set(-h, -h, h, h)
-                    cv.drawBitmap(icones[montre], null, zone, p)
+                    cv.drawBitmap(icones[j], null, zone, p)
                     if (sn > 0.01f) {
                         tuile.addRoundRect(-h * 0.88f, -h * 0.88f, h * 0.88f, h * 0.88f, h * 0.52f, h * 0.52f, Path.Direction.CW)
                         p.color = Color.argb((0.3f * sn * 255).toInt(), 0, 0, 0)
