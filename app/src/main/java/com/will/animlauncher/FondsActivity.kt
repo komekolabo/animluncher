@@ -70,11 +70,12 @@ class FondsActivity : Activity() {
         liste.removeAllViews()
         // 1) les fonds de l'app
         liste.addView(Style.titreCarte(this, getString(R.string.fd_de_lapp)).apply { setPadding(px(4f), px(8f), 0, px(10f)) })
+        // (18/11) après nos dessins : la case « Galerie » (des fonds à télécharger, voir GalerieActivity.kt)
         grille(CarnetFond.catalogue.map { f ->
             vignette(VueDessinFond(this, f.fabriquer(CarnetFond.palette(this))), getString(f.nom), null) {
                 ouvrirApercu(CarnetFond.APP, f.id)
             }
-        })
+        } + caseGalerie())
         // 2) mes fonds : « + Importer » puis les fichiers importés
         liste.addView(Style.titreCarte(this, getString(R.string.fd_mes_fonds)).apply { setPadding(px(4f), px(22f), 0, px(10f)) })
         val cases = mutableListOf<View>(caseImporter(), caseFond3D(), caseDossier())
@@ -267,6 +268,27 @@ class FondsActivity : Activity() {
         })
         isClickable = true
         setOnClickListener { startActivity(Intent(this@FondsActivity, DossierFondActivity::class.java)) }
+    }
+
+    // (18/11) La case « Galerie » : même forme que les autres cases, mais avec un contour PLEIN (pas en pointillés)
+    // car ce sont des fonds de l'app, pas un import. Elle ouvre l'écran de la galerie (GalerieActivity).
+    private fun caseGalerie(): View = LinearLayout(this).apply {
+        orientation = LinearLayout.VERTICAL
+        gravity = Gravity.CENTER
+        background = GradientDrawable().apply {
+            setColor(Color.argb(14, 255, 255, 255))
+            cornerRadius = px(18f).toFloat()
+            setStroke(px(1.5f), Color.rgb(70, 70, 78))
+        }
+        setPadding(px(8f), 0, px(8f), 0)
+        addView(Style.texte(this@FondsActivity, "▦", 30f, Style.TEXTE).apply { gravity = Gravity.CENTER })
+        addView(Style.texte(this@FondsActivity, getString(R.string.gal_case), 14f, Style.TEXTE, gras = true).apply { gravity = Gravity.CENTER })
+        addView(Style.texte(this@FondsActivity, getString(R.string.gal_case_expl), 11f, Style.MUET).apply {
+            gravity = Gravity.CENTER
+            setPadding(0, px(6f), 0, 0)
+        })
+        isClickable = true
+        setOnClickListener { startActivity(Intent(this@FondsActivity, GalerieActivity::class.java)) }
     }
 
     // Le sélecteur de photos, pour un fond 3D (photos seulement).

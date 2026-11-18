@@ -122,3 +122,19 @@ de chaque fichier envoyé). Au prochain passage tranquille, ces notes pourront �
   d'une autre session (548c51e, grandes icônes + infos utiles) ; rétabli par 41f9429 / 27cf437. Avant CHAQUE envoi :
   `git fetch`, puis vérifier que chaque fichier envoyé n'a pas changé sur GitHub depuis qu'on l'a lu.
   (Arrivé une 2e fois aux notes, à quelques secondes près : les sections « suite 2 » et « STYLE AUTO » ont été remises.)
+
+## GALERIE DE FONDS D'ÉCRAN (18/11 — PAS ENCORE TESTÉ PAR WILL)
+- Demande de Will : une galerie de fonds prédéfinis dans l'app, style paysages anime « nature » (maisons/trains OK, pas de ville).
+- LICENCES : PAS d'images Pixabay/Pexels (leur licence interdit de les redistribuer comme fonds d'écran dans une app).
+  Les images viennent de Will (générées par lui, ex. Gemini). Essais de génération par Claude (FLUX sur Hugging Face :
+  quota épuisé ; Pollinations : logo + basse résolution + style pas assez anime) jugés « nuls » par Will.
+- Case « Galerie » (3e case de « Proposés par l'app » dans `FondsActivity`) -> `GalerieActivity.kt` (pastilles de
+  catégories + grille 3 colonnes, vignettes téléchargées par 3 « ouvriers ») ; logique dans `GalerieFonds.kt`.
+  Textes : `res/values*/strings_galerie.xml` (6 langues).
+- Les images sont sur la BRANCHE `galerie` (orpheline, sans code) : un DOSSIER = une catégorie (Nature, Mountains, Lakes,
+  Countryside, Forest, Japan, Winter, Night ; noms traduits dans `nomCategorie`, dossier inconnu = son nom tel quel).
+  Liste = UNE question à l'API GitHub (git/trees/galerie?recursive=1), gardée 6 h (60 questions/h/téléphone sans compte).
+  Téléchargement par raw.githubusercontent.com. Fichiers nommés par leur sha : cache/galerie (vignettes, effaçable)
+  et files/galerie (fonds choisis, gardés). Formats : jpg, jpeg, png, webp, gif, mp4. Taille vérifiée.
+- Pour ajouter un fond : Will dépose l'image dans le bon dossier sur github.com (branche galerie) : visible sans nouvelle version
+  (dans les 6 h, ou tout de suite avec « Réessayer » quand la galerie est vide).

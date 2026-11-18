@@ -1,0 +1,22 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Les textes de la GALERIE de fonds d'écran (Español). Voir GalerieActivity.kt et GalerieFonds.kt. -->
+<resources>
+    <string name="gal_case">Galería</string>
+    <string name="gal_case_expl">Fondos para descargar</string>
+    <string name="gal_titre">Galería</string>
+    <string name="gal_tout">Todo</string>
+    <string name="gal_chargement">Cargando la galería…</string>
+    <string name="gal_vide">Pronto llegarán nuevos fondos.\n¡Vuelve en un rato!</string>
+    <string name="gal_hors_ligne">No se pudo cargar la galería.\nComprueba tu conexión a Internet.</string>
+    <string name="gal_reessayer">Reintentar</string>
+    <string name="gal_telechargement">Descargando el fondo…</string>
+    <string name="gal_rate">La descarga falló. Inténtalo de nuevo.</string>
+    <string name="gal_cat_nature">Naturaleza</string>
+    <string name="gal_cat_montagnes">Montañas</string>
+    <string name="gal_cat_lacs">Lagos</string>
+    <string name="gal_cat_campagne">Campo</string>
+    <string name="gal_cat_foret">Bosque</string>
+    <string name="gal_cat_japon">Japón</string>
+    <string name="gal_cat_hiver">Invierno</string>
+    <string name="gal_cat_nuit">Noche</string>
+</resources>

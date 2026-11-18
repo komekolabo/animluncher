@@ -63,6 +63,10 @@
         <activity
             android:name=".FondsActivity"
             android:exported="false" />
+        <!-- (18/11) La galerie : des fonds d'écran téléchargés depuis la branche « galerie ». Voir GalerieActivity.kt. -->
+        <activity
+            android:name=".GalerieActivity"
+            android:exported="false" />
         <!-- (17/11) Le « dossier de fonds » : photos et vidéos qui se relaient. Voir DossierFondActivity.kt. -->
         <activity
             android:name=".DossierFondActivity"
