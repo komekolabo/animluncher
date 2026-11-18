@@ -1,0 +1,45 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- (18/11) STYLE AUTO (Português) : le bouton de l’accueil et ses écrans. Voir StyleAutoActivity.kt. -->
+<resources>
+    <string name="sa_banniere_titre">Estilo auto</string>
+    <string name="sa_banniere_texte">Um visual combinando com seus apps, com um toque</string>
+    <string name="sa_titre">Estilo auto</string>
+    <string name="sa_analyse">Analisando os ícones dos seus apps…</string>
+    <string name="sa_trouve">%1$d apps encontrados, organizados em %2$d pastas</string>
+    <string name="sa_aucun_dossier">Ainda não há apps suficientes para criar pastas: o estilo será aplicado mesmo assim ao papel de parede e à reação ao som.</string>
+    <string name="sa_legende">Papel de parede “%1$s” tingido · o contorno = reação ao som</string>
+    <string name="sa_assorti">Combinando com seus apps</string>
+    <string name="sa_assorti_desc">Cada pasta ganha a cor dos seus ícones</string>
+    <string name="sa_degrade">Degradê</string>
+    <string name="sa_degrade_desc">A cor flui de uma pasta para a outra</string>
+    <string name="sa_mono">Monocromático</string>
+    <string name="sa_mono_desc">Um único tom, em nuances: discreto</string>
+    <string name="sa_neon">Noite neon</string>
+    <string name="sa_neon_desc">Duas cores vivas sobre um preto profundo</string>
+    <string name="sa_soleil">Pôr do sol</string>
+    <string name="sa_soleil_desc">Tons quentes, do coral ao âmbar</string>
+    <string name="sa_continuer">Continuar</string>
+    <string name="sa_recap_titre">O que vai mudar</string>
+    <string name="sa_l_couleurs">Cores das pastas</string>
+    <string name="sa_l_couleurs_desc">Uma cor por pasta, no estilo escolhido</string>
+    <string name="sa_l_widgets">Pastas na tela inicial</string>
+    <string name="sa_l_widgets_desc">Coloque suas %1$d pastas na tela inicial (o Android pede para confirmar cada uma)</string>
+    <string name="sa_l_fond">Papel de parede</string>
+    <string name="sa_l_fond_desc">“%1$s”, tingido no estilo</string>
+    <string name="sa_l_fond_android">O Android vai pedir para você confirmar</string>
+    <string name="sa_l_son">Reação ao som</string>
+    <string name="sa_l_son_desc">As 3 cores da luz ao redor da tela</string>
+    <string name="sa_l_anim">Animações de apps</string>
+    <string name="sa_l_anim_desc">Ativa as animações dos seus %1$d apps compatíveis</string>
+    <string name="sa_garde">Suas configurações atuais ficam salvas: você poderá desfazer tudo com um toque.</string>
+    <string name="sa_appliquer">Aplicar o estilo</string>
+    <string name="sa_fini_titre">Pronto</string>
+    <string name="sa_fini_texte">Seu estilo “%1$s” está aplicado.</string>
+    <string name="sa_poser_titre">Coloque suas pastas na tela inicial</string>
+    <string name="sa_poser">Colocar</string>
+    <string name="sa_pose">Colocada</string>
+    <string name="sa_terminer">Concluir</string>
+    <string name="sa_annuler">Desfazer este estilo</string>
+    <string name="sa_annuler_dernier">Desfazer o último estilo</string>
+    <string name="sa_annule">Seu estilo anterior voltou.</string>
+</resources>

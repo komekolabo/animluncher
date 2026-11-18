@@ -56,12 +56,20 @@ abstract class DessinFond {
 // « NUIT » : le fond de la carte 3 de l'accueil (déjà vu et validé par Will), en plein écran.
 // Trois lueurs sombres (bleu nuit, braise, vert profond) qui dérivent très lentement, et des étoiles
 // qui scintillent. Très sombre : sur l'écran OLED du Samsung, le noir ne consomme presque rien.
-class FondNuit : DessinFond() {
+// (18/11) « palette » : les couleurs d'un STYLE AUTO (voir StyleAuto.kt). Sans palette, les couleurs d'origine.
+// Avec, chaque lueur prend la teinte d'une couleur du style, mais reste aussi sombre que l'originale
+// (clarté 0,27 en OKLCH, voir Teinte.kt) : le fond reste un fond de nuit, juste teinté.
+class FondNuit(private val palette: IntArray? = null) : DessinFond() {
     private class Lueur(val fx: Float, val fy: Float, val couleur: Int)
+    private fun sombre(i: Int, origine: Int): Int {
+        if (palette == null || palette.isEmpty()) return origine
+        val h = Teinte.versOklch(palette[i % palette.size])[2]
+        return Teinte.oklch(0.27f, 0.055f, h)
+    }
     private val lueurs = listOf(
-        Lueur(0.33f, 0.30f, Color.rgb(30, 42, 58)),
-        Lueur(0.70f, 0.50f, Color.rgb(58, 36, 24)),
-        Lueur(0.25f, 0.72f, Color.rgb(16, 48, 42))
+        Lueur(0.33f, 0.30f, sombre(0, Color.rgb(30, 42, 58))),
+        Lueur(0.70f, 0.50f, sombre(1, Color.rgb(58, 36, 24))),
+        Lueur(0.25f, 0.72f, sombre(2, Color.rgb(16, 48, 42)))
     )
     private val etoiles = listOf(
         floatArrayOf(0.18f, 0.22f, 1f), floatArrayOf(0.72f, 0.16f, 1.5f), floatArrayOf(0.58f, 0.38f, 1f),
@@ -106,14 +114,20 @@ class FondNuit : DessinFond() {
 
 // « GALETS » : le fond de la carte 2 de l'accueil (déjà vu par Will), en plein écran :
 // un halo doré très léger qui respire au centre et 4 galets de couleur qui flottent autour.
-class FondGalets : DessinFond() {
+// (18/11) « palette » : avec un STYLE AUTO, les 4 galets prennent les 4 couleurs du style et le halo la 1re.
+class FondGalets(private val palette: IntArray? = null) : DessinFond() {
     private class Galet(val dx: Float, val dy: Float, val r: Float, val couleur: Int, val retard: Float)
+    private fun couleur(i: Int, origine: Int): Int =
+        if (palette == null || palette.isEmpty()) origine else palette[i % palette.size]
     private val galets = listOf(
-        Galet(-92f, -63f, 19f, Color.rgb(217, 119, 87), 0f),
-        Galet(94f, -13f, 15f, Color.rgb(60, 196, 106), 0.9f),
-        Galet(-74f, 97f, 13f, Color.rgb(91, 147, 240), 1.7f),
-        Galet(66f, 103f, 11f, Color.rgb(123, 203, 58), 2.4f)
+        Galet(-92f, -63f, 19f, couleur(0, Color.rgb(217, 119, 87)), 0f),
+        Galet(94f, -13f, 15f, couleur(1, Color.rgb(60, 196, 106)), 0.9f),
+        Galet(-74f, 97f, 13f, couleur(2, Color.rgb(91, 147, 240)), 1.7f),
+        Galet(66f, 103f, 11f, couleur(3, Color.rgb(123, 203, 58)), 2.4f)
     )
+    // le halo du centre : doré à l'origine, sinon la 1re couleur du style (toujours très léger : 31 sur 255)
+    private val halo = if (palette == null || palette.isEmpty()) Color.argb(31, 246, 210, 122)
+        else Teinte.avecAlpha(palette[0], 31f)
     private val pinceau = Paint(Paint.ANTI_ALIAS_FLAG)
     private val ombre = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = Color.argb(110, 0, 0, 0) }
 
@@ -126,7 +140,7 @@ class FondGalets : DessinFond() {
         val souffle = 0.92f + 0.14f * (0.5f - 0.5f * cos(2f * PI.toFloat() * cycle(t, 6f)))
         val rh = 100f * dp * echelle * souffle
         pinceau.shader = RadialGradient(cx, cy, rh,
-            intArrayOf(Color.argb(31, 246, 210, 122), Color.TRANSPARENT, Color.TRANSPARENT),
+            intArrayOf(halo, Color.TRANSPARENT, Color.TRANSPARENT),
             floatArrayOf(0f, 0.65f, 1f), Shader.TileMode.CLAMP)
         c.drawCircle(cx, cy, rh, pinceau)
         for (g in galets) {
@@ -182,16 +196,31 @@ object CarnetFond {
 
     // Le catalogue des fonds proposés par l'app : identifiant -> (nom affiché, fabrique du dessin).
     // Pour en ajouter un : une ligne ici + son nom dans res/values*/strings_fonds.xml.
-    class FondApp(val id: String, val nom: Int, val fabriquer: () -> DessinFond)
+    // (18/11) « fabriquer » reçoit la palette du style auto (null = les couleurs d'origine).
+    class FondApp(val id: String, val nom: Int, val fabriquer: (IntArray?) -> DessinFond)
     val catalogue = listOf(
-        FondApp("nuit", R.string.fd_nom_nuit) { FondNuit() },
-        FondApp("galets", R.string.fd_nom_galets) { FondGalets() }
+        FondApp("nuit", R.string.fd_nom_nuit) { FondNuit(it) },
+        FondApp("galets", R.string.fd_nom_galets) { FondGalets(it) }
     )
-    fun dessin(id: String): DessinFond = (catalogue.firstOrNull { it.id == id } ?: catalogue[0]).fabriquer()
+    fun dessin(id: String, palette: IntArray? = null): DessinFond =
+        (catalogue.firstOrNull { it.id == id } ?: catalogue[0]).fabriquer(palette)
 
-    // Le dessin d'un choix : un fond 3D (s'il existe encore) ou un dessin de l'app.
+    // Le dessin d'un choix : un fond 3D (s'il existe encore) ou un dessin de l'app (teinté par le style auto, s'il y en a un).
     fun dessinPour(c: Context, sorte: String, id: String): DessinFond =
-        if (sorte == PROFONDEUR) FondProfondeur(c, id).takeIf { it.valide } ?: FondNuit() else dessin(id)
+        if (sorte == PROFONDEUR) FondProfondeur(c, id).takeIf { it.valide } ?: FondNuit() else dessin(id, palette(c))
+
+    // LA PALETTE DU STYLE AUTO (18/11) : 4 couleurs rangées dans le carnet sous « dessin_palette » (le préfixe
+    // « dessin_ » fait que le fond d'écran déjà posé se recharge tout seul quand elle change, voir FondService).
+    // Absente = les dessins gardent leurs couleurs d'origine.
+    const val CLE_PALETTE = "dessin_palette"
+    fun palette(c: Context): IntArray? =
+        carnet(c).getString(CLE_PALETTE, null)?.split(",")?.mapNotNull { it.trim().toIntOrNull() }
+            ?.takeIf { it.isNotEmpty() }?.toIntArray()
+    fun definirPalette(c: Context, couleurs: IntArray?) {
+        val e = carnet(c).edit()
+        if (couleurs == null || couleurs.isEmpty()) e.remove(CLE_PALETTE) else e.putString(CLE_PALETTE, couleurs.joinToString(","))
+        e.apply()
+    }
 
     // Ce que l'utilisateur a choisi, tout en un.
     //  - sorte : APP / VIDEO / GIF / IMAGE / PROFONDEUR

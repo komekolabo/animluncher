@@ -95,6 +95,10 @@
         <activity
             android:name=".GroupesActivity"
             android:exported="false" />
+        <!-- (18/11) Le STYLE AUTO : 5 styles assortis aux apps du téléphone (voir StyleAutoActivity.kt). -->
+        <activity
+            android:name=".StyleAutoActivity"
+            android:exported="false" />
         <activity
             android:name=".DossierActivity"
             android:exported="false"

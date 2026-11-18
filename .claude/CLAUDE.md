@@ -85,3 +85,20 @@ de chaque fichier envoyé). Au prochain passage tranquille, ces notes pourront �
   `partiallyUpdateAppWidget` (`mettreAJourInfos`, à l'arrivée sur l'accueil). Will n'a pas encore vu ça sur le téléphone.
 - ⚠️ 18/11 : un envoi `push_files` d'une autre session (polices) a ÉCRASÉ WidgetDossier.kt avec une vieille copie ; rétabli
   (41f9429). Avant d'envoyer un fichier entier, TOUJOURS repartir de la version GitHub du moment (git fetch juste avant).
+
+## STYLE AUTO (18/11 — PAS ENCORE TESTÉ PAR WILL SUR LE TÉLÉPHONE)
+- Demande de Will : une option bien visible pour habiller tout le téléphone d'un style beau et cohérent, d'après
+  ses apps. Maquette validée : canevas Design https://claude.ai/artifact/L3zhTGzM4aqeq1M1ToVjDc (3 écrans).
+- Bouton « Style auto » sous le titre de l'accueil (`MainActivity.banniereStyle`, anneau `AnneauStyle` aux couleurs
+  des dossiers). Écrans : `StyleAutoActivity.kt` (ANALYSE → CHOIX avec aperçu `ApercuStyle` → RECAP avec interrupteurs
+  → FINI avec un bouton « Poser » par dossier, car Android montre sa fenêtre pour chaque widget).
+  Textes : `res/values*/strings_style.xml` (6 langues).
+- Moteur : `StyleAuto.kt`. Analyse = histogramme des teintes OKLCH des icônes (32 x 32, pixels pondérés par leur
+  intensité, 24 bacs de 15°) → teinte de chaque dossier + dominante du téléphone. 5 styles : Assorti (teintes des
+  icônes, écartées d'au moins 24°), Dégradé (dominante −55° → +65°), Monochrome, Nuit néon (dominante / +150°),
+  Coucher de soleil (22° → 77°). `StyleAuto.roue()` retrouve l'angle HSV de la roue qui donne la teinte OKLCH voulue.
+- Applique : couleurs des dossiers (`Groupes.definirCouleur`), 3 teintes de la réaction sonore, fond Nuit/Galets
+  TEINTÉ (nouvelle palette `CarnetFond.CLE_PALETTE` = « dessin_palette », lue par `FondNuit(palette)` /
+  `FondGalets(palette)`), animations des apps compatibles. SAUVEGARDE avant (carnet « style_auto ») : « Annuler ce
+  style » remet couleur_*, teinte_*, dessin_*, animations_actives et off_*. Limite : si le fond du téléphone n'était
+  pas le nôtre, l'annulation ne remet pas l'ancien fond d'Android.

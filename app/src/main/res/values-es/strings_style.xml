@@ -1,0 +1,45 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- (18/11) STYLE AUTO (Español) : le bouton de l’accueil et ses écrans. Voir StyleAutoActivity.kt. -->
+<resources>
+    <string name="sa_banniere_titre">Estilo auto</string>
+    <string name="sa_banniere_texte">Un look a juego con tus apps, en un toque</string>
+    <string name="sa_titre">Estilo auto</string>
+    <string name="sa_analyse">Analizando los iconos de tus apps…</string>
+    <string name="sa_trouve">%1$d apps encontradas, ordenadas en %2$d carpetas</string>
+    <string name="sa_aucun_dossier">Aún no hay suficientes apps para crear carpetas: el estilo se aplicará igualmente al fondo y a la reacción al sonido.</string>
+    <string name="sa_legende">Fondo «%1$s» teñido · el contorno = reacción al sonido</string>
+    <string name="sa_assorti">A juego con tus apps</string>
+    <string name="sa_assorti_desc">Cada carpeta toma el color de sus iconos</string>
+    <string name="sa_degrade">Degradado</string>
+    <string name="sa_degrade_desc">El color fluye de una carpeta a otra</string>
+    <string name="sa_mono">Monocromo</string>
+    <string name="sa_mono_desc">Un solo tono, en matices: sobrio</string>
+    <string name="sa_neon">Noche neón</string>
+    <string name="sa_neon_desc">Dos colores vivos sobre un negro profundo</string>
+    <string name="sa_soleil">Atardecer</string>
+    <string name="sa_soleil_desc">Tonos cálidos, del coral al ámbar</string>
+    <string name="sa_continuer">Continuar</string>
+    <string name="sa_recap_titre">Lo que va a cambiar</string>
+    <string name="sa_l_couleurs">Colores de las carpetas</string>
+    <string name="sa_l_couleurs_desc">Un color por carpeta, en el estilo elegido</string>
+    <string name="sa_l_widgets">Carpetas en la pantalla de inicio</string>
+    <string name="sa_l_widgets_desc">Coloca tus %1$d carpetas en la pantalla de inicio (Android te pide confirmar cada una)</string>
+    <string name="sa_l_fond">Fondo de pantalla</string>
+    <string name="sa_l_fond_desc">«%1$s», teñido con el estilo</string>
+    <string name="sa_l_fond_android">Android te pedirá que confirmes</string>
+    <string name="sa_l_son">Reacción al sonido</string>
+    <string name="sa_l_son_desc">Los 3 colores de la luz alrededor de la pantalla</string>
+    <string name="sa_l_anim">Animaciones de apps</string>
+    <string name="sa_l_anim_desc">Activa las animaciones de tus %1$d apps compatibles</string>
+    <string name="sa_garde">Tus ajustes actuales se guardan: podrás deshacerlo todo en un toque.</string>
+    <string name="sa_appliquer">Aplicar el estilo</string>
+    <string name="sa_fini_titre">Listo</string>
+    <string name="sa_fini_texte">Tu estilo «%1$s» ya está aplicado.</string>
+    <string name="sa_poser_titre">Coloca tus carpetas en la pantalla de inicio</string>
+    <string name="sa_poser">Colocar</string>
+    <string name="sa_pose">Colocada</string>
+    <string name="sa_terminer">Terminar</string>
+    <string name="sa_annuler">Deshacer este estilo</string>
+    <string name="sa_annuler_dernier">Deshacer el último estilo</string>
+    <string name="sa_annule">Tu estilo anterior ha vuelto.</string>
+</resources>

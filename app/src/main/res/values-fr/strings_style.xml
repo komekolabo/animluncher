@@ -1,0 +1,45 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- (18/11) STYLE AUTO (Français) : le bouton de l’accueil et ses écrans. Voir StyleAutoActivity.kt. -->
+<resources>
+    <string name="sa_banniere_titre">Style auto</string>
+    <string name="sa_banniere_texte">Un look assorti à tes apps, en 1 appui</string>
+    <string name="sa_titre">Style auto</string>
+    <string name="sa_analyse">J’analyse les icônes de tes apps…</string>
+    <string name="sa_trouve">%1$d apps trouvées, rangées en %2$d dossiers</string>
+    <string name="sa_aucun_dossier">Pas encore assez d’apps pour faire des dossiers : le style s’applique quand même au fond d’écran et à la réaction sonore.</string>
+    <string name="sa_legende">Fond « %1$s » teinté · le contour = la réaction sonore</string>
+    <string name="sa_assorti">Assorti à tes apps</string>
+    <string name="sa_assorti_desc">Chaque dossier prend la couleur de ses icônes</string>
+    <string name="sa_degrade">Dégradé</string>
+    <string name="sa_degrade_desc">Un fondu de couleur d’un dossier à l’autre</string>
+    <string name="sa_mono">Monochrome</string>
+    <string name="sa_mono_desc">Une seule teinte, en nuances : sobre</string>
+    <string name="sa_neon">Nuit néon</string>
+    <string name="sa_neon_desc">Deux couleurs vives sur fond très noir</string>
+    <string name="sa_soleil">Coucher de soleil</string>
+    <string name="sa_soleil_desc">Des tons chauds, du corail à l’ambre</string>
+    <string name="sa_continuer">Continuer</string>
+    <string name="sa_recap_titre">Ce qui va changer</string>
+    <string name="sa_l_couleurs">Couleurs des dossiers</string>
+    <string name="sa_l_couleurs_desc">Une couleur par dossier, dans le style choisi</string>
+    <string name="sa_l_widgets">Dossiers sur l’accueil</string>
+    <string name="sa_l_widgets_desc">Pose tes %1$d dossiers sur l’accueil (Android te demande de valider chacun)</string>
+    <string name="sa_l_fond">Fond d’écran</string>
+    <string name="sa_l_fond_desc">« %1$s », teinté dans le style</string>
+    <string name="sa_l_fond_android">Android te demandera de confirmer</string>
+    <string name="sa_l_son">Réaction sonore</string>
+    <string name="sa_l_son_desc">Les 3 couleurs du tour de l’écran</string>
+    <string name="sa_l_anim">Animations d’apps</string>
+    <string name="sa_l_anim_desc">Active les animations de tes %1$d apps compatibles</string>
+    <string name="sa_garde">Tes réglages actuels sont gardés : tu pourras tout annuler en 1 appui.</string>
+    <string name="sa_appliquer">Appliquer le style</string>
+    <string name="sa_fini_titre">C’est fait</string>
+    <string name="sa_fini_texte">Ton style « %1$s » est en place.</string>
+    <string name="sa_poser_titre">Pose tes dossiers sur l’accueil</string>
+    <string name="sa_poser">Poser</string>
+    <string name="sa_pose">Posé</string>
+    <string name="sa_terminer">Terminé</string>
+    <string name="sa_annuler">Annuler ce style</string>
+    <string name="sa_annuler_dernier">Annuler le dernier style</string>
+    <string name="sa_annule">Ton ancien style est revenu.</string>
+</resources>

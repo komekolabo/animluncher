@@ -1,0 +1,45 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- (18/11) STYLE AUTO (Deutsch) : le bouton de l’accueil et ses écrans. Voir StyleAutoActivity.kt. -->
+<resources>
+    <string name="sa_banniere_titre">Auto-Stil</string>
+    <string name="sa_banniere_texte">Ein Look passend zu deinen Apps, mit einem Tipp</string>
+    <string name="sa_titre">Auto-Stil</string>
+    <string name="sa_analyse">Ich sehe mir die Symbole deiner Apps an…</string>
+    <string name="sa_trouve">%1$d Apps gefunden, in %2$d Ordner sortiert</string>
+    <string name="sa_aucun_dossier">Noch nicht genug Apps für Ordner: Der Stil gilt trotzdem für Hintergrund und Sound-Reaktion.</string>
+    <string name="sa_legende">Hintergrund „%1$s“, eingefärbt · der Rand = Sound-Reaktion</string>
+    <string name="sa_assorti">Passend zu deinen Apps</string>
+    <string name="sa_assorti_desc">Jeder Ordner bekommt die Farbe seiner Symbole</string>
+    <string name="sa_degrade">Verlauf</string>
+    <string name="sa_degrade_desc">Die Farbe fließt von Ordner zu Ordner</string>
+    <string name="sa_mono">Monochrom</string>
+    <string name="sa_mono_desc">Ein einziger Farbton, in Nuancen: schlicht</string>
+    <string name="sa_neon">Neon-Nacht</string>
+    <string name="sa_neon_desc">Zwei kräftige Farben auf tiefem Schwarz</string>
+    <string name="sa_soleil">Sonnenuntergang</string>
+    <string name="sa_soleil_desc">Warme Töne, von Koralle bis Bernstein</string>
+    <string name="sa_continuer">Weiter</string>
+    <string name="sa_recap_titre">Was sich ändert</string>
+    <string name="sa_l_couleurs">Ordnerfarben</string>
+    <string name="sa_l_couleurs_desc">Eine Farbe pro Ordner, im gewählten Stil</string>
+    <string name="sa_l_widgets">Ordner auf dem Startbildschirm</string>
+    <string name="sa_l_widgets_desc">Lege deine %1$d Ordner auf den Startbildschirm (Android fragt bei jedem nach)</string>
+    <string name="sa_l_fond">Hintergrund</string>
+    <string name="sa_l_fond_desc">„%1$s“, im Stil eingefärbt</string>
+    <string name="sa_l_fond_android">Android bittet dich um Bestätigung</string>
+    <string name="sa_l_son">Sound-Reaktion</string>
+    <string name="sa_l_son_desc">Die 3 Farben des Lichts rund um den Bildschirm</string>
+    <string name="sa_l_anim">App-Animationen</string>
+    <string name="sa_l_anim_desc">Schaltet die Animationen deiner %1$d kompatiblen Apps ein</string>
+    <string name="sa_garde">Deine aktuellen Einstellungen bleiben gespeichert: Du kannst alles mit einem Tipp rückgängig machen.</string>
+    <string name="sa_appliquer">Stil anwenden</string>
+    <string name="sa_fini_titre">Fertig</string>
+    <string name="sa_fini_texte">Dein Stil „%1$s“ ist eingerichtet.</string>
+    <string name="sa_poser_titre">Lege deine Ordner auf den Startbildschirm</string>
+    <string name="sa_poser">Ablegen</string>
+    <string name="sa_pose">Abgelegt</string>
+    <string name="sa_terminer">Fertig</string>
+    <string name="sa_annuler">Diesen Stil rückgängig machen</string>
+    <string name="sa_annuler_dernier">Letzten Stil rückgängig machen</string>
+    <string name="sa_annule">Dein vorheriger Stil ist zurück.</string>
+</resources>

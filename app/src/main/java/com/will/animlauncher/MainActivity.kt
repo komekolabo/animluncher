@@ -90,6 +90,10 @@ class MainActivity : Activity() {
             setOnClickListener { ouvrir(ReglagesActivity::class.java) }
         }, LinearLayout.LayoutParams(px(48f), px(48f)))
 
+        // ---------- 1 bis. (18/11) le bouton « Style auto », bien visible sous le titre ----------
+        // Un appui ouvre StyleAutoActivity : l'app propose 5 styles assortis aux apps du téléphone.
+        val banniere = banniereStyle()
+
         // ---------- 2. les 3 cartes, dans le manège qui tourne en boucle ----------
         manege = Manege(this, pas).apply {
             setPadding(0, px(6f), 0, 0)
@@ -145,6 +149,9 @@ class MainActivity : Activity() {
             orientation = LinearLayout.VERTICAL
             setBackgroundColor(Style.NOIR)
             addView(entete, LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, px(64f)))
+            addView(banniere, LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, px(68f)).apply {
+                leftMargin = px(20f); rightMargin = px(20f); topMargin = px(2f); bottomMargin = px(6f)
+            })
             addView(manege, LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, 0, 1f))
             addView(bas)
         }
@@ -201,6 +208,7 @@ class MainActivity : Activity() {
             else resources.getQuantityString(R.plurals.apps_trouvees, avecAnimation.size, avecAnimation.size)
         // la démo joue les animations de 5 de CES apps-là (voir DemoAccueil.kt)
         demo.choisir(if (jouables.isNotEmpty()) jouables else avecAnimation)
+        majAnneauStyle()
         manege.enAvant = true                  // le défilement automatique repart (5 s pleines)
     }
 
@@ -216,6 +224,45 @@ class MainActivity : Activity() {
     override fun onUserLeaveHint() {
         super.onUserLeaveHint()
         manege.autoArrete = false
+    }
+
+    // ================= LE BOUTON « STYLE AUTO » (18/11) =================
+    // Une carte basse et large : à gauche l'anneau qui tourne doucement (aux couleurs des dossiers déjà
+    // colorés, sinon une palette douce), le titre et une phrase, à droite la petite flèche ronde des cartes.
+    private var anneauStyle: FrameLayout? = null
+    private fun banniereStyle(): LinearLayout = LinearLayout(this).apply {
+        orientation = LinearLayout.HORIZONTAL
+        gravity = Gravity.CENTER_VERTICAL
+        background = Style.arrondi(this@MainActivity, Style.CARTE, 22f, Color.rgb(42, 42, 48))
+        setPadding(px(12f), 0, px(12f), 0)
+        val a = obtainStyledAttributes(intArrayOf(android.R.attr.selectableItemBackground))
+        foreground = a.getDrawable(0)
+        a.recycle()
+        val place = FrameLayout(this@MainActivity)
+        anneauStyle = place
+        addView(place, LinearLayout.LayoutParams(px(44f), px(44f)))
+        addView(LinearLayout(this@MainActivity).apply {
+            orientation = LinearLayout.VERTICAL
+            setPadding(px(14f), 0, px(8f), 0)
+            addView(Style.texte(this@MainActivity, getString(R.string.sa_banniere_titre), 15.5f, Style.TEXTE, gras = true))
+            addView(Style.texte(this@MainActivity, getString(R.string.sa_banniere_texte), 12.5f, Style.MUET).apply { setPadding(0, px(2f), 0, 0) })
+        }, LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f))
+        addView(Style.texte(this@MainActivity, "→", 15f, Style.TEXTE).apply {
+            gravity = Gravity.CENTER
+            background = Style.arrondi(this@MainActivity, Color.rgb(28, 28, 32), 17f)
+        }, LinearLayout.LayoutParams(px(34f), px(34f)))
+        contentDescription = getString(R.string.sa_banniere_titre)
+        isClickable = true
+        setOnClickListener { ouvrir(StyleAutoActivity::class.java) }
+    }
+
+    // L'anneau est refait à chaque retour sur l'accueil : il prend les couleurs que les dossiers ont maintenant.
+    private fun majAnneauStyle() {
+        val place = anneauStyle ?: return
+        val couleurs = (Groupes.CATEGORIES.map { it.id } + Groupes.persos(this))
+            .mapNotNull { Groupes.couleur(this, it) }.take(6).map { Teinte.vitrine(it) }
+        place.removeAllViews()
+        place.addView(AnneauStyle(this, couleurs))
     }
 
     // ================= LES CARTES =================

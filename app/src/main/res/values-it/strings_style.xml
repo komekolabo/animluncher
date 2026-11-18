@@ -1,0 +1,45 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- (18/11) STYLE AUTO (Italiano) : le bouton de l’accueil et ses écrans. Voir StyleAutoActivity.kt. -->
+<resources>
+    <string name="sa_banniere_titre">Stile auto</string>
+    <string name="sa_banniere_texte">Un look abbinato alle tue app, con un tocco</string>
+    <string name="sa_titre">Stile auto</string>
+    <string name="sa_analyse">Sto guardando le icone delle tue app…</string>
+    <string name="sa_trouve">%1$d app trovate, ordinate in %2$d cartelle</string>
+    <string name="sa_aucun_dossier">Non ci sono ancora abbastanza app per le cartelle: lo stile verrà comunque applicato allo sfondo e alla reazione sonora.</string>
+    <string name="sa_legende">Sfondo «%1$s» colorato · il contorno = reazione sonora</string>
+    <string name="sa_assorti">Abbinato alle tue app</string>
+    <string name="sa_assorti_desc">Ogni cartella prende il colore delle sue icone</string>
+    <string name="sa_degrade">Sfumatura</string>
+    <string name="sa_degrade_desc">Il colore sfuma da una cartella all’altra</string>
+    <string name="sa_mono">Monocromo</string>
+    <string name="sa_mono_desc">Un’unica tinta, in sfumature: sobrio</string>
+    <string name="sa_neon">Notte neon</string>
+    <string name="sa_neon_desc">Due colori vivaci su un nero profondo</string>
+    <string name="sa_soleil">Tramonto</string>
+    <string name="sa_soleil_desc">Toni caldi, dal corallo all’ambra</string>
+    <string name="sa_continuer">Continua</string>
+    <string name="sa_recap_titre">Cosa cambierà</string>
+    <string name="sa_l_couleurs">Colori delle cartelle</string>
+    <string name="sa_l_couleurs_desc">Un colore per cartella, nello stile scelto</string>
+    <string name="sa_l_widgets">Cartelle nella schermata Home</string>
+    <string name="sa_l_widgets_desc">Metti le tue %1$d cartelle nella schermata Home (Android ti chiede di confermare ognuna)</string>
+    <string name="sa_l_fond">Sfondo</string>
+    <string name="sa_l_fond_desc">«%1$s», colorato nello stile</string>
+    <string name="sa_l_fond_android">Android ti chiederà di confermare</string>
+    <string name="sa_l_son">Reazione sonora</string>
+    <string name="sa_l_son_desc">I 3 colori della luce intorno allo schermo</string>
+    <string name="sa_l_anim">Animazioni delle app</string>
+    <string name="sa_l_anim_desc">Attiva le animazioni delle tue %1$d app compatibili</string>
+    <string name="sa_garde">Le tue impostazioni attuali vengono salvate: potrai annullare tutto con un tocco.</string>
+    <string name="sa_appliquer">Applica lo stile</string>
+    <string name="sa_fini_titre">Fatto</string>
+    <string name="sa_fini_texte">Il tuo stile «%1$s» è attivo.</string>
+    <string name="sa_poser_titre">Metti le tue cartelle nella schermata Home</string>
+    <string name="sa_poser">Aggiungi</string>
+    <string name="sa_pose">Aggiunta</string>
+    <string name="sa_terminer">Fine</string>
+    <string name="sa_annuler">Annulla questo stile</string>
+    <string name="sa_annuler_dernier">Annulla l’ultimo stile</string>
+    <string name="sa_annule">Il tuo stile precedente è tornato.</string>
+</resources>

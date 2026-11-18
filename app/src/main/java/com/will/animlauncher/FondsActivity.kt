@@ -71,7 +71,7 @@ class FondsActivity : Activity() {
         // 1) les fonds de l'app
         liste.addView(Style.titreCarte(this, getString(R.string.fd_de_lapp)).apply { setPadding(px(4f), px(8f), 0, px(10f)) })
         grille(CarnetFond.catalogue.map { f ->
-            vignette(VueDessinFond(this, f.fabriquer()), getString(f.nom), null) {
+            vignette(VueDessinFond(this, f.fabriquer(CarnetFond.palette(this))), getString(f.nom), null) {
                 ouvrirApercu(CarnetFond.APP, f.id)
             }
         })

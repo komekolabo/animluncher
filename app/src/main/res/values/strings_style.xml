@@ -1,0 +1,45 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- (18/11) STYLE AUTO (English (default)) : le bouton de l’accueil et ses écrans. Voir StyleAutoActivity.kt. -->
+<resources>
+    <string name="sa_banniere_titre">Auto style</string>
+    <string name="sa_banniere_texte">A look that matches your apps, in one tap</string>
+    <string name="sa_titre">Auto style</string>
+    <string name="sa_analyse">Looking at your app icons…</string>
+    <string name="sa_trouve">%1$d apps found, sorted into %2$d folders</string>
+    <string name="sa_aucun_dossier">Not enough apps to make folders yet: the style will still apply to your wallpaper and sound reaction.</string>
+    <string name="sa_legende">“%1$s” wallpaper, tinted · the outline = sound reaction</string>
+    <string name="sa_assorti">Matches your apps</string>
+    <string name="sa_assorti_desc">Each folder takes the colour of its icons</string>
+    <string name="sa_degrade">Gradient</string>
+    <string name="sa_degrade_desc">Colour flows from one folder to the next</string>
+    <string name="sa_mono">Monochrome</string>
+    <string name="sa_mono_desc">A single hue, in shades: understated</string>
+    <string name="sa_neon">Neon night</string>
+    <string name="sa_neon_desc">Two vivid colours on a very black background</string>
+    <string name="sa_soleil">Sunset</string>
+    <string name="sa_soleil_desc">Warm tones, from coral to amber</string>
+    <string name="sa_continuer">Continue</string>
+    <string name="sa_recap_titre">What will change</string>
+    <string name="sa_l_couleurs">Folder colours</string>
+    <string name="sa_l_couleurs_desc">One colour per folder, in the chosen style</string>
+    <string name="sa_l_widgets">Folders on your home screen</string>
+    <string name="sa_l_widgets_desc">Place your %1$d folders on the home screen (Android asks you to confirm each one)</string>
+    <string name="sa_l_fond">Wallpaper</string>
+    <string name="sa_l_fond_desc">“%1$s”, tinted in the style</string>
+    <string name="sa_l_fond_android">Android will ask you to confirm</string>
+    <string name="sa_l_son">Sound reaction</string>
+    <string name="sa_l_son_desc">The 3 colours of the light around the screen</string>
+    <string name="sa_l_anim">App animations</string>
+    <string name="sa_l_anim_desc">Turns on the animations of your %1$d compatible apps</string>
+    <string name="sa_garde">Your current settings are kept: you can undo everything in one tap.</string>
+    <string name="sa_appliquer">Apply the style</string>
+    <string name="sa_fini_titre">Done</string>
+    <string name="sa_fini_texte">Your “%1$s” style is in place.</string>
+    <string name="sa_poser_titre">Place your folders on the home screen</string>
+    <string name="sa_poser">Place</string>
+    <string name="sa_pose">Placed</string>
+    <string name="sa_terminer">Finish</string>
+    <string name="sa_annuler">Undo this style</string>
+    <string name="sa_annuler_dernier">Undo the last style</string>
+    <string name="sa_annule">Your previous style is back.</string>
+</resources>
