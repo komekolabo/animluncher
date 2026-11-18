@@ -78,3 +78,10 @@ de chaque fichier envoyé). Au prochain passage tranquille, ces notes pourront �
   dossier tire son style (`tirerVariante(c, "widget_<groupe>", 2, …)`) puis ALTERNE au plus toutes les 30 min
   (à l'arrivée sur l'accueil). L'ancienne boucle reste (style ANCIENNE), non tirée. Aperçu : /home/claude/apercu_dossier/widgets.html.
   La lueur du logo (`dossier_lueur_anime.xml`) suit encore l'ancien rythme : à recaler si Will la trouve décalée.
+- (18/11, suite 2) WIDGETS « GRANDES ICÔNES » : boîte 54 dp (`COTE_DP`, layout `widget_dossier.xml` marges 4 / 2,76 dp),
+  Carrousel = 4 apps max sur l'anneau (une app remplacée par la suivante quand elle passe au fond), Mosaïque = tuiles 2 x 2
+  dont les retournements servent de PAGES. `gesteVisible` : logo au repos COMPLET après son geste (sinon Finance/Maps/Health/
+  News se vidaient). INFOS UTILES : pastille « apps ouvertes » et rond « dernière app », vues à part mises à jour par
+  `partiallyUpdateAppWidget` (`mettreAJourInfos`, à l'arrivée sur l'accueil). Will n'a pas encore vu ça sur le téléphone.
+- ⚠️ 18/11 : un envoi `push_files` d'une autre session (polices) a ÉCRASÉ WidgetDossier.kt avec une vieille copie ; rétabli
+  (41f9429). Avant d'envoyer un fichier entier, TOUJOURS repartir de la version GitHub du moment (git fetch juste avant).
