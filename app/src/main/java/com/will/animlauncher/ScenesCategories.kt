@@ -26,7 +26,8 @@ import kotlin.math.sqrt
 //  - la COULEUR principale de son icône (calculée ici), pour tout le motif.
 // Le motif dépend de la catégorie : réseau de neurones (IA), bulles de conversation (Social), égaliseur (Musique),
 // diaphragme (Photos), pixels (Jeux), courbe et pièces (Finance), itinéraire (Trajets), liste cochée (Travail),
-// pouls (Santé), sacs (Shopping), engrenages (Réglages), titres qui défilent (Infos).
+// pouls (Santé), sacs (Shopping), engrenages (Réglages), titres qui défilent (Infos), et depuis le 18/11 :
+// piste de course (Sport), vapeur et assiette (Cuisine), livre qui tourne ses pages (Apprendre), maison (Maison).
 // Thème sombre, lumières douces : jamais de flash.
 
 // L'APPARENCE D'UNE APP : son icône (en image) et sa couleur principale. Calculée une fois, gardée pour les
@@ -101,7 +102,7 @@ class AnimCategorie(private val id: String, apparence: Apparence) : Scene() {
     companion object {
         // les catégories qui ont un motif
         val IDS = setOf("ia", "social", "musique", "photo", "jeux", "finance", "trajets", "travail", "sante",
-            "shopping", "reglages", "infos")
+            "shopping", "reglages", "infos", "sport", "cuisine", "ecole", "maison")
 
         // la couleur de la catégorie, quand l'icône de l'app n'en a pas (icône noire et blanche)
         fun couleurDe(id: String): Int = when (id) {
@@ -116,6 +117,10 @@ class AnimCategorie(private val id: String, apparence: Apparence) : Scene() {
             "sante" -> rgb(248, 113, 113)
             "shopping" -> rgb(251, 146, 60)
             "reglages" -> rgb(148, 163, 184)
+            "sport" -> rgb(255, 170, 80)
+            "cuisine" -> rgb(240, 106, 90)
+            "ecole" -> rgb(242, 194, 62)
+            "maison" -> rgb(242, 143, 92)
             else -> rgb(165, 180, 252)
         }
     }
@@ -153,6 +158,10 @@ class AnimCategorie(private val id: String, apparence: Apparence) : Scene() {
             "sante" -> pouls(c, o, cx, cy, m, s, f)
             "shopping" -> sacs(c, o, cx, cy, m, s, f)
             "reglages" -> engrenages(c, o, cx, cy, m, s, f)
+            "sport" -> piste(c, o, cx, cy, m, s, f)
+            "cuisine" -> vapeur(c, o, cx, cy, m, s, f)
+            "ecole" -> livre(c, o, cx, cy, m, s, f)
+            "maison" -> maison(c, o, cx, cy, m, s, f)
             else -> titres(c, o, cx, cy, m, s, f)
         }
         // 3) l'icône de l'app, au centre
@@ -531,5 +540,133 @@ class AnimCategorie(private val id: String, apparence: Apparence) : Scene() {
         val al = f * (0.45f + 0.3f * sin(s * 5f))
         o.halo(c, cx + m * 0.12f, cy - m * 0.12f, 10f * o.dp, al * 0.6f, couleur)
         c.drawCircle(cx + m * 0.12f, cy - m * 0.12f, 3.2f * o.dp, o.lumiere(avecAlpha(couleur, al)))
+    }
+
+    // ------------------------------ SPORT : une piste de course (18/11) ------------------------------
+    // Trois couloirs en ellipse autour de l'icône ; dans chacun, un coureur (un point lumineux) avec sa traînée.
+    private fun piste(c: Canvas, o: Outils, cx: Float, cy: Float, m: Float, s: Float, f: Float) {
+        for (k in 0 until 3) {
+            val rx = m * (0.25f + 0.055f * k)
+            val ry = rx * 0.42f
+            cadre.set(cx - rx, cy - ry, cx + rx, cy + ry)
+            c.drawOval(cadre, o.lumiere(avecAlpha(couleur, 0.18f * f), 1.4f * o.dp))
+            val tete = s * (1.5f + 0.4f * k) + k * 2.1f
+            for (j in 0 until 12) {                               // la traînée : 12 points de plus en plus pâles
+                val an = tete - j * 0.06f
+                val devant = 0.55f + 0.45f * sin(an)                // plus pâle quand le coureur passe derrière
+                val al = f * 0.65f * (1f - j / 12f) * devant
+                c.drawCircle(cx + cos(an) * rx, cy + sin(an) * ry, (3.2f - j * 0.18f) * o.dp,
+                    o.lumiere(avecAlpha(couleur, al)))
+            }
+        }
+    }
+
+    // ------------------------------ CUISINE : une assiette et de la vapeur (18/11) ------------------------------
+    private fun vapeur(c: Canvas, o: Outils, cx: Float, cy: Float, m: Float, s: Float, f: Float) {
+        // l'assiette, vue un peu de biais, sous l'icône
+        val py = cy + m * 0.11f
+        val p = o.lumiere(avecAlpha(couleur, 0.35f * f), 1.6f * o.dp)
+        cadre.set(cx - m * 0.25f, py - m * 0.075f, cx + m * 0.25f, py + m * 0.075f)
+        c.drawOval(cadre, p)
+        cadre.set(cx - m * 0.17f, py - m * 0.045f, cx + m * 0.17f, py + m * 0.045f)
+        c.drawOval(cadre, o.lumiere(avecAlpha(couleur, 0.2f * f), 1.2f * o.dp))
+        // trois volutes de vapeur qui montent en ondulant au-dessus de l'icône
+        val pv = o.lumiere(couleur, 2.2f * o.dp)
+        for (k in 0 until 3) {
+            val x0 = cx + (k - 1) * m * 0.08f
+            val bas = cy - m * 0.12f
+            val haut = cy - m * 0.42f
+            var px = 0f
+            var pyv = 0f
+            for (j in 0..24) {
+                val u = j / 24f                                   // 0 = en bas, 1 = en haut
+                val y = mix(bas, haut, u)
+                val x = x0 + sin(u * 9f - s * 3.5f + k * 2f) * m * 0.022f * (0.4f + u)
+                if (j > 0) {
+                    val al = f * 0.45f * sin(PI_F * u) * (0.55f + 0.45f * sin(u * 7f - s * 4f + k))
+                    pv.color = avecAlpha(couleur, al.coerceAtLeast(0f))
+                    c.drawLine(px, pyv, x, y, pv)
+                }
+                px = x
+                pyv = y
+            }
+        }
+    }
+
+    // ------------------------------ APPRENDRE : un livre qui tourne ses pages (18/11) ------------------------------
+    private fun livre(c: Canvas, o: Outils, cx: Float, cy: Float, m: Float, s: Float, f: Float) {
+        val by = cy + m * 0.25f                                   // le haut du livre, sous l'icône
+        val lw = m * 0.2f                                         // la largeur d'une page
+        val lh = m * 0.13f                                        // la hauteur d'une page
+        val p = o.lumiere(avecAlpha(couleur, 0.45f * f), 1.6f * o.dp)
+        // les deux pages ouvertes et le dos du livre
+        cadre.set(cx - lw, by, cx, by + lh)
+        c.drawRoundRect(cadre, 3f * o.dp, 3f * o.dp, p)
+        cadre.set(cx, by, cx + lw, by + lh)
+        c.drawRoundRect(cadre, 3f * o.dp, 3f * o.dp, p)
+        // les lignes de texte
+        val pl = o.lumiere(avecAlpha(couleur, 0.22f * f), 1.6f * o.dp)
+        for (k in 0 until 3) {
+            val y = by + lh * (0.3f + 0.2f * k)
+            c.drawLine(cx - lw * 0.82f, y, cx - lw * (0.18f + 0.1f * (k % 2)), y, pl)
+            c.drawLine(cx + lw * 0.18f, y, cx + lw * (0.82f - 0.12f * (k % 2)), y, pl)
+        }
+        // la page qui tourne, de droite à gauche (elle se lève, passe au-dessus du dos, et se pose)
+        val t = modulo(s * 0.65f, 1f)
+        val th = doux(t) * PI_F
+        val bord = cx + cos(th) * lw
+        val leve = sin(th) * lh * 0.25f
+        chemin.reset()
+        chemin.moveTo(cx, by)
+        chemin.lineTo(bord, by - leve)
+        chemin.lineTo(bord, by + lh - leve)
+        chemin.lineTo(cx, by + lh)
+        chemin.close()
+        c.drawPath(chemin, o.lumiere(avecAlpha(couleur, 0.55f * f * sin(PI_F * t).coerceAtLeast(0.15f)), 1.8f * o.dp))
+        // de petites lettres de lumière qui s'envolent du livre
+        for (k in 0 until 6) {
+            val g = graines[k]
+            val u = modulo(s * 0.4f + g[0], 1f)
+            val x = cx + (g[1] - 0.5f) * lw * 1.6f
+            val y = by - u * m * 0.5f
+            c.drawCircle(x, y, (1.5f + g[2] * 1.5f) * o.dp, o.lumiere(avecAlpha(couleur, f * 0.5f * sin(PI_F * u))))
+        }
+    }
+
+    // ------------------------------ MAISON : la maison se dessine autour de l'icône (18/11) ------------------------------
+    private fun maison(c: Canvas, o: Outils, cx: Float, cy: Float, m: Float, s: Float, f: Float) {
+        val g = cx - m * 0.22f
+        val d = cx + m * 0.22f
+        val bas = cy + m * 0.24f
+        val toit = cy - m * 0.11f
+        // le contour : le mur de gauche, le toit, le mur de droite, puis le sol
+        chemin.reset()
+        chemin.moveTo(g, bas)
+        chemin.lineTo(g, toit)
+        chemin.lineTo(g - m * 0.05f, toit)
+        chemin.lineTo(cx, cy - m * 0.35f)
+        chemin.lineTo(d + m * 0.05f, toit)
+        chemin.lineTo(d, toit)
+        chemin.lineTo(d, bas)
+        chemin.lineTo(g, bas)
+        val mesure = PathMeasure(chemin, false)
+        val morceau = Path()
+        mesure.getSegment(0f, mesure.length * borne(s * 0.9f), morceau, true)
+        c.drawPath(morceau, o.lumiere(avecAlpha(couleur, 0.5f * f), 2.2f * o.dp))
+        // deux fenêtres qui s'allument doucement une fois la maison dessinée (comme une lumière chaude, sans flash)
+        val allume = borne(s * 0.9f - 0.9f) * f
+        if (allume > 0.01f) {
+            for (cote in intArrayOf(-1, 1)) {
+                val fx = cx + cote * m * 0.155f
+                val fy = cy + m * 0.07f
+                val t = m * 0.028f
+                val vacille = 0.8f + 0.2f * sin(s * 3f + cote)
+                o.halo(c, fx, fy, t * 2.6f, 0.3f * allume * vacille, couleur)
+                cadre.set(fx - t, fy - t, fx + t, fy + t)
+                c.drawRect(cadre, o.lumiere(avecAlpha(couleur, 0.5f * allume * vacille), 1.4f * o.dp))
+                c.drawLine(fx, fy - t, fx, fy + t, o.lumiere(avecAlpha(couleur, 0.35f * allume), 1f * o.dp))
+                c.drawLine(fx - t, fy, fx + t, fy, o.lumiere(avecAlpha(couleur, 0.35f * allume), 1f * o.dp))
+            }
+        }
     }
 }
