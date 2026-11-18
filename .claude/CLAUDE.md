@@ -73,3 +73,8 @@ de chaque fichier envoyé). Au prochain passage tranquille, ces notes pourront �
   Will a vu et validé la v2 d'Orbite et de Cartes ; « Goutte » (liquide) proposée, non retenue.
 - `git push` marche dans cette session une fois le dépôt ajouté (add_repo) : plus besoin de push_files ici.
 - Compilation en échec « 429 Too Many Requests » sur repo.maven.apache.org = Maven surchargé : relancer (`gh run rerun`).
+- (18/11, suite) WIDGETS DOSSIER : 2 nouvelles boucles dans `WidgetDossier.Boucle`, CARROUSEL (logo en petit au centre,
+  apps sur un anneau incliné en 3D) et MOSAÏQUE (logo fendu en tuiles qui se retournent en vague, reflet). Chaque
+  dossier tire son style (`tirerVariante(c, "widget_<groupe>", 2, …)`) puis ALTERNE au plus toutes les 30 min
+  (à l'arrivée sur l'accueil). L'ancienne boucle reste (style ANCIENNE), non tirée. Aperçu : /home/claude/apercu_dossier/widgets.html.
+  La lueur du logo (`dossier_lueur_anime.xml`) suit encore l'ancien rythme : à recaler si Will la trouve décalée.
