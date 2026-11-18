@@ -6,6 +6,8 @@ import android.graphics.Color
 import android.graphics.drawable.ColorDrawable
 import android.os.Handler
 import android.os.Looper
+import android.text.Editable
+import android.text.TextWatcher
 import android.view.Gravity
 import android.view.View
 import android.view.ViewGroup
@@ -16,11 +18,13 @@ import android.widget.FrameLayout
 import android.widget.LinearLayout
 import android.widget.ScrollView
 import android.widget.TextView
+import android.text.TextUtils
 
 // LES PETITES FENÊTRES DES DOSSIERS PERSO (11/11, demande de Will) :
 //  - « Nouveau dossier » : un nom + le choix du logo animé, dans une grille où tous les logos bougent ;
 //  - « Changer le logo » : la même grille seule ;
-//  - « Renommer » : une case de texte (on y arrive aussi en touchant le titre du dossier ouvert) ;
+//  - « Renommer » : une case de texte (on y arrive aussi en touchant le titre du dossier ouvert), et (18/11) le
+//    choix de la POLICE d'écriture du nom : chaque police montre le nom tapé, en direct (voir Polices.kt) ;
 //  - « Supprimer » : une question de confirmation.
 // Toutes ont le même style : une carte sombre arrondie, au centre de l'écran, comme la fenêtre de la réaction sonore.
 // Elles ne font qu'une chose : demander, puis appeler « fini » avec la réponse. C'est l'écran qui les ouvre qui
@@ -157,11 +161,76 @@ object DossiersPerso {
 
     // ---------------- « RENOMMER » ----------------
     // Le clavier s'ouvre tout seul, avec le nom actuel déjà écrit (tout sélectionné : on tape directement le nouveau).
-    fun renommer(a: Activity, actuel: String, fini: (String) -> Unit) {
+    // (18/11) En dessous, LES POLICES : une grille de 2 colonnes ; chaque case écrit le nom du dossier dans sa police
+    // (et se met à jour à chaque lettre tapée), avec le nom de la police en petit au-dessus. La police choisie a un fond
+    // clair. « OK » appelle fini(nom, police).
+    fun renommer(a: Activity, actuel: String, policeActuelle: String, fini: (String, String) -> Unit) {
         val f = fenetre(a, a.getString(R.string.dossier_renommer_titre))
         val nom = caseNom(a, actuel).apply { selectAll() }
         f.colonne.addView(nom)
-        boutons(a, f, a.getString(R.string.dossier_ok)) { f.dialogue.dismiss(); fini(nom.text.toString()) }
+
+        var police = policeActuelle
+        val polices = Polices.proposees(a)
+        // (s'il n'y a que Classique, par exemple si les polices manquent dans l'app : pas de grille)
+        if (polices.size > 1) {
+            f.colonne.addView(Style.texte(a, a.getString(R.string.dossier_police), 13f, Style.MUET).apply {
+                setPadding(Style.px(a, 4f), Style.px(a, 16f), 0, Style.px(a, 8f))
+            })
+            val cases = ArrayList<Pair<String, LinearLayout>>()
+            val apercus = ArrayList<TextView>()
+            fun peindre() {
+                for ((cle, case) in cases) case.background = if (cle == police)
+                    Style.arrondi(a, Color.argb(34, 255, 255, 255), 16f, Color.argb(120, 255, 255, 255))
+                    else Style.arrondi(a, Color.argb(10, 255, 255, 255), 16f, Color.argb(24, 255, 255, 255))
+            }
+            val grille = LinearLayout(a).apply { orientation = LinearLayout.VERTICAL }
+            for (debut in polices.indices step 2) {
+                val rangee = LinearLayout(a).apply { orientation = LinearLayout.HORIZONTAL }
+                for (k in 0 until 2) {
+                    val p = polices.getOrNull(debut + k)
+                    if (p == null) { rangee.addView(View(a), LinearLayout.LayoutParams(0, 1, 1f)); continue }
+                    // l'aperçu : le nom du dossier, écrit dans cette police (une seule ligne, « … » s'il est trop long)
+                    val apercu = TextView(a).apply {
+                        text = actuel.ifBlank { "Aa" }
+                        typeface = Polices.typeface(a, p.cle)
+                        textSize = 19f * p.echelle
+                        setTextColor(Color.rgb(247, 239, 236))
+                        setSingleLine()
+                        ellipsize = TextUtils.TruncateAt.END
+                    }
+                    apercus.add(apercu)
+                    val case = LinearLayout(a).apply {
+                        orientation = LinearLayout.VERTICAL
+                        setPadding(Style.px(a, 12f), Style.px(a, 8f), Style.px(a, 12f), Style.px(a, 10f))
+                        addView(Style.texte(a, a.getString(p.nom), 11f, Style.MUET))
+                        addView(apercu)
+                        setOnClickListener { police = p.cle; peindre() }
+                    }
+                    cases.add(p.cle to case)
+                    rangee.addView(case, LinearLayout.LayoutParams(0, Style.px(a, 66f), 1f).apply {
+                        if (k == 0) rightMargin = Style.px(a, 6f)
+                        bottomMargin = Style.px(a, 6f)
+                    })
+                }
+                grille.addView(rangee)
+            }
+            peindre()
+            // la grille ne prend pas plus de 40 % de l'écran (le clavier prend déjà de la place) : au-delà, elle défile
+            val defilant = ScrollView(a).apply { addView(grille); isVerticalScrollBarEnabled = false }
+            f.colonne.addView(defilant, LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT,
+                minOf((a.resources.displayMetrics.heightPixels * 0.4f).toInt(), Style.px(a, 72f) * ((polices.size + 1) / 2))))
+            // à chaque lettre tapée, tous les aperçus montrent le nouveau nom
+            nom.addTextChangedListener(object : TextWatcher {
+                override fun beforeTextChanged(s: CharSequence?, d: Int, n: Int, apres: Int) {}
+                override fun onTextChanged(s: CharSequence?, d: Int, avant: Int, n: Int) {}
+                override fun afterTextChanged(s: Editable?) {
+                    val t = s?.toString()?.trim().orEmpty().ifEmpty { actuel.ifBlank { "Aa" } }
+                    for (v in apercus) v.text = t
+                }
+            })
+        }
+
+        boutons(a, f, a.getString(R.string.dossier_ok)) { f.dialogue.dismiss(); fini(nom.text.toString(), police) }
         f.dialogue.window?.setSoftInputMode(WindowManager.LayoutParams.SOFT_INPUT_STATE_VISIBLE)
         f.dialogue.show()
         nom.requestFocus()

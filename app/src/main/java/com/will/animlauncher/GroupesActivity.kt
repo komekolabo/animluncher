@@ -258,8 +258,10 @@ class GroupesActivity : Activity() {
             orientation = LinearLayout.HORIZONTAL
             gravity = Gravity.CENTER_VERTICAL
             addView(logo, LinearLayout.LayoutParams(px(56f), px(56f)).apply { rightMargin = px(12f) })
-            addView(Style.texte(this@GroupesActivity, cat.nom, 18f, Style.TEXTE, gras = true),
-                LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f))
+            // (18/11) le nom, dans la police choisie pour ce dossier (voir Polices.kt)
+            addView(Style.texte(this@GroupesActivity, cat.nom, 18f * Polices.echelle(this@GroupesActivity, cat.id), Style.TEXTE).apply {
+                typeface = Polices.typeface(this@GroupesActivity, Polices.cleDe(this@GroupesActivity, cat.id))
+            }, LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f))
             setOnClickListener { logo.jouer() }
         })
         logo.postDelayed({ logo.jouer() }, 400)
@@ -267,8 +269,9 @@ class GroupesActivity : Activity() {
             orientation = LinearLayout.HORIZONTAL
             setPadding(0, px(12f), 0, 0)
             addView(Style.boutonDiscret(this@GroupesActivity, getString(R.string.dossier_renommer)) {
-                DossiersPerso.renommer(this@GroupesActivity, cat.nom) { nouveau ->
+                DossiersPerso.renommer(this@GroupesActivity, cat.nom, Groupes.police(this@GroupesActivity, cat.id)) { nouveau, police ->
                     Groupes.renommer(this@GroupesActivity, cat.id, nouveau)
+                    Groupes.definirPolice(this@GroupesActivity, cat.id, police)
                     try { WidgetGroupe.rafraichir(this@GroupesActivity, cat.id) } catch (_: Exception) {}
                     rafraichir()
                 }

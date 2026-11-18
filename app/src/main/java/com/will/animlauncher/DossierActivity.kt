@@ -112,8 +112,9 @@ class DossierActivity : Activity() {
     private fun renommer() {
         if (fini) return
         val actuel = Groupes.categorie(groupe)?.nom ?: ""
-        DossiersPerso.renommer(this, actuel) { nouveau ->
+        DossiersPerso.renommer(this, actuel, Groupes.police(this, groupe)) { nouveau, police ->
             Groupes.renommer(this, groupe, nouveau)
+            Groupes.definirPolice(this, groupe, police)
             vue?.renommer(Groupes.categorie(groupe)?.nom ?: nouveau)
             try { WidgetGroupe.rafraichir(this, groupe) } catch (_: Exception) {}
         }
@@ -183,7 +184,16 @@ class DossierVue(
     var surTitre: (() -> Unit)? = null
     private var titreG = 0f
     private var titreD = 0f
-    fun renommer(nouveau: String) { nom = nouveau; invalidate() }
+    fun renommer(nouveau: String) { nom = nouveau; lirePolice(); invalidate() }
+
+    // (18/11) LA POLICE DU TITRE, choisie dans la fenêtre « Renommer » (voir Polices.kt), et son facteur de taille.
+    private var policeTitre: Typeface = Typeface.DEFAULT_BOLD
+    private var tailleTitre = 28f
+    private fun lirePolice() {
+        policeTitre = Polices.typeface(context, Polices.cleDe(context, groupe))
+        tailleTitre = 28f * Polices.echelle(context, groupe)
+    }
+    init { lirePolice() }
 
     // UNE CASE du dossier : l'app, son nom, son icône (dessinée à la bonne taille), et ses infos.
     // dx, dy = l'endroit où elle est DESSINÉE : il rejoint en douceur sa vraie place (quand on déplace
@@ -348,8 +358,8 @@ class DossierVue(
         if (width == 0 || cases.isEmpty()) return
         val m = min(cases.size, parPage)
         val lignes = max(1, ceil(m / colonnes.toFloat()).toInt())
-        texte.typeface = gras
-        texte.textSize = 28f * k
+        texte.typeface = policeTitre
+        texte.textSize = tailleTitre * k
         val tw = texte.measureText(nom)
         texte.typeface = Typeface.DEFAULT
         try {
@@ -482,8 +492,8 @@ class DossierVue(
 
         // 2) LE PANNEAU du dossier : il sort du widget en grandissant (il part de la place du widget)
         val p = seg(t, 0.08f, 0.42f) * (1 - fer)
-        texte.typeface = gras
-        val tw = texte.apply { textSize = 28f * k }.measureText(nom)
+        texte.typeface = policeTitre
+        val tw = texte.apply { textSize = tailleTitre * k }.measureText(nom)
         val titreX = panneau.centerX() - (41f * k + tw) / 2 + 19f * k
         titreG = titreX - 24f * k; titreD = titreX + 22f * k + tw + 12f * k      // la zone qu'on peut toucher pour renommer
         val titreY = panneau.top + 44f * k
@@ -621,8 +631,8 @@ class DossierVue(
 
     // LA FENÊTRE DU DOSSIER : le fond, son liseré, la transition (la carte de Maps), le titre, le point multicolore…
     private fun dessinerPanneau(c: Canvas, p: Float, t: Float, titreX: Float) {
-        texte.typeface = gras
-        texte.textSize = 28f * k
+        texte.typeface = policeTitre
+        texte.textSize = tailleTitre * k
         pinceau.shader = LinearGradient(0f, panneau.top, 0f, panneau.bottom,
             Teinte.avecAlpha(teinte.haut, 235 * p), Teinte.avecAlpha(teinte.bas, 235 * p), Shader.TileMode.CLAMP)
         pinceau.style = Paint.Style.FILL

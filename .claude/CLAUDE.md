@@ -78,27 +78,22 @@ de chaque fichier envoyé). Au prochain passage tranquille, ces notes pourront �
   dossier tire son style (`tirerVariante(c, "widget_<groupe>", 2, …)`) puis ALTERNE au plus toutes les 30 min
   (à l'arrivée sur l'accueil). L'ancienne boucle reste (style ANCIENNE), non tirée. Aperçu : /home/claude/apercu_dossier/widgets.html.
   La lueur du logo (`dossier_lueur_anime.xml`) suit encore l'ancien rythme : à recaler si Will la trouve décalée.
-- (18/11, suite 2) WIDGETS « GRANDES ICÔNES » : boîte 54 dp (`COTE_DP`, layout `widget_dossier.xml` marges 4 / 2,76 dp),
-  Carrousel = 4 apps max sur l'anneau (une app remplacée par la suivante quand elle passe au fond), Mosaïque = tuiles 2 x 2
-  dont les retournements servent de PAGES. `gesteVisible` : logo au repos COMPLET après son geste (sinon Finance/Maps/Health/
-  News se vidaient). INFOS UTILES : pastille « apps ouvertes » et rond « dernière app », vues à part mises à jour par
-  `partiallyUpdateAppWidget` (`mettreAJourInfos`, à l'arrivée sur l'accueil). Will n'a pas encore vu ça sur le téléphone.
-- ⚠️ 18/11 : un envoi `push_files` d'une autre session (polices) a ÉCRASÉ WidgetDossier.kt avec une vieille copie ; rétabli
-  (41f9429). Avant d'envoyer un fichier entier, TOUJOURS repartir de la version GitHub du moment (git fetch juste avant).
 
-## STYLE AUTO (18/11 — PAS ENCORE TESTÉ PAR WILL SUR LE TÉLÉPHONE)
-- Demande de Will : une option bien visible pour habiller tout le téléphone d'un style beau et cohérent, d'après
-  ses apps. Maquette validée : canevas Design https://claude.ai/artifact/L3zhTGzM4aqeq1M1ToVjDc (3 écrans).
-- Bouton « Style auto » sous le titre de l'accueil (`MainActivity.banniereStyle`, anneau `AnneauStyle` aux couleurs
-  des dossiers). Écrans : `StyleAutoActivity.kt` (ANALYSE → CHOIX avec aperçu `ApercuStyle` → RECAP avec interrupteurs
-  → FINI avec un bouton « Poser » par dossier, car Android montre sa fenêtre pour chaque widget).
-  Textes : `res/values*/strings_style.xml` (6 langues).
-- Moteur : `StyleAuto.kt`. Analyse = histogramme des teintes OKLCH des icônes (32 x 32, pixels pondérés par leur
-  intensité, 24 bacs de 15°) → teinte de chaque dossier + dominante du téléphone. 5 styles : Assorti (teintes des
-  icônes, écartées d'au moins 24°), Dégradé (dominante −55° → +65°), Monochrome, Nuit néon (dominante / +150°),
-  Coucher de soleil (22° → 77°). `StyleAuto.roue()` retrouve l'angle HSV de la roue qui donne la teinte OKLCH voulue.
-- Applique : couleurs des dossiers (`Groupes.definirCouleur`), 3 teintes de la réaction sonore, fond Nuit/Galets
-  TEINTÉ (nouvelle palette `CarnetFond.CLE_PALETTE` = « dessin_palette », lue par `FondNuit(palette)` /
-  `FondGalets(palette)`), animations des apps compatibles. SAUVEGARDE avant (carnet « style_auto ») : « Annuler ce
-  style » remet couleur_*, teinte_*, dessin_*, animations_actives et off_*. Limite : si le fond du téléphone n'était
-  pas le nôtre, l'annulation ne remet pas l'ancien fond d'Android.
+## POLICES DES DOSSIERS (18/11 — PAS ENCORE TESTÉ PAR WILL)
+- Demande de Will : renommer les dossiers (ça existait déjà depuis le 11/11 : toucher le titre du dossier ouvert, ou
+  « Renommer » dans l'écran Dossiers) + choisir une POLICE, dont une gothique.
+- `Polices.kt` : 8 polices (Classique = celle du téléphone, Gothique = Pirata One, Fraktur = UnifrakturMaguntia,
+  Horreur = Creepster, Manuscrite = Pacifico, Élégante = Cinzel 600, Futuriste = Orbitron 600, Pixel = Press Start 2P),
+  toutes OFL, réduites aux lettres latines avec fonttools (360 Ko). Rangées dans `app/src/main/assets/polices.zip`
+  (+ LICENCES.txt), sorties du zip dans filesDir/polices à la 1re utilisation (`VERSION` à changer si le zip change).
+  Sans le zip : seule Classique est proposée, rien ne plante. Le connecteur GitHub ne sait pas envoyer de binaire :
+  c'est Will qui a déposé le zip (upload sur github.com).
+- Choix : grille 2 colonnes dans `DossiersPerso.renommer(a, nom, police) { nom, police -> }`, aperçu en direct du nom
+  tapé. Retenu dans le carnet des groupes : `police_<id>` (Groupes.police / definirPolice, effacé à la suppression).
+- Appliqué : titre du dossier ouvert (`DossierVue.policeTitre` / `tailleTitre`), carte « Personnaliser » de
+  GroupesActivity, et nom sous les widgets (WidgetDossier, WidgetGroupe, WidgetTop) : un widget ne peut pas changer de
+  police -> `Polices.poserNom` dessine le nom dans une image (`*_nom_image` ajouté aux 3 layouts) et cache le TextView.
+- Pas fait : la police dans « Nouveau dossier » (on la choisit ensuite via Renommer) et dans les listes de l'écran Dossiers.
+- ACCIDENT DU 18/11 : un `push_files` de WidgetDossier.kt (fait à partir d'une copie vieille de 10 min) a écrasé le travail
+  d'une autre session (548c51e, grandes icônes + infos utiles) ; rétabli par 41f9429 / 27cf437. Avant CHAQUE envoi :
+  `git fetch`, puis vérifier que chaque fichier envoyé n'a pas changé sur GitHub depuis qu'on l'a lu.
