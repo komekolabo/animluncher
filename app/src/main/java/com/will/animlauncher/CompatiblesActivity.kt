@@ -35,7 +35,9 @@ import android.widget.TextView
 //  - quatre boutons de TRI sous la recherche (17/11) : par couleur (de base), de A à Z, les plus récemment
 //    installées d'abord (avec la date d'installation sur la 2e ligne), ou (18/11) PAR GROUPE : une section par
 //    catégorie (IA, Social…, puis « Non répertorié »), avec un titre et le nombre d'apps. Le choix est gardé.
-// Un appui sur une app qui a une animation ouvre ses réglages.
+// Un appui sur une app qui a une animation ouvre ses réglages. (18/11) Un appui sur une app GRISE (que le
+// protocole n'a pas su classer) propose de la ranger dans un groupe : elle y est ajoutée comme avec le « + »
+// d'un dossier, c'est « ton choix », et elle reçoit aussitôt l'animation de ce groupe.
 class CompatiblesActivity : Activity() {
 
     // Ce que l'app peut faire, du mieux au moins bien (c'est aussi l'ordre de la légende).
@@ -156,7 +158,8 @@ class CompatiblesActivity : Activity() {
             // un appui sur une app qui a une animation : ses réglages
             setOnItemClickListener { _, _, position, _ ->
                 val l = lignes[position] as? Ligne ?: return@setOnItemClickListener    // un titre : rien à ouvrir
-                if (l.etat != Etat.RIEN) {
+                if (l.etat == Etat.RIEN) choisirGroupe(l)
+                else {
                     startActivity(Intent(this@CompatiblesActivity, ReglageAppActivity::class.java)
                         .putExtra("pkg", l.pkg).putExtra("nom", l.nom))
                 }
@@ -184,6 +187,10 @@ class CompatiblesActivity : Activity() {
     // La liste est préparée en arrière-plan : lire toutes les apps du téléphone prend un instant.
     override fun onResume() {
         super.onResume()
+        recharger()
+    }
+
+    private fun recharger() {
         Thread {
             val l = charger()
             runOnUiThread { if (!isDestroyed) { toutes = l; afficher() } }
@@ -230,6 +237,23 @@ class CompatiblesActivity : Activity() {
         }
         // l'ordre de la liste est choisi plus tard, dans afficher() (selon le bouton de tri)
         return resultat
+    }
+
+    // (18/11) RANGER À LA MAIN une app que le protocole n'a pas su classer : la liste des groupes s'ouvre, on en
+    // touche un, et l'app y est ajoutée (Groupes.ajouter, comme le « + » d'un dossier). Le choix de l'utilisateur
+    // passe avant les 8 questions (voir Classement.categorieFinale) : l'app change de groupe tout de suite.
+    private fun choisirGroupe(l: Ligne) {
+        val groupes = Groupes.CATEGORIES
+        val noms = groupes.map { Rayons.nom(this, it.id) }.toTypedArray()
+        android.app.AlertDialog.Builder(this, android.R.style.Theme_DeviceDefault_Dialog_Alert)
+            .setTitle(getString(R.string.compat_ranger, l.nom))
+            .setItems(noms) { _, i ->
+                Groupes.ajouter(this, groupes[i].id, l.pkg)
+                Groupes.oublier()            // les dossiers se refont avec la nouvelle app
+                recharger()
+            }
+            .setNegativeButton(android.R.string.cancel, null)
+            .show()
     }
 
     // Comment la catégorie a été trouvée (voir les 8 questions de Classement.kt), en quelques mots.
