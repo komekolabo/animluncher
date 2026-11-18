@@ -10,7 +10,7 @@ Cette branche ne contient **que des images**. L'app les lit toute seule (pas bes
 
 ## Règles
 - Un dossier = une catégorie. Les noms connus sont traduits dans l'app :
-  `Nature`, `Mountains`, `Lakes`, `Countryside`, `Forest`, `Japan`, `Winter`, `Night`.
+  `Nature`, `Mountains`, `Lakes`, `Countryside`, `Forest`, `Japan`, `Winter`, `Night`, `Sea`.
   Un autre nom de dossier marche aussi (il s'affiche tel quel).
 - Formats : `.jpg` (conseillé), `.png`, `.webp`, `.gif`, `.mp4` (sans son).
 - Format conseillé : **vertical**, environ **1080 × 2400** pixels, moins de 2 Mo.
