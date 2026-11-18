@@ -94,12 +94,14 @@ object LogosDossier {
         "nuit" to intArrayOf(c(0xB8C2FF), c(0x7C86E8), c(0x4E55B8)),         // nuit
         "fete" to intArrayOf(c(0xFFB0E8), c(0xE77CF0), c(0xA84FD1)),         // fuchsia
         "tirelire" to intArrayOf(c(0xFFC0D0), c(0xF28AA6), c(0xC85C7E)),     // rose bonbon
+        // (18/11) le dossier « Internet » : un globe (voir LogosWeb.kt)
+        "internet" to intArrayOf(c(0x9AE6FF), c(0x4FB8F0), c(0x2C7FD0)),     // bleu océan
     )
 
     // TOUS LES LOGOS qu'on peut choisir pour un dossier, dans l'ordre de la grille de choix.
     val LISTE = listOf("ia", "social", "musique", "photo", "jeux", "finance", "trajets", "travail", "sante", "shopping",
         "reglages", "infos", "maison", "cuisine", "cafe", "sport", "voiture", "voyage", "ecole", "animaux", "plante",
-        "meteo", "nuit", "fete", "tirelire")
+        "meteo", "nuit", "fete", "tirelire", "internet")
 
     // LE LOGO D'UN DOSSIER : celui qu'on a choisi pour lui, sinon celui de sa catégorie (« ia » -> l'étoile…).
     // Les choix sont lus une fois dans le carnet, puis gardés en mémoire (relus après chaque changement).
@@ -199,7 +201,8 @@ object LogosDossier {
         cv.saveLayerAlpha(calque, alpha.coerceIn(0, 255))
         // le logo de ce dossier : d'abord les 14 « vie quotidienne » (LogosQuotidien.kt), sinon ceux d'ici
         val logo = cleDe(groupe)
-        if (!LogosQuotidien.dessiner(cv, logo, g, src, lum)) when (logo) {
+        // (18/11 : et le globe d'Internet, dans LogosWeb.kt)
+        if (!LogosQuotidien.dessiner(cv, logo, g, src, lum) && !LogosWeb.dessiner(cv, logo, g, src, lum)) when (logo) {
             "social" -> social(cv, g, src, lum)
             "musique" -> musique(cv, g, src, lum)
             "photo" -> photo(cv, g, src, lum)
