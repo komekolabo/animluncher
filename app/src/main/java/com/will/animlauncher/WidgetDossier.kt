@@ -19,6 +19,7 @@ import android.os.Looper
 import android.os.Process
 import android.os.SystemClock
 import android.view.Display
+import android.view.View
 import android.widget.RemoteViews
 import java.util.concurrent.Executors
 import kotlin.math.ceil
@@ -86,9 +87,13 @@ object WidgetDossier {
     private const val PAS = 40L                  // une image toutes les 40 ms (25 images par seconde)
     private const val DUREE = 12.0               // la boucle dure 12 s
     private const val N = 300                    // 12 s / 40 ms = 300 images
-    // LA BOÎTE : le carré du milieu du galet couvert par les images (42 dp sur 62), dans le repère 100 x 100
+    // (18/11, demande de Will : « les icônes sont trop petites, illisibles ») la boîte passe de 42 à 54 dp : les icônes
+    // y sont bien plus grandes. Revers : Android limite la mémoire d'images d'un widget, on était déjà au maximum ;
+    // les images sont donc un peu moins fines (environ 113 px pour 54 dp au lieu de 110 px pour 42 dp sur le Flip6).
+    private const val COTE_DP = 54
+    // LA BOÎTE : le carré du milieu du galet couvert par les images (54 dp sur 62), dans le repère 100 x 100
     // du dessin. Elle est centrée sur l'étoile (50, 48) : de 16,13 à 83,87 en largeur, de 14,13 à 81,87 en hauteur.
-    private const val BOITE = 42f / 62f * 100f   // = 67,74 unités de côté
+    private const val BOITE = COTE_DP / 62f * 100f   // = 87,1 unités de côté
     private const val BOITE_X = 50f - BOITE / 2
     private const val BOITE_Y = 48f - BOITE / 2
     const val PAR_PAGE = 9                       // 9 apps au plus par boucle
@@ -150,7 +155,63 @@ object WidgetDossier {
             v.addView(R.id.dossier_film, img)
         }
         v.setOnClickPendingIntent(R.id.dossier_racine, WidgetGroupe.clic(c, id, groupe))
+        // (18/11) les infos utiles (apps ouvertes, dernière app utilisée)
+        infosMontrees[groupe] = poserInfos(c, groupe, v)
         return v
+    }
+
+    // ---------------- (18/11) LES INFOS UTILES ----------------
+    // Deux petites vues par-dessus la boucle (voir widget_dossier.xml) :
+    //  - le nombre d'apps du dossier encore OUVERTES (le service d'AnimLauncher le sait : il voit passer les apps) ;
+    //  - l'icône de la DERNIÈRE app du dossier qu'on a ouverte (carnet « ouvertures » du service).
+    // Elles ne font PAS partie des 300 images : quand elles changent, on envoie seulement ces deux vues au widget
+    // (« mise à jour partielle »), ce qui est instantané et ne coûte presque rien.
+    private val infosMontrees = HashMap<String, String>()     // ce qui est affiché sur chaque dossier (pour ne rien renvoyer pour rien)
+
+    // Remplit les deux vues dans « v », et renvoie un petit résumé (« 2|com.exemple.app ») pour savoir si ça a changé.
+    private fun poserInfos(c: Context, groupe: String, v: RemoteViews): String {
+        val apps = Groupes.apps(c, groupe)
+        val service = AppWatcherService.actif
+        val ouvertes = if (service == null) 0 else apps.count { try { service.estOuverte(it) } catch (_: Exception) { false } }
+        if (ouvertes > 0) {
+            v.setViewVisibility(R.id.dossier_ouvertes, View.VISIBLE)
+            v.setTextViewText(R.id.dossier_ouvertes_nb, ouvertes.toString())
+        } else v.setViewVisibility(R.id.dossier_ouvertes, View.GONE)
+        // la dernière app utilisée : celle dont la dernière ouverture est la plus récente (rien pour un dossier d'1 app)
+        val derniere = if (apps.size < 2) null
+            else apps.maxByOrNull { AppWatcherService.derniereOuverture(c, it) }?.takeIf { AppWatcherService.derniereOuverture(c, it) > 0 }
+        if (derniere != null) {
+            v.setViewVisibility(R.id.dossier_derniere, View.VISIBLE)
+            v.setImageViewBitmap(R.id.dossier_derniere_icone, petiteIcone(c, derniere))
+        } else v.setViewVisibility(R.id.dossier_derniere, View.GONE)
+        return "$ouvertes|$derniere"
+    }
+
+    // l'icône d'une app, à la taille du petit rond (11 dp)
+    private fun petiteIcone(c: Context, pkg: String): Bitmap {
+        val s = (11 * c.resources.displayMetrics.density).roundToInt().coerceAtLeast(8)
+        val b = Bitmap.createBitmap(s, s, Bitmap.Config.ARGB_8888)
+        try {
+            val d = c.packageManager.getApplicationIcon(pkg)
+            d.setBounds(0, 0, s, s)
+            d.draw(Canvas(b))
+        } catch (_: Exception) {}
+        return b
+    }
+
+    // Met à jour les infos de tous les dossiers posés, seulement là où elles ont changé (appelé en arrivant sur l'accueil).
+    private fun mettreAJourInfos(c: Context) {
+        val gestionnaire = AppWidgetManager.getInstance(c)
+        for (g in WidgetGroupe.groupesPoses(c)) {
+            if (g == WidgetTop.GROUPE || !etats.containsKey(g)) continue      // dossier pas encore dessiné : il le sera avec ses infos
+            val v = RemoteViews(c.packageName, R.layout.widget_dossier)
+            val resume = poserInfos(c, g, v)
+            if (resume == infosMontrees[g]) continue
+            for (id in WidgetGroupe.idsDuGroupe(c, g)) {
+                try { gestionnaire.partiallyUpdateAppWidget(id, v) } catch (_: Exception) {}
+            }
+            infosMontrees[g] = resume
+        }
     }
 
     // DEMANDE de mise à jour d'un dossier : on regarde (à part) si quelque chose a changé, et on redessine si besoin.
@@ -187,7 +248,7 @@ object WidgetDossier {
         val taille = Point()
         @Suppress("DEPRECATION") ecran.getRealSize(taille)
         val permis = 6.0 * taille.x * taille.y * 0.9
-        var px = min((42 * c.resources.displayMetrics.density).toInt(), sqrt(permis / (N * 4.0)).toInt()).coerceAtLeast(32)
+        var px = min((COTE_DP * c.resources.displayMetrics.density).toInt(), sqrt(permis / (N * 4.0)).toInt()).coerceAtLeast(32)
 
         for (essai in 0 until 3) {
             try {
@@ -277,6 +338,9 @@ object WidgetDossier {
             val maintenant = SystemClock.uptimeMillis()
             minuteur.postAtTime({
                 fil.execute {
+                    // (18/11) d'abord les infos utiles (instantané), puis les dossiers à redessiner s'il y en a
+                    try { if (enMarche) mettreAJourInfos(c) }
+                    catch (e: Exception) { Journal.noter(c, "ERREUR widget dossier (infos) : " + Journal.pile(e)) }
                     try { for (g in WidgetGroupe.groupesPoses(c)) if (enMarche && g != WidgetTop.GROUPE) construire(c, g, false) }
                     catch (e: Exception) { Journal.noter(c, "ERREUR widget dossier (accueil) : " + Journal.pile(e)) }
                 }
@@ -401,143 +465,173 @@ object WidgetDossier {
         }
 
 
-        // ============ (18/11) A · CARROUSEL ============
-        // Le logo fait son geste, puis rapetisse de moitié et reste au centre comme un moyeu. Les apps sortent de
-        // derrière lui sur un anneau INCLINÉ (une ellipse, vue en 3D), qui tourne doucement (42° par seconde : à
-        // 25 images par seconde, chaque image avance peu, donc ça reste coulé) et se balance un peu.
-        // La « profondeur » d'une app = où elle est sur l'anneau : devant (bas de l'ellipse) elle est grande, nette,
-        // avec une petite ombre ; derrière (haut) elle est petite, estompée, et passe DERRIÈRE le logo.
-        // À la fin, l'anneau se referme derrière le logo, qui reprend sa taille avec un ressort.
-        private val ordre = Array(icones.size) { it }
-        private val profondeur = FloatArray(icones.size)
-        private val posX = FloatArray(icones.size)
-        private val posY = FloatArray(icones.size)
-        fun carrousel(cv: Canvas, t: Double) {
-            val taille = cle(t, 0.0 to 1.0 by LIN, 0.9 to 1.06 by DOUX, 1.8 to 1.0 by DOUX, 2.5 to 0.5 by DOUX,
-                             10.2 to 0.5 by LIN, 11.2 to 1.0 by RESSORT)
-            val ouv = cle(t, 1.9 to 0.0 by LIN, 2.9 to 1.0 by DOUX, 9.9 to 1.0 by LIN, 10.8 to 0.0 by DOUX)
-            if (n == 0 || ouv <= 0.001) { logoSimple(cv, t, taille); return }
-            val ang = -Math.PI / 2 + Math.toRadians(42.0) * maxOf(0.0, t - 1.9) + Math.toRadians(30.0) * ouv
-            val rx = (if (n <= 1) 14.0 else 26.0) * ouv
-            val ry = (9.0 + 2.5 * sin(t * 0.9)) * ouv
-            val base = if (n <= 1) 24.0 else min(21.0, 2 * Math.PI * 27 / n * 0.66)
-            for (i in 0 until n) {
-                val a = ang + 2 * Math.PI * i / n
-                profondeur[i] = ((sin(a) + 1) / 2).toFloat()           // 0 = tout derrière, 1 = tout devant
-                posX[i] = (CX + rx * cos(a)).toFloat()
-                posY[i] = (50.0 + ry * sin(a)).toFloat()
-                ordre[i] = i
-            }
-            ordre.sortBy { profondeur[it] }                            // on dessine du fond vers l'avant
-            fun app(i: Int) {
-                val pr = profondeur[i]
-                val h = (base * (0.62 + 0.38 * pr) / 2 * (0.4 + 0.6 * ouv)).toFloat()
-                val alpha = ((0.45 + 0.55 * pr) * min(1.0, ouv * 3)).toFloat()
-                p.reset(); p.isAntiAlias = true; p.isFilterBitmap = true
-                if (pr > 0.5f) {                                       // une ombre douce sous les apps de devant
-                    p.color = Color.argb((0.18f * (pr - 0.5f) * 2 * ouv.toFloat() * 255).toInt(), 0, 0, 0)
-                    zone.set(posX[i] - h * 0.8f, posY[i] + h - 0.1f, posX[i] + h * 0.8f, posY[i] + h + 2.5f)
-                    cv.drawOval(zone, p)
-                }
-                p.alpha = (255 * alpha).toInt().coerceIn(0, 255)
-                zone.set(posX[i] - h, posY[i] - h, posX[i] + h, posY[i] + h)
-                cv.drawBitmap(icones[i], null, zone, p)
-            }
-            for (i in ordre) if (profondeur[i] < 0.5f) app(i)          // derrière le logo
-            logoSimple(cv, t, taille)
-            for (i in ordre) if (profondeur[i] >= 0.5f) app(i)         // devant le logo
-        }
+        // (18/11, correction) LE GESTE DU LOGO dans Carrousel et Mosaïque : le logo y reste VISIBLE pendant toute la
+        // boucle (en petit, ou en morceaux). Il joue donc son geste au début (0 -> 2,3 s), puis reste au repos avec
+        // son dessin COMPLET (0,3). Avant, les logos qui se tracent (Finance, Maps, Health, News) étaient remis à
+        // « vide » dès 2,3 s (pratique quand le logo disparaissait, mais là on le voyait se vider : le bug de Finance).
+        fun gesteVisible(t: Double): Double = if (t < 2.3) min(0.3 + t * 1.15, 2.9) else 0.3
 
-        // le logo, droit, à la taille demandée, avec son geste
-        fun logoSimple(cv: Canvas, t: Double, taille: Double) {
-            if (taille <= 0.001) return
+        // le logo, droit, à la taille demandée, avec son geste (alpha : 0 à 255, pour le faire disparaître en fondu)
+        fun logoSimple(cv: Canvas, t: Double, taille: Double, alpha: Int = 255) {
+            if (taille <= 0.001 || alpha <= 0) return
             cv.save()
             cv.scale(taille.toFloat(), taille.toFloat(), CX, CY)
-            LogosDossier.dessiner(cv, groupe, geste(t), teintes)
+            LogosDossier.dessiner(cv, groupe, gesteVisible(t), teintes, alpha)
             cv.restore()
         }
 
-        // ============ (18/11) B · MOSAÏQUE ============
-        // Le logo se FEND en tuiles, une à la place de chaque app : chaque tuile montre le morceau du logo qui tombe
-        // sur elle (le logo est étalé sur toute la grille). Une vague en diagonale (du coin en haut à gauche vers le
-        // coin en bas à droite) RETOURNE les tuiles : la tuile rétrécit en largeur jusqu'à n'être qu'un trait (on la
-        // voit de profil), s'assombrit, puis ré-élargit côté app. Un reflet doux traverse la grille deux fois, puis
-        // la vague repasse dans l'autre sens, les tuiles redeviennent le logo, qui se ressoude avec un petit ressort.
-        private val bord: FloatArray by lazy {                        // le carré qui contient la grille (gauche, haut, côté)
+        private val zone = RectF()
+        private val tuile = Path()
+
+        // ============ (18/11) A · CARROUSEL (v2, « grandes icônes ») ============
+        // Le logo fait son geste, puis devient tout petit au centre (un point de lumière). Les apps tournent autour
+        // sur un anneau INCLINÉ (une ellipse, vue en 3D) qui tourne doucement (36° par seconde : à 25 images par
+        // seconde, chaque image avance peu, donc ça reste coulé). Devant (bas de l'ellipse) : grandes, nettes, avec
+        // une petite ombre ; derrière (haut) : plus petites, un peu estompées, elles passent derrière le logo.
+        // AU PLUS 4 APPS sur l'anneau, pour qu'elles soient GRANDES. S'il y en a plus, chaque fois qu'une app passe
+        // tout au fond, elle s'efface et la suivante du dossier prend sa place : on voit défiler tout le dossier.
+        private val m = min(n, 4)
+        private val ordre = Array(m) { it }
+        private val profondeur = FloatArray(m)
+        private val posX = FloatArray(m)
+        private val posY = FloatArray(m)
+        private val quelle = IntArray(m)          // l'app montrée à chaque place de l'anneau
+        private val presence = FloatArray(m)      // 0 = effacée (le temps d'être remplacée), 1 = visible
+        fun carrousel(cv: Canvas, t: Double) {
+            val taille = cle(t, 0.0 to 1.0 by LIN, 0.9 to 1.06 by DOUX, 1.8 to 1.0 by DOUX, 2.6 to 0.3 by DOUX,
+                             10.1 to 0.3 by LIN, 11.2 to 1.0 by RESSORT)
+            val ouv = cle(t, 1.9 to 0.0 by LIN, 2.9 to 1.0 by DOUX, 9.9 to 1.0 by LIN, 10.8 to 0.0 by DOUX)
+            if (m == 0 || ouv <= 0.001) { logoSimple(cv, t, taille); return }
+            val avance = Math.toRadians(36.0) * maxOf(0.0, t - 1.9) + Math.toRadians(30.0) * ouv
+            val rx = (if (m <= 1) 10.0 else 25.0) * ouv
+            val ry = (if (m <= 1) 5.0 else 15.0 + 1.5 * sin(t * 0.8)) * ouv
+            val base = when (m) { 1 -> 50.0; 2 -> 34.0; else -> min(34.0, 2 * Math.PI * 25 / m * 0.8) }
+            for (k in 0 until m) {
+                val tourne = avance + 2 * Math.PI * k / m
+                val a = -Math.PI / 2 + tourne
+                profondeur[k] = ((sin(a) + 1) / 2).toFloat()           // 0 = tout au fond, 1 = tout devant
+                posX[k] = (CX + rx * cos(a)).toFloat()
+                posY[k] = (49.0 + ry * sin(a)).toFloat()
+                // le nombre de tours faits par cette place = combien de fois elle est passée au fond
+                val tours = kotlin.math.floor(tourne / (2 * Math.PI)).toInt()
+                quelle[k] = if (n > m) (k + tours * m) % n else k
+                presence[k] = if (n > m) min(1f, profondeur[k] * 6f) else 1f
+                ordre[k] = k
+            }
+            ordre.sortBy { profondeur[it] }                            // on dessine du fond vers l'avant
+            fun app(k: Int) {
+                val pr = profondeur[k]
+                val h = (base * (0.66 + 0.34 * pr) / 2 * (0.35 + 0.65 * ouv)).toFloat()
+                val alpha = ((0.62 + 0.38 * pr) * min(1.0, ouv * 3) * presence[k]).toFloat()
+                if (alpha <= 0.004f) return
+                p.reset(); p.isAntiAlias = true; p.isFilterBitmap = true
+                if (pr > 0.5f) {                                       // une ombre douce sous les apps de devant
+                    p.color = Color.argb((0.22f * (pr - 0.5f) * 2 * ouv.toFloat() * 255).toInt(), 0, 0, 0)
+                    zone.set(posX[k] - h * 0.75f, posY[k] + h - 0.4f, posX[k] + h * 0.75f, posY[k] + h + 2.4f)
+                    cv.drawOval(zone, p)
+                }
+                p.alpha = (255 * alpha).toInt().coerceIn(0, 255)
+                zone.set(posX[k] - h, posY[k] - h, posX[k] + h, posY[k] + h)
+                cv.drawBitmap(icones[quelle[k]], null, zone, p)
+            }
+            for (k in ordre) if (profondeur[k] < 0.5f) app(k)          // derrière le logo
+            logoSimple(cv, t, taille)
+            for (k in ordre) if (profondeur[k] >= 0.5f) app(k)         // devant le logo
+        }
+
+        // ============ (18/11) B · MOSAÏQUE (v2, « grandes icônes ») ============
+        // Le logo se FEND en tuiles : au plus 4 (2 x 2), pour qu'elles soient GRANDES. Chaque tuile montre le morceau
+        // du logo qui tombe sur elle. Une vague en diagonale RETOURNE les tuiles : la tuile rétrécit en largeur jusqu'à
+        // n'être qu'un trait (on la voit de profil), s'assombrit, puis ré-élargit de l'autre côté.
+        // Les retournements servent aussi de PAGES : logo -> apps 1 à 4 -> apps 5 à 8 -> app 9 -> logo. Une tuile sans
+        // app sur une page (ex. la page de l'app 9 seule) montre son morceau de logo.
+        // (correction du saut) Au moment de la fente, toute la grille est ramenée à la TAILLE DU LOGO : les morceaux
+        // tombent pile sur le logo, collés entre eux ; puis la grille grandit jusqu'à sa vraie taille et les espaces
+        // s'ouvrent. Le logo entier reste dessous et s'efface en douceur (les tuiles ne le couvrent pas forcément tout).
+        private val pages = maxOf(1, (n + 3) / 4)
+        private val nb = min(n, 4).coerceAtLeast(1)
+        private val coteT = if (nb == 1) 54f else 37f                  // le côté d'une tuile
+        private val placesT: List<FloatArray> = run {
+            val d = (coteT + 3f) / 2
+            when (nb) {
+                1 -> listOf(floatArrayOf(CX, CY))
+                2 -> listOf(floatArrayOf(CX - d, CY), floatArrayOf(CX + d, CY))
+                3 -> listOf(floatArrayOf(CX - d, CY - d), floatArrayOf(CX + d, CY - d), floatArrayOf(CX, CY + d))
+                else -> listOf(floatArrayOf(CX - d, CY - d), floatArrayOf(CX + d, CY - d), floatArrayOf(CX - d, CY + d), floatArrayOf(CX + d, CY + d))
+            }
+        }
+        // le carré qui contient la grille : gauche, haut, droite, bas, et son côté
+        private val bord: FloatArray = run {
             var x0 = 1e9f; var y0 = 1e9f; var x1 = -1e9f; var y1 = -1e9f
-            for (pl in places) {
-                x0 = min(x0, pl[0] - cote / 2); y0 = min(y0, pl[1] - cote / 2)
-                x1 = maxOf(x1, pl[0] + cote / 2); y1 = maxOf(y1, pl[1] + cote / 2)
+            for (pl in placesT) {
+                x0 = min(x0, pl[0] - coteT / 2); y0 = min(y0, pl[1] - coteT / 2)
+                x1 = maxOf(x1, pl[0] + coteT / 2); y1 = maxOf(y1, pl[1] + coteT / 2)
             }
             floatArrayOf(x0, y0, x1, y1, maxOf(x1 - x0, y1 - y0))
         }
-        private val tuile = Path()
+        // ce que montre la tuile j après le retournement numéro f : -1 = son morceau de logo, sinon le numéro de l'app
+        private fun face(f: Int, j: Int): Int {
+            if (f <= 0 || f > pages) return -1
+            val a = (f - 1) * 4 + j
+            return if (a < n) a else -1
+        }
         fun mosaique(cv: Canvas, t: Double) {
             val taille = cle(t, 0.0 to 1.0 by LIN, 0.9 to 1.05 by DOUX, 1.8 to 1.0 by DOUX,
                              11.1 to 1.0 by LIN, 11.35 to 1.06 by DEC, 11.7 to 1.0 by DOUX)
             val fendu = cle(t, 2.1 to 0.0 by LIN, 2.7 to 1.0 by DOUX, 10.5 to 1.0 by LIN, 11.1 to 0.0 by DOUX).toFloat()
             if (n == 0 || fendu <= 0.001f) { logoSimple(cv, t, taille); return }
-            val g = geste(t)
-            val (x0, y0, x1, y1, s) = bord
+            // le logo entier, dessous, qui s'efface en douceur
+            val lisse = fendu * fendu * (3 - 2 * fendu)
+            logoSimple(cv, t, taille, (255 * (1 - lisse)).toInt())
+            val g = gesteVisible(t)
+            val x0 = bord[0]; val y0 = bord[1]; val x1 = bord[2]; val y1 = bord[3]; val s = bord[4]
             val k2 = s / 52f                     // le logo (52 unités utiles, de 24 à 76) étalé sur toute la grille
-            for (i in 0 until n) {
-                val px = places[i][0]; val py = places[i][1]
-                val diag = ((px - x0) / (x1 - x0 + 0.01f) + (py - y0) / (y1 - y0 + 0.01f)) * 0.35
-                val aller = cle(t, (2.9 + diag) to 0.0 by LIN, (3.45 + diag) to 1.0 by DOUX)
-                val retour = cle(t, (9.4 + 0.7 - diag) to 0.0 by LIN, (9.95 + 0.7 - diag) to 1.0 by DOUX)
-                val ang = Math.PI * maxOf(0.0, aller - retour)          // 0 = côté logo, PI = côté app
+            val zoomG = 52f / s + (1 - 52f / s) * lisse     // la grille : taille du logo -> sa vraie taille
+            val pas = 6.5 / pages                // le temps entre deux retournements
+            for (j in 0 until nb) {
+                val px = placesT[j][0]; val py = placesT[j][1]
+                val diag = ((px - x0) / (x1 - x0 + 0.01f) + (py - y0) / (y1 - y0 + 0.01f)) * 0.3
+                // où en est cette tuile : le dernier retournement commencé (f) et son avancement (0 à 1)
+                var f = -1; var prog = 1.0
+                for (q in 0..pages) {
+                    val t0 = 2.9 + q * pas + diag
+                    if (t >= t0) { f = q; prog = ((t - t0) / 0.55).coerceIn(0.0, 1.0) }
+                }
+                val ang = Math.PI * DOUX(prog)                       // 0 -> PI : un demi-tour
+                val montre = if (f < 0) -1 else if (ang < Math.PI / 2) face(f, j) else face(f + 1, j)
                 val sn = sin(ang).toFloat()
                 val largeur = maxOf(0.02f, kotlin.math.abs(cos(ang)).toFloat())
-                val h = cote / 2 * (1 + 0.08f * sn)                      // la tuile se soulève un peu en se retournant
-                // pendant la fente, les tuiles partent d'un peu plus près du centre et s'écartent jusqu'à leur place
-                val cx = CX + (px - CX) * (0.86f + 0.14f * fendu)
-                val cy = CY + (py - CY) * (0.86f + 0.14f * fendu)
+                val h = (coteT / 2 + 1.5f * (1 - fendu)) * (1 + 0.06f * sn)   // collées au départ, puis l'espace s'ouvre
+                val cx = CX + (px - CX) * zoomG
+                val cy = CY + (py - CY) * zoomG
                 cv.save()
                 cv.translate(cx, cy)
-                cv.scale(largeur, 1f)
+                cv.scale(largeur * zoomG, zoomG)
                 tuile.reset()
-                if (ang < Math.PI / 2) {
-                    // le morceau de logo (les coins s'arrondissent à mesure que la tuile se détache)
-                    tuile.addRoundRect(-h, -h, h, h, h * 0.5f * fendu + 0.01f, h * 0.5f * fendu + 0.01f, Path.Direction.CW)
+                p.reset(); p.isAntiAlias = true; p.isFilterBitmap = true
+                if (montre < 0) {
+                    // le morceau de logo : on découpe la tuile, puis on y dessine le logo étalé sur toute la grille
+                    tuile.addRoundRect(-h, -h, h, h, h * 0.45f * fendu + 0.01f, h * 0.45f * fendu + 0.01f, Path.Direction.CW)
                     cv.save()
                     cv.clipPath(tuile)
-                    cv.scale(h * 2 / cote, h * 2 / cote)
                     cv.translate(-px, -py)
-                    // le repère du logo, posé pour que son carré utile couvre toute la grille
                     cv.translate(CX - s / 2, CY - s / 2); cv.scale(k2, k2); cv.translate(-24f, -22f)
                     LogosDossier.dessiner(cv, groupe, g, teintes)
                     cv.restore()
-                    // la tuile s'assombrit en se retournant, et un liseré la détache de ses voisines
-                    p.reset(); p.isAntiAlias = true
-                    p.color = Color.argb((0.35f * sn * 255).toInt(), 0, 0, 0)
-                    cv.drawPath(tuile, p)
-                    p.style = Paint.Style.STROKE; p.strokeWidth = 0.6f
-                    p.color = Color.argb((0.18f * fendu * 255).toInt(), 255, 255, 255)
+                    p.color = Color.argb((0.35f * sn * 255).toInt(), 0, 0, 0)       // elle s'assombrit en tournant
                     cv.drawPath(tuile, p)
                 } else {
-                    p.reset(); p.isAntiAlias = true; p.isFilterBitmap = true
                     zone.set(-h, -h, h, h)
-                    cv.drawBitmap(icones[i], null, zone, p)
-                    // le reflet : une bande de lumière douce qui traverse la grille en diagonale (6,3 s et 8,0 s)
-                    for (r0 in doubleArrayOf(6.3, 8.0)) {
-                        val u = ((t - r0) / 1.1 - diag / 0.35 * 0.25).toFloat()
-                        if (u <= 0f || u >= 1f) continue
-                        cv.save()
-                        tuile.reset(); tuile.addRoundRect(-h * 0.88f, -h * 0.88f, h * 0.88f, h * 0.88f, h * 0.52f, h * 0.52f, Path.Direction.CW)
-                        cv.clipPath(tuile)
-                        val bx = -2 * h + 4 * h * u
-                        p.shader = android.graphics.LinearGradient(bx - h, -h, bx + h, h,
-                            intArrayOf(Color.TRANSPARENT, Color.argb(41, 255, 255, 255), Color.TRANSPARENT), null,
-                            android.graphics.Shader.TileMode.CLAMP)
-                        cv.drawRect(-h, -h, h, h, p)
-                        p.shader = null
-                        cv.restore()
+                    cv.drawBitmap(icones[montre], null, zone, p)
+                    if (sn > 0.01f) {
+                        tuile.addRoundRect(-h * 0.88f, -h * 0.88f, h * 0.88f, h * 0.88f, h * 0.52f, h * 0.52f, Path.Direction.CW)
+                        p.color = Color.argb((0.3f * sn * 255).toInt(), 0, 0, 0)
+                        cv.drawPath(tuile, p)
                     }
                 }
                 cv.restore()
             }
         }
-        private val zone = RectF()
 
         // ============ L'ANCIENNE BOUCLE (style ANCIENNE, plus tirée depuis le 18/11) ============
         // l'anneau : il se trace (3,8 s) puis s'efface (5,4 s) derrière les points

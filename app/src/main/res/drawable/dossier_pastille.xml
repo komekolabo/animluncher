@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- (18/11) LA PASTILLE « apps ouvertes » posée en haut à droite du widget dossier : une petite gélule sombre,
+     avec un liseré vert très léger (le vert du point « Open » de l'écran du dossier). -->
+<shape xmlns:android="http://schemas.android.com/apk/res/android" android:shape="rectangle">
+    <solid android:color="#D60E1612" />
+    <stroke android:width="0.6dp" android:color="#595BD08A" />
+    <corners android:radius="6dp" />
+</shape>

@@ -39,16 +39,17 @@
             android:indeterminateOnly="true"
             android:indeterminateDrawable="@drawable/dossier_lueur_anime" />
 
-        <!-- le folioscope ne couvre que le MILIEU du galet (42 dp sur 62, centré sur l'étoile) : tout ce qui
-             bouge y tient, et chaque image pèse 2 fois moins -> 25 images par seconde (une toutes les 40 ms) -->
+        <!-- le folioscope ne couvre que le MILIEU du galet (54 dp sur 62 depuis le 18/11, 42 avant ; centré sur
+             l'étoile, qui est à 31 dp du bord gauche et 29,76 dp du haut) : tout ce qui bouge y tient -> 25 images par
+             seconde (une toutes les 40 ms) -->
         <ViewFlipper
             android:id="@+id/dossier_film"
-            android:layout_width="42dp"
-            android:layout_height="42dp"
+            android:layout_width="54dp"
+            android:layout_height="54dp"
             android:layout_gravity="top|start"
-            android:layout_marginStart="10dp"
-            android:layout_marginLeft="10dp"
-            android:layout_marginTop="8.76dp"
+            android:layout_marginStart="4dp"
+            android:layout_marginLeft="4dp"
+            android:layout_marginTop="2.76dp"
             android:autoStart="true"
             android:flipInterval="40" />
 
@@ -63,6 +64,65 @@
             android:indeterminate="true"
             android:indeterminateOnly="true"
             android:indeterminateDrawable="@drawable/widget_galet_reflet_anime" />
+
+        <!-- (18/11) LES INFOS UTILES, par-dessus la boucle. Ce sont des vues à part (pas dans les 300 images) :
+             les mettre à jour est instantané (voir WidgetDossier.poserInfos).
+             En haut à droite : le nombre d'apps du dossier encore OUVERTES (point vert + chiffre), cachée s'il n'y en a pas. -->
+        <LinearLayout
+            android:id="@+id/dossier_ouvertes"
+            android:layout_width="wrap_content"
+            android:layout_height="11dp"
+            android:layout_gravity="top|end"
+            android:layout_marginTop="2dp"
+            android:layout_marginEnd="2dp"
+            android:layout_marginRight="2dp"
+            android:background="@drawable/dossier_pastille"
+            android:gravity="center_vertical"
+            android:orientation="horizontal"
+            android:paddingStart="3dp"
+            android:paddingLeft="3dp"
+            android:paddingEnd="4dp"
+            android:paddingRight="4dp"
+            android:visibility="gone">
+
+            <ImageView
+                android:layout_width="4dp"
+                android:layout_height="4dp"
+                android:src="@drawable/dossier_point_vert" />
+
+            <TextView
+                android:id="@+id/dossier_ouvertes_nb"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginStart="2dp"
+                android:layout_marginLeft="2dp"
+                android:includeFontPadding="false"
+                android:text="1"
+                android:textColor="#E1F5E8"
+                android:textSize="8sp"
+                android:textStyle="bold" />
+        </LinearLayout>
+
+        <!-- En bas à droite : l'icône de la DERNIÈRE app utilisée du dossier, dans un petit rond (cachée pour un
+             dossier d'une seule app, et tant qu'aucune n'a été ouverte). -->
+        <FrameLayout
+            android:id="@+id/dossier_derniere"
+            android:layout_width="16dp"
+            android:layout_height="16dp"
+            android:layout_gravity="bottom|end"
+            android:layout_marginEnd="1dp"
+            android:layout_marginRight="1dp"
+            android:layout_marginBottom="1dp"
+            android:background="@drawable/dossier_rond"
+            android:visibility="gone">
+
+            <ImageView
+                android:id="@+id/dossier_derniere_icone"
+                android:layout_width="11dp"
+                android:layout_height="11dp"
+                android:layout_gravity="center"
+                android:scaleType="fitCenter" />
+        </FrameLayout>
     </FrameLayout>
 
     <TextView

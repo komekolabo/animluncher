@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- (18/11) le petit rond sombre, en bas à droite du widget dossier, qui contient l'icône de la dernière app utilisée -->
+<shape xmlns:android="http://schemas.android.com/apk/res/android" android:shape="oval">
+    <solid android:color="#C40A0A0E" />
+    <stroke android:width="0.6dp" android:color="#33FFFFFF" />
+</shape>
