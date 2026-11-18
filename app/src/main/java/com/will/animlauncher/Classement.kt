@@ -120,13 +120,24 @@ object Classement {
         // 5. un rôle proposé à Android
         val t = if (c != null) tables(c) else null
         t?.roles?.get(pkg)?.let { return it to ROLE }
-        // 6. les mots du nom
-        parMots(mots(nom))?.let { return it to NOM }
+        // 6. les mots du nom. (18/11) Le nom de l'APP et le nom de son ICÔNE peuvent être différents : l'app
+        //    « microG Services » a une icône « Paramètres de microG ». On regarde donc les deux.
+        parMots(mots(nom) + mots(nomIcone(c, pkg)))?.let { return it to NOM }
         // 7. les mots du nom technique (sans les morceaux qui ne veulent rien dire : « com », « android »…)
         parMots(p.split(Regex("[^a-z0-9]+")).filter { it.length >= 3 && it !in VIDES })?.let { return it to PAQUET }
         // 8. un service typique
         t?.services?.get(pkg)?.let { return it to SERVICE }
         return null
+    }
+
+    // Le nom affiché sous l'icône de l'app (celui de son écran de départ), ou "" si on ne le trouve pas.
+    private fun nomIcone(c: Context?, pkg: String): String {
+        if (c == null) return ""
+        return try {
+            val pm = c.packageManager
+            val intention = pm.getLaunchIntentForPackage(pkg) ?: return ""
+            pm.resolveActivity(intention, 0)?.loadLabel(pm)?.toString() ?: ""
+        } catch (_: Exception) { "" }
     }
 
     // Le nom découpé en mots, en minuscules et sans accents : « Éditeur Photo » → [« editeur », « photo »].
@@ -288,7 +299,11 @@ object Classement {
         editeurs("infos", "com.google.android.apps.magazines", "fr.lemonde.", "fr.playsoft.lefigaro", "com.cnn.",
             "bbc.", "uk.co.bbc.", "flipboard.", "com.android.chrome", "org.mozilla.", "com.opera.", "com.brave.",
             "com.microsoft.emmx", "com.sec.android.app.sbrowser", "com.duckduckgo.", "com.accuweather.",
-            "com.weather.", "fr.meteo", "com.meteofrance", "fr.francetv.")
+            "com.weather.", "fr.meteo", "com.meteofrance", "fr.francetv.", "com.fivemobile.thescore", "com.espn.",
+            "fr.lequipe.", "com.onefootball.", "com.sofascore.", "com.flashscore.") +
+        // (18/11) les eSIM de voyage, et les apps nature (on photographie une plante, un oiseau…)
+        editeurs("trajets", "com.saily.", "com.airalo.", "com.holafly.") +
+        editeurs("photo", "org.inaturalist.", "com.plantnet", "cn.danatech.xingseus", "org.ebird.", "com.labs.merlinbirdid")
     ).toMap()
 
     // 6 et 7. Les mots-clés, EN PLUS de ceux de Groupes.kt. Un mot-clé compte s'il COMMENCE un mot du nom
@@ -306,7 +321,7 @@ object Classement {
             "playlist", "concert", "replay"),
         "photo" to setOf("photo", "foto", "camera", "gallery", "galerie", "image", "picture", "selfie", "snapseed",
             "lightroom", "picsart", "canva", "collage", "draw", "paint", "dessin", "sketch", "wallpaper", "retouche",
-            "filtre", "filter"),
+            "filtre", "filter", "nature", "inaturalist", "plant", "bird", "oiseau", "flore", "faune"),
         "jeux" to setOf("game", "jeu", "chess", "echec", "puzzle", "quest", "craft", "clash", "battle", "royale",
             "legend", "hero", "dungeon", "racing", "football", "soccer", "fifa", "minecraft", "roblox", "sudoku",
             "solitaire", "tetris", "mario", "pokemon", "casino", "arcade", "simulat", "tycoon", "idle", "rpg", "kart",
@@ -318,7 +333,7 @@ object Classement {
         "trajets" to setOf("map", "gps", "navigation", "transport", "train", "sncf", "tram", "taxi", "uber", "bolt",
             "vtc", "flight", "airline", "airport", "aeroport", "booking", "hotel", "travel", "voyage", "trip", "trajet",
             "itineraire", "parking", "velo", "bike", "scooter", "trottinette", "blablacar", "waze", "citymapper", "ratp",
-            "billet", "ticket"),
+            "billet", "ticket", "esim", "roaming", "saily", "airalo", "holafly"),
         "travail" to setOf("office", "word", "excel", "powerpoint", "docs", "document", "sheet", "drive", "cloud",
             "note", "todo", "task", "tache", "agenda", "calendar", "calendrier", "mail", "outlook", "teams", "slack",
             "zoom", "notion", "trello", "scan", "pdf", "file", "fichier", "dropbox", "onedrive", "keep", "memo",
@@ -337,6 +352,7 @@ object Classement {
             "systeme", "update"),
         "infos" to setOf("journal", "presse", "press", "monde", "figaro", "liberation", "franceinfo", "bfm", "cnn",
             "bbc", "reuters", "magazine", "flipboard", "feed", "rss", "meteo", "weather", "wiki", "browser",
-            "navigateur", "chrome", "firefox", "opera", "brave", "internet", "duckduckgo", "actualit", "headline"),
+            "navigateur", "chrome", "firefox", "opera", "brave", "internet", "duckduckgo", "actualit", "headline",
+            "sport", "score", "thescore", "espn", "lequipe", "onefootball", "sofascore", "flashscore", "ligue"),
     )
 }
