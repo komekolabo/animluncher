@@ -148,3 +148,6 @@ de chaque fichier envoyé). Au prochain passage tranquille, ces notes pourront �
   (les 9 images de Will, nom traduit `gal_pret_paysages`). Les images restent aussi dans leurs catégories (git ne stocke qu'une fois).
   Will ne voyait pas la carte (liste gardée 6 h, lue avant la création du dossier) -> la liste est redemandée après chaque
   nouvelle installation de l'app (`arbre_version` = lastUpdateTime).
+- (19/11) FOND « DOSSIER » : change aussi à CHAQUE APPUI sur une app (icône, widget, dossier animé), même déjà ouverte
+  (`DossierFond.avancerAuClic`, appelé dans `AppWatcherService.clic` et `depuisDossier`) ; Will trouvait qu'il ne changeait
+  qu'au démarrage des apps. Le changement « fond caché 0,4 s » reste (écran éteint…), le verrou de 1,5 s évite un double saut.

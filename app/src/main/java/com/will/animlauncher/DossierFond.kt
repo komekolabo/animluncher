@@ -87,6 +87,23 @@ object DossierFond {
         e.putString(COURANT, suivant).apply()
     }
 
+    // (19/11, demande de Will) CHANGER DE FOND À CHAQUE APPUI SUR UNE APP : appelé par le service d'accessibilité
+    // dès qu'on touche l'icône d'une app (ou une app d'un dossier animé), même si l'app était déjà ouverte en
+    // arrière-plan. Avant, le fond ne changeait que quand Android le signalait « caché », ce qui n'arrivait pas
+    // toujours quand on rouvrait une app déjà ouverte.
+    // On ne fait rien si le fond du téléphone n'est pas notre « dossier » (pas la peine de mélanger son ordre).
+    // C'est fait dans un fil à part : demander le fond actuel à Android ne doit pas retarder l'animation.
+    // (Si le fond se cache juste après, le changement « caché » est ignoré : avancer() refuse deux changements
+    // en moins de 1,5 s. On ne saute donc pas deux images d'un coup.)
+    fun avancerAuClic(c: Context) {
+        Thread {
+            try {
+                val voulu = ComponentName(c, FondDossierService::class.java)
+                if (WallpaperManager.getInstance(c).wallpaperInfo?.component == voulu) avancer(c)
+            } catch (_: Exception) {}
+        }.start()
+    }
+
     // (17/11) Le son de CETTE vidéo est-il coupé ? (par défaut : non, elle suit le réglage général)
     const val MUETTES = "muettes"
     fun estMuette(c: Context, f: File): Boolean = carnet(c).getStringSet(MUETTES, emptySet())?.contains(f.name) == true

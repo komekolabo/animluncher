@@ -208,6 +208,9 @@ class AppWatcherService : AccessibilityService() {
             noter("clic accueil « ${textes.joinToString(" / ")} » : pas une app connue")
             return
         }
+        // (19/11) un appui sur une app = le fond « dossier » passe au suivant, même si l'app était déjà ouverte,
+        // et même si l'app n'a pas d'animation (voir DossierFond.avancerAuClic)
+        DossierFond.avancerAuClic(this)
         if (app in ignorees) return
         if (!Reglages.actif(this)) return
         if (Catalogue.pour(app) == null) return
@@ -957,6 +960,7 @@ class AppWatcherService : AccessibilityService() {
                 quitteeA = SystemClock.uptimeMillis()
                 derniereApp = accueil
             }
+            DossierFond.avancerAuClic(this)          // (19/11) le fond « dossier » change à chaque appui sur une app
             if (!Reglages.actif(this)) return
             val lancement = Catalogue.lancement(this, app)
             if (lancement == null) { noter("dossier -> $app : pas d'animation"); return }
